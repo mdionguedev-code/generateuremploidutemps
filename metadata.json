@@ -1,0 +1,6 @@
+{
+  "name": "Diongue-IziSchool Timetable Generator",
+  "description": "Architecte d'emploi du temps intelligent et automatisé utilisant un solveur de contraintes et l'IA Gemini pour Diongue-IziSchool.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,535 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #5A45FF;
+  --color-secondary: #00E5FF;
+  --color-background-light: #F8F9FA;
+  --color-background-dark: #0B0E14;
+  --color-surface-dark: #161B26;
+  --color-surface-darker: #1A1E29;
+}
+
+/* ==========================================================================
+   GLASSMORPHISM & GENERAL STYLES (DARK/DEFAULT MODE)
+   ========================================================================== */
+@layer utilities {
+  .bg-glass {
+    background-color: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  
+  .bg-glass-heavy {
+    background-color: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  .border-glass {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .border-glass-glow {
+    border-color: rgba(59, 130, 246, 0.25);
+  }
+
+  .shadow-glass {
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  }
+}
+
+/* ==========================================================================
+   DYNAMIC TILE LUMINOUS GLOW ANIMATION (AESTHETIC VIBRANCY CODES)
+   ========================================================================== */
+@keyframes tile-glow {
+  0%, 100% {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 0 5px 0.5px var(--tile-glow-rgba-low, rgba(99, 102, 241, 0.15));
+  }
+  50% {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 0 12px 3px var(--tile-glow-rgba-high, rgba(99, 102, 241, 0.45));
+  }
+}
+
+@keyframes tile-glow-light {
+  0%, 100% {
+    box-shadow: 0 2px 4px rgba(15, 23, 42, 0.02), 0 0 4px 0.5px var(--tile-glow-rgba-low, rgba(99, 102, 241, 0.1));
+  }
+  50% {
+    box-shadow: 0 6px 12px rgba(15, 23, 42, 0.05), 0 0 10px 2.5px var(--tile-glow-rgba-high, rgba(99, 102, 241, 0.28));
+  }
+}
+
+.tile-glow-active {
+  animation: none !important;
+  box-shadow: none !important;
+}
+
+.tile-glow-active:hover {
+  animation-play-state: paused;
+  transform: none !important;
+}
+
+body.light .tile-glow-active {
+  animation: none !important;
+  box-shadow: none !important;
+}
+
+body.light .tile-glow-active:hover {
+  animation-play-state: paused;
+  transform: none !important;
+}
+
+/* Custom premium scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.3);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Base Body Styles (Twilight Dark Mode) */
+body {
+  background: radial-gradient(circle at 50% 0%, #0a0a0f 0%, #020204 100%) !important;
+  color: #f3f4f6;
+  min-height: 100vh;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  transition: background-color 0.3s ease, background 0.3s ease, border-color 0.3s ease, color 0.2s ease, box-shadow 0.3s ease;
+}
+
+/* ==========================================================================
+   PREMIUM LIGHT THEME SUITE
+   ========================================================================== */
+body.light {
+  background: radial-gradient(circle at 50% 0%, #f8fafc 0%, #e2e8f0 100%) !important;
+  color: #0f172a !important;
+}
+
+/* 1. Global Typography Contrast Refinements */
+body.light h1:not(.text-white):not([class*="text-white"]),
+body.light h2:not(.text-white):not([class*="text-white"]),
+body.light h3:not(.text-white):not([class*="text-white"]),
+body.light h4:not(.text-white):not([class*="text-white"]),
+body.light h5:not(.text-white):not([class*="text-white"]),
+body.light h6:not(.text-white):not([class*="text-white"]) {
+  color: #0f172a !important;
+}
+
+/* Remap generic utility gray levels to high contrast equivalents */
+body.light .text-white:not(
+  button.bg-gradient-to-r,
+  button[class*="bg-indigo-"],
+  button[class*="bg-emerald-"],
+  button[class*="bg-purple-"],
+  button[class*="bg-rose-"],
+  button[class*="bg-red-"],
+  .btn-primary,
+  [class*="from-indigo-"],
+  [class*="from-purple-"],
+  [class*="from-emerald-"],
+  [class*="from-teal-"],
+  [class*="bg-indigo-500"],
+  [class*="bg-indigo-600"],
+  [class*="bg-emerald-500"],
+  [class*="bg-emerald-600"],
+  [class*="bg-purple-600"],
+  [class*="bg-red-600"],
+  [class*="bg-slate-800"]
+) {
+  color: #0f172a !important;
+}
+
+body.light .text-gray-100 { color: #0f172a !important; }
+body.light .text-gray-200 { color: #1e293b !important; }
+body.light .text-gray-300 { color: #334155 !important; } /* slate-700 */
+body.light .text-gray-400 { color: #475569 !important; } /* slate-600 */
+body.light .text-gray-500 { color: #64748b !important; } /* slate-500 */
+
+body.light .text-slate-100 { color: #0f172a !important; }
+body.light .text-slate-200 { color: #1e293b !important; }
+body.light .text-slate-300 { color: #334155 !important; }
+body.light .text-slate-400 { color: #475569 !important; }
+body.light .text-slate-500 { color: #64748b !important; }
+
+/* Keep light texts beautifully colored on custom dark/neon colored accents */
+body.light .text-indigo-400 { color: #4f46e5 !important; }
+body.light .text-indigo-300 { color: #4338ca !important; }
+body.light .text-indigo-200 { color: #3730a3 !important; }
+
+body.light .text-purple-400 { color: #9333ea !important; }
+body.light .text-purple-300 { color: #7e22ce !important; }
+
+body.light .text-emerald-400 { color: #059669 !important; }
+body.light .text-emerald-300 { color: #047857 !important; }
+body.light .text-emerald-200 { color: #065f46 !important; }
+
+body.light .text-teal-400 { color: #0d9488 !important; }
+body.light .text-teal-300 { color: #0f766e !important; }
+
+body.light .text-pink-400 { color: #db2777 !important; }
+body.light .text-amber-400 { color: #d97706 !important; }
+body.light .text-amber-300 { color: #b45309 !important; }
+
+body.light .text-rose-400,
+body.light .text-red-400 { color: #dc2626 !important; }
+body.light .text-rose-300,
+body.light .text-red-300 { color: #b91c1c !important; }
+
+body.light .text-blue-400 { color: #2563eb !important; }
+body.light .text-cyan-400 { color: #0891b2 !important; }
+
+/* 2. Professional Card Surfaces & Borders */
+body.light [class*="bg-slate-900"],
+body.light .bg-slate-900,
+body.light .bg-glass,
+body.light .bg-glass-heavy {
+  background-color: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-color: rgba(15, 23, 42, 0.1) !important;
+  box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.05), 0 2px 4px -1px rgba(15, 23, 42, 0.03) !important;
+}
+
+body.light [class*="border-white/"],
+body.light [class*="border-slate-800"],
+body.light [class*="border-slate-900"],
+body.light .border-glass {
+  border-color: rgba(15, 23, 42, 0.1) !important;
+}
+
+body.light .shadow-glass {
+  box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.05), 0 4px 6px -2px rgba(15, 23, 42, 0.02) !important;
+}
+
+/* 3. Dropdown Panels & Nesting slots */
+body.light [class*="bg-slate-950"]:not(.fixed.inset-0):not([class*="fixed"]),
+body.light [class*="bg-black"]:not(.fixed.inset-0):not([class*="fixed"]),
+body.light [class*="bg-slate-800"]:not(.fixed.inset-0):not([class*="fixed"]) {
+  background-color: #f1f5f9 !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+  color: #0f172a !important;
+}
+
+/* Fixed Overlay Backdrops (modals) */
+body.light div.fixed.inset-0 {
+  background-color: rgba(15, 23, 42, 0.6) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+/* Modal Content Box inside fixed overlays */
+body.light .fixed.inset-0 [class*="bg-slate-900"],
+body.light .fixed.inset-0 [class*="bg-slate-950"] {
+  background-color: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25) !important;
+}
+
+/* Track container for stats progress bars */
+body.light .bg-slate-950 .rounded-full,
+body.light [class*="bg-slate-950"].rounded-full {
+  background-color: #e2e8f0 !important;
+}
+
+/* 4. Soft Pastel Pill Badges */
+body.light [class*="bg-indigo-500/"],
+body.light [class*="bg-indigo-600/"] {
+  background-color: #e0e7ff !important;
+  border-color: #c7d2fe !important;
+  color: #3730a3 !important;
+}
+
+body.light [class*="bg-emerald-500/"],
+body.light [class*="bg-emerald-600/"] {
+  background-color: #d1fae5 !important;
+  border-color: #a7f3d0 !important;
+  color: #047857 !important;
+}
+
+body.light [class*="bg-amber-500/"] {
+  background-color: #fef3c7 !important;
+  border-color: #fde68a !important;
+  color: #b45309 !important;
+}
+
+body.light [class*="bg-rose-500/"],
+body.light [class*="bg-red-500/"] {
+  background-color: #ffe4e6 !important;
+  border-color: #fecdd3 !important;
+  color: #be123c !important;
+}
+
+body.light [class*="bg-purple-500/"],
+body.light [class*="bg-purple-600/"] {
+  background-color: #f3e8ff !important;
+  border-color: #e9d5ff !important;
+  color: #6b21a8 !important;
+}
+
+body.light [class*="bg-teal-500/"] {
+  background-color: #ccfbf1 !important;
+  border-color: #99f6e4 !important;
+  color: #0f766e !important;
+}
+
+/* 5. Interactive White/Ghost buttons in Light Mode */
+body.light [class*="bg-white/5"],
+body.light [class*="bg-white/10"] {
+  background-color: #f1f5f9 !important;
+  border-color: rgba(15, 23, 42, 0.1) !important;
+  color: #1e293b !important;
+}
+
+body.light [class*="hover:bg-white/5"]:hover,
+body.light [class*="hover:bg-white/10"]:hover,
+body.light [class*="hover:bg-white/20"]:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* 6. Timetable Spreadsheets & Grid Controls */
+body.light table {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+body.light th {
+  color: #1e293b !important;
+  background-color: #f1f5f9 !important;
+}
+
+body.light tr {
+  border-color: #e2e8f0 !important;
+}
+
+body.light tr[class*="bg-slate-950"] {
+  background-color: #f1f5f9 !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+}
+
+body.light td[class*="bg-slate-950"] {
+  background-color: #f8fafc !important;
+  color: #475569 !important;
+  font-weight: 600 !important;
+  border-right: 1px solid #e2e8f0 !important;
+}
+
+body.light td {
+  border-color: #e2e8f0 !important;
+}
+
+body.light .border-dashed {
+  border-color: #cbd5e1 !important;
+}
+
+body.light .hover\:bg-white\/\[0\.02\]:hover {
+  background-color: #f1f5f9 !important;
+}
+
+/* Course Cards in Timetable Grid & Basket */
+body.light [id^="card-"],
+body.light [onDragStart*="handleBasketDragStart"] {
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06) !important;
+  border-radius: 0.75rem !important;
+}
+
+body.light [id^="card-"] .text-white,
+body.light [onDragStart*="handleBasketDragStart"] .text-white {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+body.light [id^="card-"] .text-gray-300,
+body.light [id^="card-"] .text-gray-400,
+body.light [onDragStart*="handleBasketDragStart"] .text-gray-400 {
+  color: #334155 !important;
+  font-weight: 600 !important;
+}
+
+body.light [id^="card-"] .bg-black\/40 {
+  background-color: #ffffff !important;
+  color: #334155 !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* 7. Tabs & Navigation Pills */
+body.light nav {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+}
+
+body.light nav button:not([class*="from-indigo-500"]):not([class*="bg-indigo-"]) {
+  color: #475569 !important;
+  background-color: transparent !important;
+}
+
+body.light nav button:not([class*="from-indigo-500"]):not([class*="bg-indigo-"]):hover {
+  color: #0f172a !important;
+  background-color: #e2e8f0 !important;
+}
+
+/* 8. Active forms fields & exclusions blocks */
+body.light input,
+body.light select,
+body.light textarea {
+  color: #0f172a !important;
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+body.light input::placeholder,
+body.light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+body.light option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+body.light input:focus,
+body.light select:focus,
+body.light textarea:focus {
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
+}
+
+body.light button.bg-white\/5 {
+  background-color: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+body.light button.bg-white\/5:hover {
+  background-color: #e2e8f0 !important;
+}
+
+/* Selected exclusion states (Soft premium pastel red) */
+body.light .bg-red-500\/20,
+body.light [class*="bg-red-500/20"] {
+  background-color: #fee2e2 !important;
+  color: #dc2626 !important;
+  border: 1px solid #fca5a5 !important;
+}
+
+body.light .bg-red-950\/20,
+body.light [class*="bg-red-950/20"] {
+  background-color: #fef2f2 !important;
+  color: #ef4444 !important;
+  border: 1px solid #fecaca !important;
+}
+
+/* 9. Gemini AI Suggestions & Problem-Solving Panel Integration */
+body.light .bg-gradient-to-r.from-emerald-950\/20.to-teal-950\/20 {
+  background: linear-gradient(135deg, #f0fdf4 0%, #ccfbf1 100%) !important;
+  border-color: #a7f3d0 !important;
+}
+
+body.light .bg-gradient-to-r.from-emerald-950\/20.to-teal-950\/20 h3 {
+  color: #047857 !important;
+}
+
+body.light .bg-gradient-to-r.from-emerald-950\/20.to-teal-950\/20 p {
+  color: #065f46 !important;
+}
+
+body.light .border-emerald-500\/30 {
+  background-color: #ffffff !important;
+  border-color: #a7f3d0 !important;
+  color: #0f172a !important;
+}
+
+body.light .bg-emerald-500\/5 {
+  background-color: #f0fdf4 !important;
+  border-color: #bbf7d0 !important;
+}
+
+body.light .bg-indigo-950\/30,
+body.light .bg-indigo-950\/15,
+body.light .bg-indigo-500\/5 {
+  background-color: #f5f3ff !important;
+  border-color: #c7d2fe !important;
+}
+
+body.light .bg-gradient-to-br.from-slate-900\/50.to-indigo-950\/15 {
+  background: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+body.light .prose,
+body.light .prose-invert {
+  color: #1e293b !important;
+}
+
+body.light .prose strong,
+body.light .prose-invert strong {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+body.light .prose li,
+body.light .prose p,
+body.light .prose-invert li,
+body.light .prose-invert p {
+  color: #334155 !important;
+}
+
+body.light .prose h1, body.light .prose h2, body.light .prose h3,
+body.light .prose-invert h1, body.light .prose-invert h2, body.light .prose-invert h3 {
+  color: #0f171e !important;
+}
+
+/* 10. Standalone Toasts & Popups */
+body.light .fixed.top-5.right-5 {
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.15) !important;
+}
+
+body.light .fixed.top-5.right-5 p {
+  color: #0f172a !important;
+}
+
+body.light .shadow-slate-950\/40 {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* 11. Recharts Customization for Light Mode */
+body.light .recharts-cartesian-grid line {
+  stroke: #e2e8f0 !important;
+}
+
+body.light .recharts-text {
+  fill: #475569 !important;
+}
+
+body.light .recharts-default-tooltip {
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.1) !important;
+  border-radius: 12px !important;
+}
+
+/* Scrollbar adjustment */
+body.light ::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.02);
+}
+
+body.light ::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.15);
+}
+
+body.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.25);
+}
+
