@@ -464,33 +464,48 @@ export async function getSaaSAdminLivePlatformData() {
   };
 }
 
+export async function dbAdminGenerateLicenseKeys(
+  planId: string,
+  durationDays: number,
+  keys: string[]
+): Promise<{ success: boolean; message: string; count?: number }> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('admin_generate_license_keys', {
+    p_plan_id: planId,
+    p_duration_days: durationDays,
+    p_keys: keys
+  });
+
+  if (error) {
+    console.error('Error generating license keys in db:', error);
+    return {
+      success: false,
+      message: error.message || "Erreur lors de l'enregistrement des clés de licence."
+    };
+  }
+
+  return {
+    success: data?.success ?? false,
+    message: data?.message || "Clés enregistrées avec succès.",
+    count: data?.count
+  };
+}
+
 export async function dbCreateLicenseKey(planId: string, durationDays: number): Promise<SaaSLicenseKey | null> {
   const supabase = createClient();
   const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-  const key = `IZI-${planId.replace('plan_', '').toUpperCase()}-${randomStr}`;
+  const key = `SCH-${planId.replace('plan_', '').toUpperCase()}-2026-${randomStr}`;
 
-  const { data, error } = await supabase
-    .from('saas_license_keys')
-    .insert({
-      key,
-      plan_id: planId,
-      duration_days: durationDays,
-      status: 'unused'
-    })
-    .select()
-    .single();
+  const res = await dbAdminGenerateLicenseKeys(planId, durationDays, [key]);
+  if (!res.success) return null;
 
-  if (error || !data) {
-    console.error('Error creating license key:', error);
-    return null;
-  }
   return {
-    id: data.id,
-    key: data.key,
-    planId: data.plan_id,
-    durationDays: data.duration_days,
-    generatedAt: data.generated_at,
-    status: data.status
+    id: `key_${Date.now()}`,
+    key,
+    planId: planId,
+    durationDays: durationDays,
+    generatedAt: new Date().toISOString(),
+    status: 'unused'
   };
 }
 

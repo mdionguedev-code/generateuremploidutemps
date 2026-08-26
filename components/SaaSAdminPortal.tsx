@@ -50,7 +50,11 @@ import {
   Maximize2,
   EyeOff
 } from 'lucide-react';
-import { dbAdminCreateClientUser, dbAdminResetUserPassword } from '@/lib/supabase/dbService';
+import {
+  dbAdminCreateClientUser,
+  dbAdminResetUserPassword,
+  dbAdminGenerateLicenseKeys
+} from '@/lib/supabase/dbService';
 
 const generateDefaultPassword = () => {
   const digits = '23456789';
@@ -516,8 +520,8 @@ export default function SaaSAdminPortal({
     }
   };
 
-  // Generate unique, collision-free license keys with high entropy
-  const handleGenerateKeys = (e: React.FormEvent) => {
+  // Generate unique, collision-free license keys with high entropy and save to database
+  const handleGenerateKeys = async (e: React.FormEvent) => {
     e.preventDefault();
     const selectedPlan = plans.find(p => p.id === newKeyForm.planId);
     const count = Math.min(Math.max(1, Number(newKeyForm.quantity)), 20);
@@ -556,6 +560,10 @@ export default function SaaSAdminPortal({
         status: 'unused'
       });
     }
+
+    // Save permanently in database
+    const keysToInsert = newKeysList.map(k => k.key);
+    await dbAdminGenerateLicenseKeys(newKeyForm.planId, Number(newKeyForm.durationDays), keysToInsert);
 
     onUpdateLicenseKeys([...newKeysList, ...licenseKeys]);
     setIsGenerateKeyModalOpen(false);
