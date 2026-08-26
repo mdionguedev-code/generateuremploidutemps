@@ -10,74 +10,110 @@ import {
   GraduationCap,
   Sparkles,
   ArrowRight,
-  Key,
   Building2,
   AlertCircle
 } from 'lucide-react';
+import { createClient } from '@/utils/supabase/client';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLoginClient: (email: string) => void;
-  onLoginAdmin: (email: string) => void;
   theme?: 'dark' | 'light';
 }
 
 export default function AuthModal({
   isOpen,
   onClose,
-  onLoginClient,
-  onLoginAdmin,
   theme = 'light'
 }: AuthModalProps) {
   const [activeTab, setActiveTab] = useState<'client' | 'admin'>('client');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+
+  const supabase = createClient();
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccessMsg('');
 
     if (!email.trim()) {
       setError('Veuillez saisir votre adresse email.');
       return;
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-    
-    // Auto detect role or check tab
-    // SECURITY WARNING: Client-side credential checking and hardcoded secrets (like 'admin123') 
-    // are only suitable for this interactive local demo/mockup. 
-    // For production environments, migrate authentication to server-side auth (e.g., NextAuth.js, Firebase Auth, etc.)
-    // and securely store hashes in a backend database.
-    if (cleanEmail.includes('admin') || activeTab === 'admin') {
-      if (password && password !== 'admin123' && password !== '1234' && password !== 'admin') {
-        setError("Mot de passe/PIN Administrateur incorrect. Utilisez 'admin123' ou le bouton 1-clic.");
-        return;
+    if (isForgotPassword) {
+      setLoading(true);
+      try {
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: `${origin}/reset-password`,
+        });
+        if (resetError) {
+          setError(resetError.message);
+        } else {
+          setSuccessMsg("Un lien sécurisé de réinitialisation a été envoyé à votre adresse email.");
+        }
+      } catch (err: any) {
+        setError("Erreur lors de l'envoi de la demande.");
+      } finally {
+        setLoading(false);
       }
-      onLoginAdmin(cleanEmail || 'admin@izischool.com');
-      onClose();
-    } else {
-      onLoginClient(cleanEmail || 'client@ecole.com');
-      onClose();
+      return;
     }
-  };
 
-  const handleQuickClientLogin = () => {
-    setEmail('client@ecole.com');
-    setPassword('123456');
-    onLoginClient('client@ecole.com');
-    onClose();
-  };
+    if (!password.trim()) {
+      setError('Veuillez saisir votre mot de passe.');
+      return;
+    }
 
-  const handleQuickAdminLogin = () => {
-    setEmail('admin@izischool.com');
-    setPassword('admin123');
-    onLoginAdmin('admin@izischool.com');
-    onClose();
+    setLoading(true);
+
+    if (isSignUp) {
+      // Sign Up
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: password.trim(),
+      });
+      if (signUpError) {
+        setError(signUpError.message);
+      } else {
+        setSuccessMsg("Inscription réussie ! Vérifiez votre email ou connectez-vous.");
+        setIsSignUp(false);
+      }
+    } else {
+      // Login
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password.trim(),
+      });
+      if (signInError) {
+        setError("Identifiants incorrects. Vérifiez votre email ou mot de passe.");
+      } else if (signInData?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', signInData.user.id)
+          .single();
+
+        if (profile?.role === 'admin') {
+          window.location.href = '/admin';
+        } else {
+          window.location.href = '/user';
+        }
+        return;
+      } else {
+        window.location.href = '/';
+      }
+    }
+    setLoading(false);
   };
 
   return (
@@ -92,113 +128,63 @@ export default function AuthModal({
           {/* Top Banner Gradient */}
           <div className="h-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-amber-500" />
 
-          {/* Bouton de Fermeture X Bien Visible */}
+          {/* Bouton de Fermeture */}
           <button
             type="button"
             onClick={onClose}
-            aria-label="Fermer"
             className="absolute top-3 right-3 p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/20 text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white border border-slate-200 dark:border-white/10 transition-all cursor-pointer z-20 shadow-xs"
-            title="Fermer la boîte de connexion"
           >
             <X className="w-4 h-4" />
           </button>
 
           <div className="p-4 sm:p-5">
-            {/* Header Title Compact */}
-            <div className="text-center mb-3.5 pr-6 pl-6">
+            <div className="text-center mb-4 pr-6 pl-6">
               <div className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 mb-1.5 shadow-inner">
                 <Sparkles className="w-4 h-4" />
               </div>
               <h3 className="text-base font-black text-slate-900 dark:text-white font-sans tracking-tight">
-                Connexion à Diongue-IziSchool
+                {isForgotPassword 
+                  ? 'Réinitialiser votre mot de passe'
+                  : isSignUp 
+                  ? 'Créer un compte' 
+                  : 'Connexion à Diongue-IziSchool'}
               </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                Accédez à votre espace de gestion ou au portail SaaS
-              </p>
-            </div>
-
-            {/* PRESET TEST ACCOUNTS BOX COMPACT */}
-            <div className="mb-3 p-2.5 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1">
-                  <Key className="w-3 h-3 text-amber-500" />
-                  Comptes de Test Fournis
-                </span>
-                <span className="text-[9px] bg-emerald-200/60 dark:bg-emerald-800/60 text-emerald-900 dark:text-emerald-200 px-1.5 py-0.2 rounded-full font-mono font-semibold">
-                  1-Clic
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                {/* Client Quick Account */}
-                <button
-                  type="button"
-                  onClick={handleQuickClientLogin}
-                  className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700/60 text-left hover:border-emerald-500 hover:shadow-xs transition-all group cursor-pointer"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-900 dark:text-white flex items-center gap-1 truncate">
-                      <GraduationCap className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                      Établissement
-                    </span>
-                    <span className="text-[9px] text-emerald-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
-                      →
-                    </span>
-                  </div>
-                  <p className="text-[10px] font-mono text-slate-600 dark:text-slate-300 truncate mt-0.5">
-                    client@ecole.com
-                  </p>
-                </button>
-
-                {/* Admin Quick Account */}
-                <button
-                  type="button"
-                  onClick={handleQuickAdminLogin}
-                  className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-purple-300 dark:border-purple-700/60 text-left hover:border-purple-500 hover:shadow-xs transition-all group cursor-pointer"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-900 dark:text-white flex items-center gap-1 truncate">
-                      <Shield className="w-3 h-3 text-purple-600 dark:text-purple-400 shrink-0" />
-                      Admin SaaS
-                    </span>
-                    <span className="text-[9px] text-purple-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
-                      →
-                    </span>
-                  </div>
-                  <p className="text-[10px] font-mono text-slate-600 dark:text-slate-300 truncate mt-0.5">
-                    admin@izischool.com
-                  </p>
-                </button>
-              </div>
+              {isForgotPassword && (
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Saisissez l&apos;adresse email de votre compte pour recevoir un lien de réinitialisation.
+                </p>
+              )}
             </div>
 
             {/* Login Role Toggle Tabs */}
-            <div className="flex rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5 mb-3">
-              <button
-                type="button"
-                onClick={() => { setActiveTab('client'); setError(''); }}
-                className={`flex-1 py-1.5 text-[11px] font-bold rounded-md transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                  activeTab === 'client'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900'
-                }`}
-              >
-                <Building2 className="w-3 h-3 text-emerald-600" />
-                Espace Établissement
-              </button>
-              <button
-                type="button"
-                onClick={() => { setActiveTab('admin'); setError(''); }}
-                className={`flex-1 py-1.5 text-[11px] font-bold rounded-md transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                  activeTab === 'admin'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900'
-                }`}
-              >
-                <Shield className="w-3 h-3 text-purple-600" />
-                Portail Admin SaaS
-              </button>
-            </div>
+            {!isForgotPassword && (
+              <div className="flex rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5 mb-3">
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab('client'); setError(''); setSuccessMsg(''); }}
+                  className={`flex-1 py-1.5 text-[11px] font-bold rounded-md transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                    activeTab === 'client'
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  <Building2 className="w-3 h-3 text-emerald-600" />
+                  Espace Client
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab('admin'); setError(''); setSuccessMsg(''); }}
+                  className={`flex-1 py-1.5 text-[11px] font-bold rounded-md transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                    activeTab === 'admin'
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  <Shield className="w-3 h-3 text-purple-600" />
+                  Portail Admin
+                </button>
+              </div>
+            )}
 
             {error && (
               <div className="mb-2.5 p-2 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 text-[11px] flex items-center gap-1.5">
@@ -206,9 +192,15 @@ export default function AuthModal({
                 <span>{error}</span>
               </div>
             )}
+            {successMsg && (
+              <div className="mb-2.5 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-300 text-[11px] flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                <span>{successMsg}</span>
+              </div>
+            )}
 
             {/* Manual Credentials Form */}
-            <form onSubmit={handleSubmit} className="space-y-2.5">
+            <form onSubmit={handleSubmit} className="space-y-3">
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
                   Adresse Email
@@ -217,50 +209,92 @@ export default function AuthModal({
                   <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="email"
+                    required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder={activeTab === 'admin' ? "admin@izischool.com" : "votre-ecole@domaine.com"}
+                    placeholder="votre-email@domaine.com"
                     className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  {activeTab === 'admin' ? 'Code PIN ou Mot de passe Admin' : 'Mot de passe'}
-                </label>
-                <div className="relative">
-                  <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
+              {!isForgotPassword && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                      Mot de passe
+                    </label>
+                    {!isSignUp && (
+                      <button
+                        type="button"
+                        onClick={() => { setIsForgotPassword(true); setError(''); setSuccessMsg(''); }}
+                        className="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline font-semibold cursor-pointer"
+                      >
+                        Mot de passe oublié ?
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               <button
                 type="submit"
-                className={`w-full py-2.5 rounded-lg text-xs font-bold text-white shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-1 ${
+                disabled={loading}
+                className={`w-full py-2.5 rounded-lg text-xs font-bold text-white shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-2 ${
+                  loading ? 'opacity-70 cursor-not-allowed' : ''
+                } ${
                   activeTab === 'admin'
-                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-purple-600/20'
-                    : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-emerald-600/20'
+                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700'
+                    : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
                 }`}
               >
-                <span>Accéder à mon tableau de bord</span>
+                <span>
+                  {loading 
+                    ? 'Chargement...' 
+                    : isForgotPassword 
+                    ? 'Envoyer le lien de réinitialisation'
+                    : (isSignUp ? 'S\'inscrire' : 'Se Connecter')}
+                </span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </form>
 
-            {/* Footer Notice */}
-            <p className="text-[10px] text-center text-slate-400 dark:text-slate-500 mt-3">
-              En vous connectant, vous acceptez nos conditions d&apos;utilisation.
-            </p>
+            <div className="mt-4 text-center space-y-1.5">
+              {isForgotPassword ? (
+                <button
+                  type="button"
+                  onClick={() => { setIsForgotPassword(false); setError(''); setSuccessMsg(''); }}
+                  className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline transition-colors cursor-pointer"
+                >
+                  ← Retour à la connexion
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setIsSignUp(!isSignUp); setError(''); setSuccessMsg(''); }}
+                  className="text-[11px] text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer"
+                >
+                  {isSignUp 
+                    ? "Vous avez déjà un compte ? Connectez-vous" 
+                    : "Pas encore de compte ? S'inscrire librement"}
+                </button>
+              )}
+            </div>
           </div>
         </motion.div>
       </div>
     </AnimatePresence>
   );
 }
+

@@ -47,8 +47,21 @@ import {
   ExternalLink,
   Smartphone,
   Link2,
-  Maximize2
+  Maximize2,
+  EyeOff
 } from 'lucide-react';
+import { dbAdminCreateClientUser, dbAdminResetUserPassword } from '@/lib/supabase/dbService';
+
+const generateDefaultPassword = () => {
+  const digits = '23456789';
+  const symbols = '!@#$*';
+  let p = 'IziSchool2026';
+  for (let i = 0; i < 3; i++) {
+    p += digits.charAt(Math.floor(Math.random() * digits.length));
+  }
+  p += symbols.charAt(Math.floor(Math.random() * symbols.length));
+  return p;
+};
 
 import {
   ResponsiveContainer,
@@ -134,11 +147,64 @@ export default function SaaSAdminPortal({
   const [adminDetailModal, setAdminDetailModal] = useState<'mrr' | 'plans' | null>(null);
 
   // New client form state
+  const [showDefaultPassword, setShowDefaultPassword] = useState(false);
+  const [copiedPassword, setCopiedPassword] = useState(false);
+  const [isCreatingClient, setIsCreatingClient] = useState(false);
+  const [createClientError, setCreateClientError] = useState<string | null>(null);
+  const [createdClientSuccess, setCreatedClientSuccess] = useState<{ email: string; password: string; schoolName: string } | null>(null);
+
+  // Admin User Password Reset Modal State
+  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
+  const [resetPasswordClient, setResetPasswordClient] = useState<SaaSClient | null>(null);
+  const [resetPasswordInput, setResetPasswordInput] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [resetPasswordError, setResetPasswordError] = useState<string | null>(null);
+  const [resetPasswordSuccess, setResetPasswordSuccess] = useState<string | null>(null);
+  const [copiedResetCreds, setCopiedResetCreds] = useState(false);
+
+  const handleOpenResetPasswordModal = (client: SaaSClient) => {
+    setResetPasswordClient(client);
+    setResetPasswordInput(generateDefaultPassword());
+    setShowResetPassword(false);
+    setResetPasswordError(null);
+    setResetPasswordSuccess(null);
+    setCopiedResetCreds(false);
+    setIsResetPasswordModalOpen(true);
+  };
+
+  const handlePerformResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetPasswordClient) return;
+
+    if (resetPasswordInput.trim().length < 6) {
+      setResetPasswordError("Le mot de passe doit comporter au moins 6 caractères.");
+      return;
+    }
+
+    setIsResettingPassword(true);
+    setResetPasswordError(null);
+
+    try {
+      const res = await dbAdminResetUserPassword(resetPasswordClient.id, resetPasswordInput.trim());
+      if (res.success) {
+        setResetPasswordSuccess(`Mot de passe réinitialisé avec succès pour ${resetPasswordClient.schoolName} (${resetPasswordClient.adminEmail}) !`);
+      } else {
+        setResetPasswordError(res.message);
+      }
+    } catch (err: any) {
+      setResetPasswordError("Erreur lors de la réinitialisation du mot de passe.");
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
   const [newClientForm, setNewClientForm] = useState({
     schoolName: '',
     logoIcon: 'GraduationCap',
     adminName: '',
     adminEmail: '',
+    password: generateDefaultPassword(),
     phone: '',
     whatsapp: '',
     cityCountry: 'Dakar, Sénégal',
@@ -269,96 +335,81 @@ export default function SaaSAdminPortal({
   }, [clients, clientSearch, statusFilter, planFilter]);
 
   // Handlers for Add/Edit Client
-  const handleCreateClient = (e: React.FormEvent) => {
+  const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
-    const selectedPlan = plans.find(p => p.id === newClientForm.planId);
-    
-    const now = new Date();
-    const startDateStr = now.toISOString().split('T')[0];
-    
-    const trialEnd = new Date(now);
-    trialEnd.setDate(trialEnd.getDate() + (settings.defaultTrialDays || 14));
-    const trialEndDateStr = trialEnd.toISOString().split('T')[0];
+    setCreateClientError(null);
+    setIsCreatingClient(true);
 
-    const subEnd = new Date(now);
-    subEnd.setMonth(subEnd.getMonth() + Number(newClientForm.durationMonths));
-    const subscriptionEndDateStr = subEnd.toISOString().split('T')[0];
-
-    const generatedKey = `SCH-${selectedPlan?.code || 'PRO'}-2026-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
-
-    const newKeyObj: SaaSLicenseKey = {
-      id: `key_${Date.now()}_client`,
-      key: generatedKey,
-      planId: newClientForm.planId,
-      durationDays: Number(newClientForm.durationMonths) * 30,
-      generatedAt: startDateStr,
-      status: newClientForm.status === 'active' ? 'used' : 'unused',
-      usedByClientId: `cli_${Date.now()}`,
-      usedByClientName: newClientForm.schoolName,
-      usedAt: newClientForm.status === 'active' ? startDateStr : undefined
-    };
-
-    const newClient: SaaSClient = {
-      id: `cli_${Date.now()}`,
-      schoolName: newClientForm.schoolName,
-      logoIcon: newClientForm.logoIcon,
-      adminName: newClientForm.adminName,
-      adminEmail: newClientForm.adminEmail,
-      phone: newClientForm.phone,
-      whatsapp: newClientForm.whatsapp || newClientForm.phone,
-      cityCountry: newClientForm.cityCountry,
-      planId: newClientForm.planId,
-      status: newClientForm.status,
-      startDate: startDateStr,
-      trialEndDate: trialEndDateStr,
-      subscriptionEndDate: subscriptionEndDateStr,
-      licenseKey: generatedKey,
-      paymentMethod: newClientForm.paymentMethod,
-      totalPaidFCFA: Number(newClientForm.amountFCFA),
-      createdAt: startDateStr,
-      lastActiveAt: 'À l\'instant',
-      classesCount: 0,
-      teachersCount: 0,
-      notes: newClientForm.notes
-    };
-
-    onUpdateClients([newClient, ...clients]);
-    onUpdateLicenseKeys([newKeyObj, ...licenseKeys]);
-
-    // Record Transaction if paid
-    if (newClientForm.amountFCFA > 0) {
-      const newTx: SaaSPaymentTransaction = {
-        id: `tx_${Date.now()}`,
-        invoiceRef: `INV-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-        clientId: newClient.id,
-        clientName: newClient.schoolName,
-        amountFCFA: Number(newClientForm.amountFCFA),
-        amountEUR: Math.round(Number(newClientForm.amountFCFA) / 655.957),
+    try {
+      const selectedPlan = plans.find(p => p.id === newClientForm.planId);
+      const res = await dbAdminCreateClientUser({
+        email: newClientForm.adminEmail.trim(),
+        password: newClientForm.password.trim(),
+        schoolName: newClientForm.schoolName.trim(),
+        adminName: newClientForm.adminName.trim(),
+        phone: newClientForm.phone.trim(),
+        cityCountry: newClientForm.cityCountry.trim(),
+        planId: newClientForm.planId,
+        status: newClientForm.status,
+        durationMonths: Number(newClientForm.durationMonths),
         paymentMethod: newClientForm.paymentMethod,
-        status: 'completed',
-        date: startDateStr,
-        planName: selectedPlan?.name || 'Abonnement',
-        period: `${newClientForm.durationMonths} mois`
-      };
-      onUpdateTransactions([newTx, ...transactions]);
-    }
+        amountFCFA: Number(newClientForm.amountFCFA),
+        notes: newClientForm.notes
+      });
 
-    setIsAddClientModalOpen(false);
-    setNewClientForm({
-      schoolName: '',
-      logoIcon: 'GraduationCap',
-      adminName: '',
-      adminEmail: '',
-      phone: '',
-      whatsapp: '',
-      cityCountry: 'Dakar, Sénégal',
-      planId: 'plan_standard',
-      status: 'active',
-      durationMonths: 1,
-      paymentMethod: 'Orange Money',
-      amountFCFA: 10000,
-      notes: ''
-    });
+      if (!res.success || !res.client) {
+        setCreateClientError(res.message);
+        setIsCreatingClient(false);
+        return;
+      }
+
+      onUpdateClients([res.client, ...clients]);
+
+      // Record Transaction if paid
+      if (newClientForm.amountFCFA > 0) {
+        const newTx: SaaSPaymentTransaction = {
+          id: `tx_${Date.now()}`,
+          invoiceRef: `INV-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+          clientId: res.client.id,
+          clientName: res.client.schoolName,
+          amountFCFA: Number(newClientForm.amountFCFA),
+          amountEUR: Math.round(Number(newClientForm.amountFCFA) / 655.957),
+          paymentMethod: newClientForm.paymentMethod,
+          status: 'completed',
+          date: new Date().toISOString().split('T')[0],
+          planName: selectedPlan?.name || 'Abonnement',
+          period: `${newClientForm.durationMonths} mois`
+        };
+        onUpdateTransactions([newTx, ...transactions]);
+      }
+
+      setCreatedClientSuccess({
+        email: newClientForm.adminEmail.trim(),
+        password: newClientForm.password.trim(),
+        schoolName: newClientForm.schoolName.trim()
+      });
+
+      setNewClientForm({
+        schoolName: '',
+        logoIcon: 'GraduationCap',
+        adminName: '',
+        adminEmail: '',
+        password: generateDefaultPassword(),
+        phone: '',
+        whatsapp: '',
+        cityCountry: 'Dakar, Sénégal',
+        planId: 'plan_standard',
+        status: 'active',
+        durationMonths: 1,
+        paymentMethod: 'Orange Money',
+        amountFCFA: 10000,
+        notes: ''
+      });
+    } catch (err: any) {
+      setCreateClientError("Erreur inattendue lors de la création du compte.");
+    } finally {
+      setIsCreatingClient(false);
+    }
   };
 
   const handleSaveEditedClient = (e: React.FormEvent) => {
@@ -1373,10 +1424,19 @@ export default function SaaSAdminPortal({
                               {/* Edit Client */}
                               <button
                                 onClick={() => setEditingClient(client)}
-                                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 transition-all"
+                                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 transition-all cursor-pointer"
                                 title="Modifier les paramètres du client"
                               >
                                 <Edit className="w-4 h-4" />
+                              </button>
+
+                              {/* Reset User Password */}
+                              <button
+                                onClick={() => handleOpenResetPasswordModal(client)}
+                                className="p-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/20 transition-all cursor-pointer"
+                                title="Réinitialiser le mot de passe de l'utilisateur"
+                              >
+                                <Key className="w-4 h-4" />
                               </button>
 
                               {/* Suspend / Reactivate Toggle */}
@@ -2073,184 +2133,471 @@ export default function SaaSAdminPortal({
                 </button>
               </div>
 
-              <form onSubmit={handleCreateClient} className="space-y-4 text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {createdClientSuccess ? (
+                <div className="space-y-4 py-3 text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto shadow-lg">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
                   <div>
-                    <label className="block text-gray-400 mb-1 font-semibold">Nom de l&apos;Établissement *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="ex: Lycée Lamine Guèye"
-                      value={newClientForm.schoolName}
-                      onChange={e => setNewClientForm({ ...newClientForm, schoolName: e.target.value })}
-                      className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
-                    />
+                    <h4 className="text-base font-bold text-white">Compte Établissement Créé avec Succès !</h4>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Le compte pour <strong className="text-white">{createdClientSuccess.schoolName}</strong> a été enregistré en base de données.
+                    </p>
                   </div>
 
-                  <div>
-                    <label className="block text-gray-400 mb-1 font-semibold">Ville & Pays *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="ex: Dakar, Sénégal"
-                      value={newClientForm.cityCountry}
-                      onChange={e => setNewClientForm({ ...newClientForm, cityCountry: e.target.value })}
-                      className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-gray-400 mb-1 font-semibold">Nom du Directeur *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="ex: M. Mamadou Diallo"
-                      value={newClientForm.adminName}
-                      onChange={e => setNewClientForm({ ...newClientForm, adminName: e.target.value })}
-                      className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
-                    />
+                  <div className="p-4 rounded-xl bg-slate-950 border border-white/10 text-left space-y-2.5">
+                    <div className="text-[11px] font-semibold text-gray-400">Identifiants d&apos;accès à transmettre au client :</div>
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-white/5">
+                      <span className="text-gray-400 text-xs">Email :</span>
+                      <span className="text-white font-mono font-bold text-xs">{createdClientSuccess.email}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-white/5">
+                      <span className="text-gray-400 text-xs">Mot de passe temporaire :</span>
+                      <span className="text-emerald-400 font-mono font-bold text-xs">{createdClientSuccess.password}</span>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-gray-400 mb-1 font-semibold">Email Admin *</label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="ex: m.diallo@school.edu.sn"
-                      value={newClientForm.adminEmail}
-                      onChange={e => setNewClientForm({ ...newClientForm, adminEmail: e.target.value })}
-                      className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-gray-400 mb-1 font-semibold">WhatsApp / Tél *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="ex: +221 77 654 32 10"
-                      value={newClientForm.phone}
-                      onChange={e => setNewClientForm({ ...newClientForm, phone: e.target.value, whatsapp: e.target.value })}
-                      className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-gray-400 mb-1 font-semibold">Choix de la Formule *</label>
-                    <select
-                      value={newClientForm.planId}
-                      onChange={e => {
-                        const pId = e.target.value;
-                        const plan = plans.find(p => p.id === pId);
-                        setNewClientForm({
-                          ...newClientForm,
-                          planId: pId,
-                          amountFCFA: (plan?.monthlyPriceFCFA || 0) * newClientForm.durationMonths
-                        });
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          `Vos identifiants Diongue-IziSchool pour ${createdClientSuccess.schoolName} :\nEmail: ${createdClientSuccess.email}\nMot de passe: ${createdClientSuccess.password}\nLien de connexion: ${window.location.origin}`
+                        );
+                        setCopiedPassword(true);
+                        setTimeout(() => setCopiedPassword(false), 2500);
                       }}
-                      className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
+                      className="px-4 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/30 font-bold text-xs flex items-center gap-2 cursor-pointer"
                     >
-                      {plans.map(p => (
-                        <option key={p.id} value={p.id}>{p.name} ({p.monthlyPriceFCFA.toLocaleString('fr-FR')} FCFA/mois)</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-gray-400 mb-1 font-semibold">Durée de l&apos;abonnement *</label>
-                    <select
-                      value={newClientForm.durationMonths}
-                      onChange={e => {
-                        const dur = Number(e.target.value);
-                        const plan = plans.find(p => p.id === newClientForm.planId);
-                        setNewClientForm({
-                          ...newClientForm,
-                          durationMonths: dur,
-                          amountFCFA: (plan?.monthlyPriceFCFA || 0) * dur
-                        });
+                      {copiedPassword ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                      <span>{copiedPassword ? 'Identifiants Copiés !' : 'Copier les Identifiants'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreatedClientSuccess(null);
+                        setIsAddClientModalOpen(false);
                       }}
-                      className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
+                      className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer shadow-lg shadow-emerald-600/30"
                     >
-                      <option value={1}>1 Mois</option>
-                      <option value={3}>3 Mois</option>
-                      <option value={6}>6 Mois</option>
-                      <option value={12}>12 Mois</option>
-                    </select>
+                      Terminer
+                    </button>
                   </div>
                 </div>
+              ) : (
+                <form onSubmit={handleCreateClient} className="space-y-4 text-xs">
+                  {createClientError && (
+                    <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>{createClientError}</span>
+                    </div>
+                  )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-gray-400 mb-1 font-semibold">Statut Initial *</label>
-                    <select
-                      value={newClientForm.status}
-                      onChange={e => setNewClientForm({ ...newClientForm, status: e.target.value as SubscriptionStatus })}
-                      className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
-                    >
-                      <option value="active">Actif (Paiement Validé)</option>
-                      <option value="trial">Période d&apos;Essai</option>
-                      <option value="suspended">Suspendu</option>
-                    </select>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-gray-400 mb-1 font-semibold">Nom de l&apos;Établissement *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="ex: Lycée Lamine Guèye"
+                        value={newClientForm.schoolName}
+                        onChange={e => setNewClientForm({ ...newClientForm, schoolName: e.target.value })}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-400 mb-1 font-semibold">Ville & Pays *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="ex: Dakar, Sénégal"
+                        value={newClientForm.cityCountry}
+                        onChange={e => setNewClientForm({ ...newClientForm, cityCountry: e.target.value })}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-gray-400 mb-1 font-semibold">Nom du Directeur *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="ex: M. Mamadou Diallo"
+                        value={newClientForm.adminName}
+                        onChange={e => setNewClientForm({ ...newClientForm, adminName: e.target.value })}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-400 mb-1 font-semibold">Email Admin *</label>
+                      <input
+                        type="email"
+                        required
+                        placeholder="ex: m.diallo@school.edu.sn"
+                        value={newClientForm.adminEmail}
+                        onChange={e => setNewClientForm({ ...newClientForm, adminEmail: e.target.value })}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-400 mb-1 font-semibold">WhatsApp / Tél *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="ex: +221 77 654 32 10"
+                        value={newClientForm.phone}
+                        onChange={e => setNewClientForm({ ...newClientForm, phone: e.target.value, whatsapp: e.target.value })}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* CHAMP MOT DE PASSE PAR DEFAUT DEFINI AUTOMATIQUEMENT */}
+                  <div className="p-3.5 rounded-xl bg-slate-950/80 border border-indigo-500/20 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-indigo-300 font-bold text-xs flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-indigo-400" />
+                        Mot de Passe par Défaut (Généré Automatiquement) *
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newPass = generateDefaultPassword();
+                            setNewClientForm({ ...newClientForm, password: newPass });
+                          }}
+                          className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-indigo-300 hover:text-white text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-all"
+                          title="Générer un autre mot de passe aléatoire"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          <span>Régénérer</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(newClientForm.password);
+                            setCopiedPassword(true);
+                            setTimeout(() => setCopiedPassword(false), 2000);
+                          }}
+                          className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-emerald-400 hover:text-emerald-300 text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-all"
+                          title="Copier le mot de passe"
+                        >
+                          {copiedPassword ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedPassword ? 'Copié !' : 'Copier'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        type={showDefaultPassword ? 'text' : 'password'}
+                        required
+                        value={newClientForm.password}
+                        onChange={e => setNewClientForm({ ...newClientForm, password: e.target.value })}
+                        className="w-full bg-slate-900 border border-indigo-500/30 rounded-xl p-2.5 pr-10 text-emerald-400 font-mono font-bold text-xs focus:outline-none focus:border-indigo-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowDefaultPassword(!showDefaultPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
+                        title={showDefaultPassword ? 'Masquer' : 'Afficher'}
+                      >
+                        {showDefaultPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-gray-400">
+                      💡 Mot de passe initial défini automatiquement pour l&apos;accès du client. L&apos;utilisateur pourra le modifier librement plus tard.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-gray-400 mb-1 font-semibold">Choix de la Formule *</label>
+                      <select
+                        value={newClientForm.planId}
+                        onChange={e => {
+                          const pId = e.target.value;
+                          const plan = plans.find(p => p.id === pId);
+                          setNewClientForm({
+                            ...newClientForm,
+                            planId: pId,
+                            amountFCFA: (plan?.monthlyPriceFCFA || 0) * newClientForm.durationMonths
+                          });
+                        }}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
+                      >
+                        {plans.map(p => (
+                          <option key={p.id} value={p.id}>{p.name} ({p.monthlyPriceFCFA.toLocaleString('fr-FR')} FCFA/mois)</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-400 mb-1 font-semibold">Durée de l&apos;abonnement *</label>
+                      <select
+                        value={newClientForm.durationMonths}
+                        onChange={e => {
+                          const dur = Number(e.target.value);
+                          const plan = plans.find(p => p.id === newClientForm.planId);
+                          setNewClientForm({
+                            ...newClientForm,
+                            durationMonths: dur,
+                            amountFCFA: (plan?.monthlyPriceFCFA || 0) * dur
+                          });
+                        }}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
+                      >
+                        <option value={1}>1 Mois</option>
+                        <option value={3}>3 Mois</option>
+                        <option value={6}>6 Mois</option>
+                        <option value={12}>12 Mois</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-gray-400 mb-1 font-semibold">Statut Initial *</label>
+                      <select
+                        value={newClientForm.status}
+                        onChange={e => setNewClientForm({ ...newClientForm, status: e.target.value as SubscriptionStatus })}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
+                      >
+                        <option value="active">Actif (Paiement Validé)</option>
+                        <option value="trial">Période d&apos;Essai</option>
+                        <option value="suspended">Suspendu</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-400 mb-1 font-semibold">Mode de Paiement</label>
+                      <select
+                        value={newClientForm.paymentMethod}
+                        onChange={e => setNewClientForm({ ...newClientForm, paymentMethod: e.target.value as PaymentMethod })}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
+                      >
+                        <option value="Orange Money">Orange Money</option>
+                        <option value="Wave">Wave</option>
+                        <option value="Stripe">Carte Bancaire / Stripe</option>
+                        <option value="Virement">Virement Bancaire</option>
+                        <option value="Clé Licence">Clé Licence Prépayée</option>
+                        <option value="Gratuit">Gratuit / Offert</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-400 mb-1 font-semibold">Montant Encaissé (FCFA)</label>
+                      <input
+                        type="number"
+                        value={newClientForm.amountFCFA}
+                        onChange={e => setNewClientForm({ ...newClientForm, amountFCFA: Number(e.target.value) })}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
                   </div>
 
                   <div>
-                    <label className="block text-gray-400 mb-1 font-semibold">Mode de Paiement</label>
-                    <select
-                      value={newClientForm.paymentMethod}
-                      onChange={e => setNewClientForm({ ...newClientForm, paymentMethod: e.target.value as PaymentMethod })}
-                      className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
-                    >
-                      <option value="Orange Money">Orange Money</option>
-                      <option value="Wave">Wave</option>
-                      <option value="Stripe">Carte Bancaire / Stripe</option>
-                      <option value="Virement">Virement Bancaire</option>
-                      <option value="Clé Licence">Clé Licence Prépayée</option>
-                      <option value="Gratuit">Gratuit / Offert</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-gray-400 mb-1 font-semibold">Montant Encaissé (FCFA)</label>
+                    <label className="block text-gray-400 mb-1 font-semibold">Notes Interne Admin</label>
                     <input
-                      type="number"
-                      value={newClientForm.amountFCFA}
-                      onChange={e => setNewClientForm({ ...newClientForm, amountFCFA: Number(e.target.value) })}
-                      className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-indigo-500"
+                      type="text"
+                      placeholder="ex: Contrat signé par le proviseur, reçu transmis par WhatsApp"
+                      value={newClientForm.notes}
+                      onChange={e => setNewClientForm({ ...newClientForm, notes: e.target.value })}
+                      className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-gray-400 mb-1 font-semibold">Notes Interne Admin</label>
-                  <input
-                    type="text"
-                    placeholder="ex: Contrat signé par le proviseur, reçu transmis par WhatsApp"
-                    value={newClientForm.notes}
-                    onChange={e => setNewClientForm({ ...newClientForm, notes: e.target.value })}
-                    className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
+                  <div className="pt-4 flex items-center justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddClientModalOpen(false)}
+                      className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 font-bold"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isCreatingClient}
+                      className={`px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow-lg shadow-indigo-600/30 cursor-pointer flex items-center gap-2 ${
+                        isCreatingClient ? 'opacity-70 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      <span>{isCreatingClient ? 'Création en cours...' : 'Créer & Activer le Compte'}</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
-                <div className="pt-4 flex items-center justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddClientModalOpen(false)}
-                    className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 font-bold"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow-lg shadow-indigo-600/30"
-                  >
-                    Créer & Activer le Compte
-                  </button>
+      {/* ========================================================= */}
+      {/* MODAL: ADMIN RESET USER PASSWORD                          */}
+      {/* ========================================================= */}
+      <AnimatePresence>
+        {isResetPasswordModalOpen && resetPasswordClient && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-slate-900 border border-purple-500/30 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Key className="w-5 h-5 text-purple-400" />
+                  Réinitialiser le Mot de Passe Client
+                </h3>
+                <button
+                  onClick={() => setIsResetPasswordModalOpen(false)}
+                  className="text-gray-400 hover:text-white cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {resetPasswordSuccess ? (
+                <div className="space-y-4 py-2 text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto shadow-lg">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white">Nouveau Mot de Passe Validé !</h4>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Le mot de passe a été instantanément mis à jour pour <strong className="text-white">{resetPasswordClient.schoolName}</strong>.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-950 border border-white/10 text-left space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400 text-xs">Email :</span>
+                      <span className="text-white font-mono font-bold text-xs">{resetPasswordClient.adminEmail}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400 text-xs">Nouveau mot de passe :</span>
+                      <span className="text-emerald-400 font-mono font-bold text-xs">{resetPasswordInput}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2.5 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          `Bonjour,\nVoici vos nouveaux identifiants Diongue-IziSchool pour ${resetPasswordClient.schoolName} :\nEmail: ${resetPasswordClient.adminEmail}\nNouveau Mot de passe: ${resetPasswordInput}\nLien de connexion: ${window.location.origin}`
+                        );
+                        setCopiedResetCreds(true);
+                        setTimeout(() => setCopiedResetCreds(false), 2500);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 border border-purple-500/30 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                    >
+                      {copiedResetCreds ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                      <span>{copiedResetCreds ? 'Message Copié !' : 'Copier pour WhatsApp/Email'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsResetPasswordModalOpen(false)}
+                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer shadow-lg shadow-emerald-600/30"
+                    >
+                      Fermer
+                    </button>
+                  </div>
                 </div>
-              </form>
+              ) : (
+                <form onSubmit={handlePerformResetPassword} className="space-y-4 text-xs">
+                  {resetPasswordError && (
+                    <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>{resetPasswordError}</span>
+                    </div>
+                  )}
+
+                  <div className="p-3 rounded-xl bg-slate-950 border border-white/5 space-y-1">
+                    <div className="text-white font-bold">{resetPasswordClient.schoolName}</div>
+                    <div className="text-gray-400 font-mono text-[11px]">{resetPasswordClient.adminEmail}</div>
+                    <div className="text-gray-500 text-[10px]">Directeur : {resetPasswordClient.adminName}</div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-gray-300 font-bold">
+                        Nouveau Mot de Passe Temporaire *
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setResetPasswordInput(generateDefaultPassword())}
+                          className="px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-purple-300 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                          title="Générer un autre mot de passe"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          <span>Régénérer</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(resetPasswordInput);
+                            setCopiedResetCreds(true);
+                            setTimeout(() => setCopiedResetCreds(false), 2000);
+                          }}
+                          className="px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-emerald-400 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                          title="Copier le mot de passe"
+                        >
+                          {copiedResetCreds ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedResetCreds ? 'Copié !' : 'Copier'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        type={showResetPassword ? 'text' : 'password'}
+                        required
+                        minLength={6}
+                        value={resetPasswordInput}
+                        onChange={e => setResetPasswordInput(e.target.value)}
+                        className="w-full bg-slate-950 border border-purple-500/30 rounded-xl p-2.5 pr-10 text-emerald-400 font-mono font-bold text-xs focus:outline-none focus:border-purple-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowResetPassword(!showResetPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
+                        title={showResetPassword ? 'Masquer' : 'Afficher'}
+                      >
+                        {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-gray-400">
+                      💡 Ce mot de passe écrasera immédiatement l&apos;ancien mot de passe de l&apos;utilisateur dans la base d&apos;authentification.
+                    </p>
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsResetPasswordModalOpen(false)}
+                      className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 font-bold"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isResettingPassword}
+                      className={`px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold shadow-lg shadow-purple-600/30 cursor-pointer flex items-center gap-2 ${
+                        isResettingPassword ? 'opacity-70 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      <span>{isResettingPassword ? 'Mise à jour...' : 'Confirmer & Réinitialiser'}</span>
+                    </button>
+                  </div>
+                </form>
+              )}
             </motion.div>
           </div>
         )}

@@ -34,7 +34,7 @@ interface ClientSubscriptionModalProps {
   maxGenerations?: number;
   exportCount?: number;
   maxExports?: number;
-  onApplyLicenseKey: (keyStr: string) => { success: boolean; message: string };
+  onApplyLicenseKey: (keyStr: string) => Promise<{ success: boolean; message: string }> | { success: boolean; message: string };
   onSimulatePayment: (planId: string, paymentMethod: PaymentMethod, durationMonths: number) => void;
   onRequestUpgradeOrRenewal?: (params: {
     type: 'upgrade' | 'renewal';
@@ -84,7 +84,7 @@ export default function ClientSubscriptionModal({
 
   const currentPlan = plans.find(p => p.id === currentClient.planId) || plans[0];
 
-  const handleRedeemKeySubmit = (e: React.FormEvent) => {
+  const handleRedeemKeySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setKeyError(null);
     setKeySuccess(null);
@@ -94,7 +94,7 @@ export default function ClientSubscriptionModal({
       return;
     }
 
-    const res = onApplyLicenseKey(inputKey.trim());
+    const res = await onApplyLicenseKey(inputKey.trim());
     if (res.success) {
       setKeySuccess(res.message);
       setInputKey('');
