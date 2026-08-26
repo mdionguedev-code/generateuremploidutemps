@@ -647,5 +647,36 @@ export async function dbAdminResetUserPassword(
   };
 }
 
+export async function dbUserUpdatePassword(
+  newPassword: string
+): Promise<{ success: boolean; message: string }> {
+  const supabase = createClient();
+  if (!newPassword || newPassword.trim().length < 6) {
+    return {
+      success: false,
+      message: "Le nouveau mot de passe doit comporter au moins 6 caractères."
+    };
+  }
+
+  const { error } = await supabase.auth.updateUser({
+    password: newPassword.trim()
+  });
+
+  if (error) {
+    console.error('Error updating user password:', error);
+    return {
+      success: false,
+      message: error.message || "Erreur lors de la mise à jour du mot de passe."
+    };
+  }
+
+  return {
+    success: true,
+    message: "Votre mot de passe a été mis à jour avec succès !"
+  };
+}
+
+
+
 
 

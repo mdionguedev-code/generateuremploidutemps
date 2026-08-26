@@ -42,7 +42,12 @@ import {
   Radio,
   LogOut,
   Home,
-  Maximize2
+  Maximize2,
+  Eye,
+  EyeOff,
+  KeyRound,
+  CheckCircle2,
+  ShieldCheck
 } from 'lucide-react';
 
 import SaaSAdminPortal from '@/components/SaaSAdminPortal';
@@ -67,7 +72,8 @@ import {
   getSaaSAdminLivePlatformData,
   dbCreateLicenseKey,
   dbUpdateGlobalSettings,
-  dbRedeemLicenseKey
+  dbRedeemLicenseKey,
+  dbUserUpdatePassword
 } from '@/lib/supabase/dbService';
 import {
   SaaSPlan,
@@ -529,6 +535,48 @@ export default function TimetableDashboard({
     }
 
     return { success: false, message: "Utilisateur non connecté." };
+  };
+
+  // --- User Profile Password Change State & Handler ---
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [passwordUpdateError, setPasswordUpdateError] = useState<string | null>(null);
+  const [passwordUpdateSuccess, setPasswordUpdateSuccess] = useState<string | null>(null);
+
+  const handleUpdateUserPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordUpdateError(null);
+    setPasswordUpdateSuccess(null);
+
+    if (newPasswordInput.trim().length < 6) {
+      setPasswordUpdateError("Le nouveau mot de passe doit comporter au moins 6 caractères.");
+      return;
+    }
+
+    if (newPasswordInput.trim() !== confirmPasswordInput.trim()) {
+      setPasswordUpdateError("Les deux mots de passe ne sont pas identiques.");
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+    try {
+      const res = await dbUserUpdatePassword(newPasswordInput.trim());
+      if (res.success) {
+        setPasswordUpdateSuccess("Votre mot de passe a été modifié avec succès !");
+        setNewPasswordInput('');
+        setConfirmPasswordInput('');
+        showNotification("Mot de passe mis à jour avec succès !", "success");
+      } else {
+        setPasswordUpdateError(res.message);
+      }
+    } catch (err: any) {
+      setPasswordUpdateError("Erreur lors de la mise à jour du mot de passe.");
+    } finally {
+      setIsUpdatingPassword(false);
+    }
   };
 
   // Handle Online Simulated Payment
@@ -5677,6 +5725,110 @@ export default function TimetableDashboard({
                           </div>
                         </button>
                       </div>
+                    </div>
+
+                    {/* SECTION 5: SÉCURITÉ & MODIFICATION DU MOT DE PASSE */}
+                    <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl space-y-4">
+                      <div className="flex items-center gap-2 pb-3 border-b border-white/10">
+                        <KeyRound className="w-5 h-5 text-emerald-400" />
+                        <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+                          {"5. Sécurité & Mot de Passe"}
+                        </h3>
+                      </div>
+
+                      <p className="text-xs text-gray-400 leading-relaxed">
+                        {"Modifiez le mot de passe de votre compte utilisateur établissement. Le nouveau mot de passe sera immédiatement actif pour vos prochaines connexions."}
+                      </p>
+
+                      <form onSubmit={handleUpdateUserPassword} className="space-y-4 pt-1">
+                        {passwordUpdateError && (
+                          <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                            <span>{passwordUpdateError}</span>
+                          </div>
+                        )}
+
+                        {passwordUpdateSuccess && (
+                          <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                            <span>{passwordUpdateSuccess}</span>
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-300 mb-1.5">
+                              Nouveau mot de passe *
+                            </label>
+                            <div className="relative">
+                              <input
+                                type={showNewPassword ? 'text' : 'password'}
+                                required
+                                minLength={6}
+                                value={newPasswordInput}
+                                onChange={(e) => setNewPasswordInput(e.target.value)}
+                                placeholder="Au moins 6 caractères"
+                                className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl pl-3.5 pr-10 py-2.5 text-xs focus:outline-none focus:border-emerald-500 transition-colors shadow-inner"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowNewPassword(!showNewPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
+                                title={showNewPassword ? 'Masquer' : 'Afficher'}
+                              >
+                                {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-300 mb-1.5">
+                              Confirmer le mot de passe *
+                            </label>
+                            <div className="relative">
+                              <input
+                                type={showConfirmPassword ? 'text' : 'password'}
+                                required
+                                minLength={6}
+                                value={confirmPasswordInput}
+                                onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                                placeholder="Retapez le mot de passe"
+                                className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl pl-3.5 pr-10 py-2.5 text-xs focus:outline-none focus:border-emerald-500 transition-colors shadow-inner"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
+                                title={showConfirmPassword ? 'Masquer' : 'Afficher'}
+                              >
+                                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="pt-1">
+                          <button
+                            type="submit"
+                            disabled={isUpdatingPassword || !newPasswordInput}
+                            className={`w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                              isUpdatingPassword || !newPasswordInput ? 'opacity-60 cursor-not-allowed' : ''
+                            }`}
+                          >
+                            {isUpdatingPassword ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                <span>Mise à jour en cours...</span>
+                              </>
+                            ) : (
+                              <>
+                                <ShieldCheck className="w-4 h-4" />
+                                <span>Mettre à jour mon mot de passe</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </form>
                     </div>
 
                   </div>
