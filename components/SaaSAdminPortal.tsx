@@ -48,12 +48,15 @@ import {
   Smartphone,
   Link2,
   Maximize2,
-  EyeOff
+  EyeOff,
+  KeyRound,
+  ShieldCheck
 } from 'lucide-react';
 import {
   dbAdminCreateClientUser,
   dbAdminResetUserPassword,
-  dbAdminGenerateLicenseKeys
+  dbAdminGenerateLicenseKeys,
+  dbUserUpdatePassword
 } from '@/lib/supabase/dbService';
 
 const generateDefaultPassword = () => {
@@ -200,6 +203,48 @@ export default function SaaSAdminPortal({
       setResetPasswordError("Erreur lors de la réinitialisation du mot de passe.");
     } finally {
       setIsResettingPassword(false);
+    }
+  };
+
+  // Super-Admin Personal Password Change State & Handler
+  const [isAdminPasswordModalOpen, setIsAdminPasswordModalOpen] = useState(false);
+  const [adminNewPassword, setAdminNewPassword] = useState('');
+  const [adminConfirmPassword, setAdminConfirmPassword] = useState('');
+  const [showAdminNewPassword, setShowAdminNewPassword] = useState(false);
+  const [showAdminConfirmPassword, setShowAdminConfirmPassword] = useState(false);
+  const [isAdminUpdatingPassword, setIsAdminUpdatingPassword] = useState(false);
+  const [adminPasswordError, setAdminPasswordError] = useState<string | null>(null);
+  const [adminPasswordSuccess, setAdminPasswordSuccess] = useState<string | null>(null);
+
+  const handleUpdateAdminPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminPasswordError(null);
+    setAdminPasswordSuccess(null);
+
+    if (adminNewPassword.trim().length < 6) {
+      setAdminPasswordError("Le mot de passe doit comporter au moins 6 caractères.");
+      return;
+    }
+
+    if (adminNewPassword.trim() !== adminConfirmPassword.trim()) {
+      setAdminPasswordError("Les deux mots de passe ne correspondent pas.");
+      return;
+    }
+
+    setIsAdminUpdatingPassword(true);
+    try {
+      const res = await dbUserUpdatePassword(adminNewPassword.trim());
+      if (res.success) {
+        setAdminPasswordSuccess("Votre mot de passe Administrateur a été mis à jour avec succès !");
+        setAdminNewPassword('');
+        setAdminConfirmPassword('');
+      } else {
+        setAdminPasswordError(res.message);
+      }
+    } catch (err: any) {
+      setAdminPasswordError("Erreur lors de la mise à jour du mot de passe.");
+    } finally {
+      setIsAdminUpdatingPassword(false);
     }
   };
 
@@ -677,6 +722,24 @@ export default function SaaSAdminPortal({
             >
               <Key className="w-4 h-4 text-amber-500" />
               <span>Générer des Clés de Licence</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAdminPasswordError(null);
+                setAdminPasswordSuccess(null);
+                setAdminNewPassword('');
+                setAdminConfirmPassword('');
+                setIsAdminPasswordModalOpen(true);
+              }}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all cursor-pointer hover:scale-[1.02] active:scale-95 ${
+                theme === 'light'
+                  ? 'bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200 shadow-sm'
+                  : 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border-purple-500/30'
+              }`}
+            >
+              <KeyRound className="w-4 h-4 text-purple-400" />
+              <span>Mon Mot de Passe</span>
             </button>
           </div>
         </div>
@@ -2113,6 +2176,120 @@ export default function SaaSAdminPortal({
             </div>
           </div>
 
+          {/* SUPER-ADMIN SECURITY & PASSWORD CHANGE CARD */}
+          <div className={`p-6 rounded-2xl border shadow-xl space-y-4 transition-all ${
+            theme === 'light'
+              ? 'bg-white border-purple-200 shadow-purple-100/50'
+              : 'bg-gradient-to-br from-purple-950/40 via-slate-900 to-slate-950 border-purple-500/30'
+          }`}>
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <span className="p-2.5 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-400/30">
+                  <KeyRound className="w-5 h-5" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-black text-white flex items-center gap-2">
+                    Sécurité & Mot de Passe Administrateur
+                    <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-400/30 px-2 py-0.5 rounded-full font-mono">
+                      Super-Admin
+                    </span>
+                  </h3>
+                  <p className="text-xs text-gray-400">
+                    Modifiez votre propre mot de passe pour sécuriser l&apos;accès au panneau d&apos;administration général.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleUpdateAdminPassword} className="space-y-4 text-xs pt-1">
+              {adminPasswordError && (
+                <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-red-300 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{adminPasswordError}</span>
+                </div>
+              )}
+
+              {adminPasswordSuccess && (
+                <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{adminPasswordSuccess}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-gray-300 font-bold mb-1">
+                    Nouveau Mot de Passe Administrateur *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showAdminNewPassword ? 'text' : 'password'}
+                      required
+                      minLength={6}
+                      value={adminNewPassword}
+                      onChange={e => setAdminNewPassword(e.target.value)}
+                      placeholder="Minimum 6 caractères"
+                      className="w-full bg-slate-950 border border-purple-500/30 rounded-xl p-2.5 pr-10 text-white font-mono text-xs focus:outline-none focus:border-purple-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminNewPassword(!showAdminNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
+                    >
+                      {showAdminNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 font-bold mb-1">
+                    Confirmer le Nouveau Mot de Passe *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showAdminConfirmPassword ? 'text' : 'password'}
+                      required
+                      minLength={6}
+                      value={adminConfirmPassword}
+                      onChange={e => setAdminConfirmPassword(e.target.value)}
+                      placeholder="Retapez le mot de passe"
+                      className="w-full bg-slate-950 border border-purple-500/30 rounded-xl p-2.5 pr-10 text-white font-mono text-xs focus:outline-none focus:border-purple-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminConfirmPassword(!showAdminConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
+                    >
+                      {showAdminConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isAdminUpdatingPassword || !adminNewPassword}
+                  className={`px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-lg shadow-purple-500/25 cursor-pointer flex items-center gap-2 ${
+                    isAdminUpdatingPassword || !adminNewPassword ? 'opacity-60 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {isAdminUpdatingPassword ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Mise à jour en cours...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Enregistrer mon Nouveau Mot de Passe Admin</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+
         </div>
       )}
 
@@ -2602,6 +2779,151 @@ export default function SaaSAdminPortal({
                       }`}
                     >
                       <span>{isResettingPassword ? 'Mise à jour...' : 'Confirmer & Réinitialiser'}</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================= */}
+      {/* MODAL: SUPER-ADMIN PERSONAL PASSWORD CHANGE               */}
+      {/* ========================================================= */}
+      <AnimatePresence>
+        {isAdminPasswordModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-slate-900 border border-purple-500/40 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <KeyRound className="w-5 h-5 text-purple-400" />
+                  Modifier mon Mot de Passe Administrateur
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsAdminPasswordModalOpen(false)}
+                  className="text-gray-400 hover:text-white cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {adminPasswordSuccess ? (
+                <div className="space-y-4 py-3 text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto shadow-lg">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-white">Mot de Passe Mis à Jour !</h4>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Votre nouveau mot de passe Super-Admin a été enregistré avec succès en base de données.
+                    </p>
+                  </div>
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsAdminPasswordModalOpen(false)}
+                      className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer shadow-lg shadow-emerald-600/30"
+                    >
+                      Terminer
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleUpdateAdminPassword} className="space-y-4 text-xs">
+                  {adminPasswordError && (
+                    <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-red-300 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>{adminPasswordError}</span>
+                    </div>
+                  )}
+
+                  <p className="text-gray-400 text-xs">
+                    Entrez votre nouveau mot de passe Super-Admin. Il sera immédiatement actif pour vos prochaines connexions.
+                  </p>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-gray-300 font-bold mb-1">
+                        Nouveau Mot de Passe *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showAdminNewPassword ? 'text' : 'password'}
+                          required
+                          minLength={6}
+                          value={adminNewPassword}
+                          onChange={e => setAdminNewPassword(e.target.value)}
+                          placeholder="Minimum 6 caractères"
+                          className="w-full bg-slate-950 border border-purple-500/30 rounded-xl p-2.5 pr-10 text-white font-mono text-xs focus:outline-none focus:border-purple-400"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAdminNewPassword(!showAdminNewPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
+                        >
+                          {showAdminNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-300 font-bold mb-1">
+                        Confirmer le Nouveau Mot de Passe *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showAdminConfirmPassword ? 'text' : 'password'}
+                          required
+                          minLength={6}
+                          value={adminConfirmPassword}
+                          onChange={e => setAdminConfirmPassword(e.target.value)}
+                          placeholder="Retapez le mot de passe"
+                          className="w-full bg-slate-950 border border-purple-500/30 rounded-xl p-2.5 pr-10 text-white font-mono text-xs focus:outline-none focus:border-purple-400"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAdminConfirmPassword(!showAdminConfirmPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
+                        >
+                          {showAdminConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsAdminPasswordModalOpen(false)}
+                      className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 font-bold"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isAdminUpdatingPassword || !adminNewPassword}
+                      className={`px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold shadow-lg shadow-purple-600/30 cursor-pointer flex items-center gap-2 ${
+                        isAdminUpdatingPassword || !adminNewPassword ? 'opacity-60 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      {isAdminUpdatingPassword ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>Mise à jour...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck className="w-4 h-4" />
+                          <span>Mettre à jour</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </form>
