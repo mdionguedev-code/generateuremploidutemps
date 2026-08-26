@@ -94,17 +94,26 @@ export default function AuthModal({
         password: password.trim(),
       });
       if (signInError) {
-        setError("Identifiants incorrects. Veuillez vérifier votre adresse email ou votre mot de passe.");
+        console.error('Login error:', signInError);
+        setError(
+          signInError.message === 'Invalid login credentials'
+            ? "Adresse email ou mot de passe incorrect. Veuillez vérifier votre saisie."
+            : signInError.message
+        );
       } else if (signInData?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', signInData.user.id)
-          .single();
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', signInData.user.id)
+            .maybeSingle();
 
-        if (profile?.role === 'admin') {
-          window.location.href = '/admin';
-        } else {
+          if (profile?.role === 'admin') {
+            window.location.href = '/admin';
+          } else {
+            window.location.href = '/user';
+          }
+        } catch {
           window.location.href = '/user';
         }
         return;

@@ -56,13 +56,6 @@ export async function updateSession(request: NextRequest) {
       url.pathname = '/user'
       return NextResponse.redirect(url)
     }
-
-    // Auto-redirect from home to dedicated space
-    if (path === '/') {
-      const url = request.nextUrl.clone()
-      url.pathname = role === 'admin' ? '/admin' : '/user'
-      return NextResponse.redirect(url)
-    }
   }
 
   return supabaseResponse
