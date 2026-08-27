@@ -500,6 +500,12 @@ export default function TimetableDashboard({
     return currentPlan.maxExports || 9999;
   }, [currentPlan]);
 
+  const pendingActivationRequest = useMemo(() => {
+    return saasActivationRequests.find(
+      r => (r.clientId === currentUserId || (currentUserEmail && r.adminEmail?.toLowerCase() === currentUserEmail.toLowerCase())) && r.status === 'pending'
+    );
+  }, [saasActivationRequests, currentUserId, currentUserEmail]);
+
   // Handle License Key Application (Activates real license key in Supabase)
   const handleApplyLicenseKey = async (keyStr: string): Promise<{ success: boolean; message: string }> => {
     const cleanKey = keyStr
@@ -2576,8 +2582,39 @@ export default function TimetableDashboard({
           </div>
         )}
 
+        {/* --- PENDING ACTIVATION REQUEST BANNER --- */}
+        {saasPortalMode === 'client' && pendingActivationRequest && (
+          <div className="mb-6 p-4 rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-500/10 via-slate-900/40 to-emerald-500/10 text-slate-200 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-xl pointer-events-none" />
+            <div className="flex items-center gap-3.5 relative z-10">
+              <div className="p-3 rounded-2xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0 shadow-sm animate-pulse">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div className="text-left">
+                <h4 className="text-sm font-black text-white flex items-center gap-2">
+                  <span>Demande d'activation en cours de traitement</span>
+                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-mono border border-indigo-500/30 uppercase font-black">
+                    En attente
+                  </span>
+                </h4>
+                <p className="text-xs text-gray-300 mt-1 max-w-2xl leading-relaxed">
+                  Nous avons bien reçu votre demande d'activation pour la formule <strong className="text-white">{(saasPlans.find(p => p.id === pendingActivationRequest.planId)?.name) || 'Abonnement'}</strong> de l'établissement <strong className="text-white">{pendingActivationRequest.schoolName}</strong>. Notre équipe procède actuellement à la vérification de votre paiement. Votre clé de licence officielle vous sera transmise sur votre WhatsApp (<strong className="text-emerald-400 font-mono">{pendingActivationRequest.whatsapp}</strong>) très prochainement. Merci pour votre patience et votre confiance !
+                </p>
+              </div>
+            </div>
+            
+            <button
+              onClick={() => setIsClientSubModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-extrabold text-xs shadow-lg transition-all flex items-center gap-1.5 cursor-pointer shrink-0 active:scale-95 border border-indigo-400/20"
+            >
+              <Key className="w-4 h-4 text-indigo-200" />
+              <span>Activer ma clé</span>
+            </button>
+          </div>
+        )}
+
         {/* --- PENDING KEY ACTIVATION ALERT BANNER --- */}
-        {saasPortalMode === 'client' && currentClient.status === 'pending_key' && (
+        {saasPortalMode === 'client' && currentClient.status === 'pending_key' && !pendingActivationRequest && (
           <div className="mb-6 p-4 rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-600/10 to-orange-500/10 text-amber-200 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
             <div className="flex items-center gap-3.5">
               <div className="p-3 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0 shadow-sm">

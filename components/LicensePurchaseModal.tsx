@@ -736,7 +736,10 @@ export default function LicensePurchaseModal({
               <div className="pt-1">
                 <button
                   type="button"
-                  onClick={handleClose}
+                  onClick={() => {
+                    handleClose();
+                    window.location.href = '/user';
+                  }}
                   className="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-[11px] transition-all cursor-pointer shadow active:scale-95"
                 >
                   Fermer &amp; Accéder à mon Espace
