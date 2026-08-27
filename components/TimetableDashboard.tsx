@@ -507,37 +507,63 @@ export default function TimetableDashboard({
       .replace(/\s*-\s*/g, '-')
       .replace(/\s+/g, '');
 
-    if (!cleanKey || cleanKey.length < 8) {
+    if (!cleanKey || cleanKey.length < 6) {
       return { success: false, message: "Veuillez saisir une clé de licence valide." };
     }
 
-    if (currentUserId) {
-      const res = await dbRedeemLicenseKey(currentUserId, cleanKey);
-      if (res.success && res.planId) {
-        setUserPlanId(res.planId);
-
-        // Refresh live establishment data
-        const estData = await getEstablishmentData(currentUserId);
-        setSchoolName(estData.settings.schoolName);
-        setSchoolSlogan(estData.settings.schoolSlogan);
-
-        // Refresh SaaS data
-        const saasData = await getSaaSAdminLivePlatformData();
-        setSaasClients(saasData.clients);
-        setSaasLicenseKeys(saasData.licenseKeys);
-
-        // Reset quotas for the new plan
-        setGenerationCount(0);
-        setExportCount(0);
-
-        showNotification(res.message, 'success');
-        return { success: true, message: res.message };
-      } else {
-        return { success: false, message: res.message };
+    let userId = currentUserId;
+    if (!userId) {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        userId = user.id;
+        setCurrentUserId(user.id);
       }
     }
 
-    return { success: false, message: "Utilisateur non connecté." };
+    if (!userId) {
+      return { success: false, message: "Session expirée ou utilisateur non connecté. Veuillez vous reconnecter." };
+    }
+
+    const res = await dbRedeemLicenseKey(userId, cleanKey);
+    if (res.success && res.planId) {
+      setUserPlanId(res.planId);
+
+      // Refresh live establishment data
+      try {
+        const estData = await getEstablishmentData(userId);
+        setSchoolName(estData.settings.schoolName);
+        setSchoolSlogan(estData.settings.schoolSlogan);
+      } catch (e) {
+        console.error('Error refreshing establishment data:', e);
+      }
+
+      // Refresh SaaS data
+      try {
+        const saasData = await getSaaSAdminLivePlatformData();
+        setSaasClients(saasData.clients);
+        setSaasLicenseKeys(saasData.licenseKeys);
+        setSaasActivationRequests(saasData.activationRequests);
+      } catch (e) {
+        console.error('Error refreshing SaaS data:', e);
+      }
+
+      // Update currentClient locally
+      setSaasClients(prev => prev.map(c => c.id === userId ? {
+        ...c,
+        planId: res.planId!,
+        status: 'active' as const
+      } : c));
+
+      // Reset quotas for the new plan
+      setGenerationCount(0);
+      setExportCount(0);
+
+      showNotification(res.message, 'success');
+      return { success: true, message: res.message };
+    } else {
+      return { success: false, message: res.message };
+    }
   };
 
   // --- User Profile Password Change State & Handler ---
