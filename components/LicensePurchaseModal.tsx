@@ -21,7 +21,8 @@ import {
   LogIn,
   Check,
   Sparkles,
-  Zap
+  Zap,
+  ShieldCheck
 } from 'lucide-react';
 import { SaaSPlan, PaymentMethod } from '@/lib/saasTypes';
 import { createClient } from '@/utils/supabase/client';
@@ -685,50 +686,86 @@ export default function LicensePurchaseModal({
           {/* STEP 3: ORDER CONFIRMED & PAYMENT LINK                   */}
           {/* ========================================================= */}
           {currentStep === 3 && (
-            <div className="space-y-4 text-xs relative z-10 flex-1 text-center">
-              <div className="py-3 text-emerald-400 space-y-2">
-                <CheckCircle2 className="w-12 h-12 mx-auto text-emerald-400 animate-bounce" />
-                <h4 className="text-base font-black text-white">Demande Transmise avec Succès !</h4>
+            <div className="space-y-4 text-xs relative z-10 flex-1 overflow-y-auto pr-1 pb-1 text-center animate-in fade-in">
+              
+              {/* Header Badge */}
+              <div className="py-2 text-emerald-400 space-y-1.5">
+                <div className="w-12 h-12 mx-auto rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-500/10">
+                  <CheckCircle2 className="w-7 h-7" />
+                </div>
+                <h4 className="text-base font-black text-white">Commande Enregistrée avec Succès !</h4>
                 <p className="text-xs text-gray-300 max-w-sm mx-auto">
-                  Votre demande d'activation pour <strong>{schoolName}</strong> a été envoyée au Super-Administrateur.
+                  Votre demande d'activation pour <strong>{schoolName}</strong> a bien été transmise au Super-Administrateur.
                 </p>
               </div>
 
               {/* Payment Box */}
-              <div className="p-4 rounded-2xl bg-slate-950/90 border border-emerald-500/20 text-left space-y-3 shadow-inner">
+              <div className="p-4 rounded-2xl bg-slate-950/90 border border-emerald-500/30 text-left space-y-3 shadow-inner">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="text-gray-400">Formule commandée :</span>
-                  <span className="font-bold text-white">{plan.name}</span>
+                  <span className="text-gray-400 font-medium">Formule commandée :</span>
+                  <span className="font-extrabold text-white px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
+                    {plan.name}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center text-xs">
-                  <span className="text-gray-400">Montant à régler :</span>
-                  <span className="font-extrabold text-emerald-400 font-mono text-sm">
+                  <span className="text-gray-400 font-medium">Montant à régler :</span>
+                  <span className="font-extrabold text-emerald-400 font-mono text-base">
                     {plan.monthlyPriceFCFA.toLocaleString('fr-FR')} FCFA
                   </span>
                 </div>
 
-                <div className="pt-2">
+                <div className="pt-1.5">
                   <a
                     href={waveLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-black text-xs shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer decoration-0"
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-black text-xs shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer decoration-0 hover:scale-[1.01] active:scale-95"
                   >
                     <ExternalLink className="w-4 h-4" />
-                    <span>Ouvrir Wave pour finaliser le règlement</span>
+                    <span>Finaliser mon paiement sur Wave</span>
                   </a>
                 </div>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 text-gray-300 text-[11px] text-left leading-relaxed">
-                ℹ️ Dès réception du règlement, le Super-Administrateur validera votre dossier et vous fera parvenir votre clé d'activation sur WhatsApp au <strong>{whatsapp}</strong> ou par e-mail à <strong>{email}</strong>.
+              {/* Professional, Warm & Reassuring Delivery Guarantee Card */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/40 to-slate-950/80 border border-indigo-500/30 text-left space-y-2.5 shadow-md">
+                <div className="flex items-center gap-2 text-indigo-300 font-extrabold text-xs">
+                  <ShieldCheck className="w-4 h-4 text-indigo-400 shrink-0" />
+                  <span>Validation &amp; Envoi Direct de votre Clé</span>
+                </div>
+                
+                <p className="text-[11px] text-gray-300 leading-relaxed">
+                  Dès réception et vérification de votre règlement, le Super-Administrateur valide votre commande et vous fait parvenir votre clé de licence officielle ainsi que les instructions d'activation.
+                </p>
+
+                <div className="pt-1 border-t border-white/10 space-y-1.5 text-[11px]">
+                  <div className="flex items-center justify-between text-gray-300">
+                    <span className="text-gray-400 flex items-center gap-1.5">
+                      <Smartphone className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      Livraison sur WhatsApp :
+                    </span>
+                    <strong className="text-emerald-300 font-mono font-bold">{whatsapp}</strong>
+                  </div>
+                  <div className="flex items-center justify-between text-gray-300">
+                    <span className="text-gray-400 flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                      Confirmation e-mail :
+                    </span>
+                    <strong className="text-white font-mono text-[10px] truncate max-w-[180px]">{email}</strong>
+                  </div>
+                </div>
+
+                <div className="pt-2 text-[10px] text-indigo-200/80 italic flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3 text-indigo-400 shrink-0" />
+                  <span>Merci pour votre confiance ! Notre équipe reste à votre écoute pour vous accompagner.</span>
+                </div>
               </div>
 
               <div className="pt-2">
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-slate-800 to-slate-700 hover:from-slate-700 hover:to-slate-600 text-white font-bold text-xs transition-colors cursor-pointer"
+                  className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-all cursor-pointer shadow hover:scale-[1.01] active:scale-95"
                 >
                   Fermer &amp; Accéder à mon Espace
                 </button>
