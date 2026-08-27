@@ -3,13 +3,21 @@
 import React, { useState, useEffect } from 'react';
 import DocumentationView from './DocumentationView';
 import LicensePurchaseModal from './LicensePurchaseModal';
-import { SaaSPlan } from '@/lib/saasTypes';
+import { SaaSPlan, PaymentMethod } from '@/lib/saasTypes';
 
 interface LandingPageProps {
   onOpenLogin: () => void;
   onDirectDemoClient: () => void;
   onDirectDemoAdmin: () => void;
-  onPurchaseLicenseRequest: (schoolName: string, email: string, whatsapp: string, planId: string) => void;
+  onPurchaseLicenseRequest: (
+    schoolName: string,
+    email: string,
+    whatsapp: string,
+    planId: string,
+    adminName?: string,
+    userId?: string,
+    paymentMethod?: PaymentMethod
+  ) => void;
   plans: SaaSPlan[];
   theme?: 'dark' | 'light';
 }

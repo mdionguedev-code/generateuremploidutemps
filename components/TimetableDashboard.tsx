@@ -725,6 +725,27 @@ export default function TimetableDashboard({
     showNotification(`Demande d'activation transmise avec succès à l'administration pour ${params.schoolName} !`, 'success');
   };
 
+  const handlePurchaseLicenseRequest = (
+    schoolName: string,
+    email: string,
+    whatsapp: string,
+    planId: string,
+    adminName?: string,
+    userId?: string,
+    paymentMethod?: PaymentMethod
+  ) => {
+    handleCreateActivationRequest({
+      type: 'new_activation',
+      schoolName,
+      adminName: adminName || `Admin ${schoolName}`,
+      adminEmail: email,
+      whatsapp,
+      planId,
+      clientId: userId,
+      paymentMethod: paymentMethod || 'Wave'
+    });
+  };
+
   // Validate request, deliver key and automatically register client (Gated until key redemption)
   const handleValidateAndDeliverRequest = async (requestId: string, deliveryType?: 'whatsapp' | 'email') => {
     const req = saasActivationRequests.find(r => r.id === requestId);
@@ -865,17 +886,6 @@ export default function TimetableDashboard({
       const mailUrl = `mailto:${req.adminEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(messageText)}`;
       window.open(mailUrl, '_blank');
     }
-  };
-
-  // Handle a new license key purchase request from modal
-  const handlePurchaseLicenseRequest = (schoolName: string, adminEmail: string, whatsapp: string, planId: string) => {
-    handleCreateActivationRequest({
-      type: 'new_activation',
-      schoolName,
-      adminEmail,
-      whatsapp,
-      planId
-    });
   };
 
   // Switch to client view from admin
