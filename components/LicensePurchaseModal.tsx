@@ -735,7 +735,7 @@ export default function LicensePurchaseModal({
                 </div>
                 
                 <p className="text-[11px] text-gray-300 leading-relaxed">
-                  Dès réception et vérification de votre règlement, le Super-Administrateur valide votre commande et vous fait parvenir votre clé de licence officielle ainsi que les instructions d'activation.
+                  Dès réception et vérification de votre paiement, nous validerons votre commande et vous ferons parvenir votre clé de licence officielle. Merci pour la confiance.
                 </p>
 
                 <div className="pt-1 border-t border-white/10 space-y-1.5 text-[11px]">
@@ -757,7 +757,7 @@ export default function LicensePurchaseModal({
 
                 <div className="pt-2 text-[10px] text-indigo-200/80 italic flex items-center gap-1.5">
                   <Sparkles className="w-3 h-3 text-indigo-400 shrink-0" />
-                  <span>Merci pour votre confiance ! Notre équipe reste à votre écoute pour vous accompagner.</span>
+                  <span>Notre équipe reste à votre écoute pour vous accompagner dans vos emplois du temps.</span>
                 </div>
               </div>
 
