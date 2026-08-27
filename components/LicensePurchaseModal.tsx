@@ -294,81 +294,85 @@ export default function LicensePurchaseModal({
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-slate-900 border border-emerald-500/30 rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl space-y-5 relative overflow-hidden flex flex-col max-h-[92vh]"
+          className="bg-slate-900 border border-emerald-500/30 rounded-3xl p-5 max-w-lg w-full shadow-2xl space-y-4 relative overflow-hidden flex flex-col"
         >
           {/* Background Decorative Glow */}
-          <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-60 h-60 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
 
           {/* Header */}
-          <div className="flex items-center justify-between pb-4 border-b border-white/10 relative z-10 shrink-0">
-            <div className="flex items-center gap-3">
-              <span className="p-2.5 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white shadow-lg shrink-0">
-                <CreditCard className="w-5 h-5" />
+          <div className="flex items-center justify-between pb-3 border-b border-white/10 relative z-10 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <span className="p-2 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white shadow-lg shrink-0">
+                <CreditCard className="w-4.5 h-4.5" />
               </span>
               <div>
-                <h3 className="text-base font-black text-white flex items-center gap-2">
+                <h3 className="text-sm font-black text-white flex items-center gap-1.5">
                   <span>Achat de Clé Licence</span>
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono uppercase font-bold">
+                  <span className="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.2 rounded-full font-mono uppercase font-bold">
                     {plan.name}
                   </span>
                 </h3>
-                <p className="text-xs text-gray-400 mt-0.5">
+                <p className="text-[11px] text-gray-400">
                   {plan.monthlyPriceFCFA.toLocaleString('fr-FR')} FCFA (~ {Math.round(plan.monthlyPriceFCFA / 655.957)} €)
                 </p>
               </div>
             </div>
             <button
               onClick={handleClose}
-              className="text-gray-400 hover:text-white p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer shadow-sm"
+              className="text-gray-400 hover:text-white p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer shadow-sm"
               title="Fermer"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          {/* 2-STEP PROGRESS BAR / STEPPER */}
+          {/* Stepper progress indicator */}
           <div className="grid grid-cols-2 gap-2 relative z-10 shrink-0">
-            <div className={`p-2.5 rounded-xl border text-center transition-all flex items-center justify-center gap-2 ${
+            <div className={`py-1.5 px-3 rounded-lg border text-center transition-all flex items-center justify-center gap-2 ${
               currentStep === 1
-                ? 'bg-indigo-600/20 border-indigo-500/40 text-white font-bold shadow-sm'
+                ? 'bg-indigo-600/10 border-indigo-500/30 text-white font-semibold shadow-sm'
                 : currentStep > 1
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 font-bold'
+                ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-300 font-semibold'
                 : 'bg-white/5 border-white/5 text-gray-500'
             }`}>
-              <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-black shrink-0 ${
+              <span className={`w-4 h-4 rounded-full text-[10px] font-mono flex items-center justify-center font-black shrink-0 ${
                 currentStep > 1 ? 'bg-emerald-500 text-slate-950' : currentStep === 1 ? 'bg-indigo-500 text-white' : 'bg-white/10 text-gray-400'
               }`}>
-                {currentStep > 1 ? <Check className="w-3.5 h-3.5" /> : '1'}
+                {currentStep > 1 ? <Check className="w-3 h-3" /> : '1'}
               </span>
-              <span className="text-xs truncate">1. Identification</span>
+              <span className="text-[11px] truncate">1. Identification</span>
             </div>
 
-            <div className={`p-2.5 rounded-xl border text-center transition-all flex items-center justify-center gap-2 ${
+            <div className={`py-1.5 px-3 rounded-lg border text-center transition-all flex items-center justify-center gap-2 ${
               currentStep === 2
-                ? 'bg-indigo-600/20 border-indigo-500/40 text-white font-bold shadow-sm'
+                ? 'bg-indigo-600/10 border-indigo-500/30 text-white font-semibold shadow-sm'
                 : currentStep === 3
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 font-bold'
+                ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-300 font-semibold'
                 : 'bg-white/5 border-white/5 text-gray-500'
             }`}>
-              <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-black shrink-0 ${
+              <span className={`w-4 h-4 rounded-full text-[10px] font-mono flex items-center justify-center font-black shrink-0 ${
                 currentStep === 3 ? 'bg-emerald-500 text-slate-950' : currentStep === 2 ? 'bg-indigo-500 text-white' : 'bg-white/10 text-gray-400'
               }`}>
-                {currentStep === 3 ? <Check className="w-3.5 h-3.5" /> : '2'}
+                {currentStep === 3 ? <Check className="w-3 h-3" /> : '2'}
               </span>
-              <span className="text-xs truncate">2. Paiement &amp; Clé</span>
+              <span className="text-[11px] truncate">2. Paiement &amp; Clé</span>
             </div>
           </div>
 
-          {/* ERROR / SUCCESS NOTIFICATIONS */}
-          {error && (
-            <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 text-xs font-semibold relative z-10 animate-in fade-in">
-              ⚠️ {error}
-            </div>
-          )}
-          {successMsg && (
-            <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold relative z-10 animate-in fade-in">
-              ✅ {successMsg}
+          {/* Messages Alerts */}
+          {(error || successMsg) && (
+            <div className="relative z-10 shrink-0">
+              {error && (
+                <div className="p-2.5 rounded-lg bg-red-500/15 border border-red-500/25 text-red-300 text-[11px] font-medium">
+                  ⚠️ {error}
+                </div>
+              )}
+              {successMsg && (
+                <div className="p-2.5 rounded-lg bg-emerald-500/15 border border-emerald-500/25 text-emerald-300 text-[11px] font-medium">
+                  ✅ {successMsg}
+                </div>
+              )}
             </div>
           )}
 
@@ -376,175 +380,178 @@ export default function LicensePurchaseModal({
           {/* STEP 1: AUTHENTICATION (SIGN UP OR SIGN IN)              */}
           {/* ========================================================= */}
           {currentStep === 1 && (
-            <div className="space-y-4 relative z-10 flex-1 overflow-y-auto pr-1">
-              
-              {/* If user is already authenticated */}
+            <div className="space-y-3 relative z-10 flex-1">
               {authenticatedUser ? (
-                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 space-y-3">
-                  <div className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                <div className="p-3.5 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-emerald-200 space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
                     <div>
-                      <h4 className="text-xs font-bold text-white">Vous êtes déjà connecté</h4>
-                      <p className="text-[11px] text-gray-300">{authenticatedUser.email}</p>
+                      <h4 className="text-[11px] font-bold text-white">Vous êtes connecté</h4>
+                      <p className="text-[10px] text-gray-300">{authenticatedUser.email}</p>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setCurrentStep(2)}
-                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    <span>Continuer vers le paiement</span>
-                    <ArrowRight className="w-4 h-4" />
+                    <span>Continuer</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ) : (
                 <>
-                  {/* TOGGLE TABS: INSCRIPTION vs CONNEXION */}
-                  <div className="grid grid-cols-2 p-1 rounded-xl bg-slate-950 border border-white/10 text-xs font-bold">
+                  <div className="grid grid-cols-2 p-0.5 rounded-lg bg-slate-950 border border-white/5 text-[11px] font-bold">
                     <button
                       type="button"
                       onClick={() => { setIsSignUp(true); setError(''); }}
-                      className={`py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      className={`py-1.5 rounded-md transition-all flex items-center justify-center gap-1 cursor-pointer ${
                         isSignUp
-                          ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
+                          ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm'
                           : 'text-gray-400 hover:text-white'
                       }`}
                     >
-                      <UserPlus className="w-3.5 h-3.5" />
-                      <span>S'inscrire (Nouveau)</span>
+                      <UserPlus className="w-3 h-3" />
+                      <span>S'inscrire</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => { setIsSignUp(false); setError(''); }}
-                      className={`py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      className={`py-1.5 rounded-md transition-all flex items-center justify-center gap-1 cursor-pointer ${
                         !isSignUp
-                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm'
                           : 'text-gray-400 hover:text-white'
                       }`}
                     >
-                      <LogIn className="w-3.5 h-3.5" />
-                      <span>Déjà un compte</span>
+                      <LogIn className="w-3 h-3" />
+                      <span>Se connecter</span>
                     </button>
                   </div>
 
-                  <form onSubmit={handleAuthSubmit} className="space-y-3.5 text-xs">
-                    {/* Inscription specific fields */}
-                    {isSignUp && (
+                  <form onSubmit={handleAuthSubmit} className="space-y-2.5 text-[11px]">
+                    {isSignUp ? (
                       <>
-                        <div className="space-y-1">
-                          <label className="block text-gray-300 font-bold text-[11px]">
-                            Nom de l'Établissement scolaire :
-                          </label>
-                          <div className="relative">
-                            <Building2 className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                            <input
-                              type="text"
-                              required
-                              placeholder="Ex: Lycée Blaise Diagne"
-                              value={schoolName}
-                              onChange={e => setSchoolName(e.target.value)}
-                              className="w-full bg-slate-950 border border-white/10 rounded-xl pl-9 pr-3 py-2.5 text-white text-xs focus:outline-none focus:border-emerald-500"
-                            />
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-0.5">
+                            <label className="text-gray-300 font-semibold">Établissement :</label>
+                            <div className="relative">
+                              <Building2 className="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                              <input
+                                type="text"
+                                required
+                                placeholder="Lycée..."
+                                value={schoolName}
+                                onChange={e => setSchoolName(e.target.value)}
+                                className="w-full bg-slate-950 border border-white/5 rounded-lg pl-8 pr-2 py-1.5 text-white text-[11px] focus:outline-none focus:border-emerald-500"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-0.5">
+                            <label className="text-gray-300 font-semibold">Responsable :</label>
+                            <div className="relative">
+                              <User className="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                              <input
+                                type="text"
+                                placeholder="Directeur..."
+                                value={adminName}
+                                onChange={e => setAdminName(e.target.value)}
+                                className="w-full bg-slate-950 border border-white/5 rounded-lg pl-8 pr-2 py-1.5 text-white text-[11px] focus:outline-none focus:border-emerald-500"
+                              />
+                            </div>
                           </div>
                         </div>
 
-                        <div className="space-y-1">
-                          <label className="block text-gray-300 font-bold text-[11px]">
-                            Nom du Responsable / Directeur :
-                          </label>
-                          <div className="relative">
-                            <User className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                            <input
-                              type="text"
-                              placeholder="Ex: M. Diongue"
-                              value={adminName}
-                              onChange={e => setAdminName(e.target.value)}
-                              className="w-full bg-slate-950 border border-white/10 rounded-xl pl-9 pr-3 py-2.5 text-white text-xs focus:outline-none focus:border-emerald-500"
-                            />
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-0.5">
+                            <label className="text-gray-300 font-semibold">WhatsApp :</label>
+                            <div className="relative">
+                              <Smartphone className="w-3.5 h-3.5 text-emerald-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                              <input
+                                type="tel"
+                                required
+                                placeholder="+221..."
+                                value={whatsapp}
+                                onChange={e => setWhatsapp(e.target.value)}
+                                className="w-full bg-slate-950 border border-white/5 rounded-lg pl-8 pr-2 py-1.5 text-white text-[11px] focus:outline-none focus:border-emerald-500 font-mono"
+                              />
+                            </div>
                           </div>
-                        </div>
 
-                        <div className="space-y-1">
-                          <label className="block text-gray-300 font-bold text-[11px]">
-                            Numéro WhatsApp (pour livraison de la clé) :
-                          </label>
-                          <div className="relative">
-                            <Smartphone className="w-4 h-4 text-emerald-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                            <input
-                              type="tel"
-                              required
-                              placeholder="Ex: +221 77 123 45 67"
-                              value={whatsapp}
-                              onChange={e => setWhatsapp(e.target.value)}
-                              className="w-full bg-slate-950 border border-white/10 rounded-xl pl-9 pr-3 py-2.5 text-white text-xs focus:outline-none focus:border-emerald-500 font-mono"
-                            />
+                          <div className="space-y-0.5">
+                            <label className="text-gray-300 font-semibold">Adresse e-mail :</label>
+                            <div className="relative">
+                              <Mail className="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                              <input
+                                type="email"
+                                required
+                                placeholder="contact@ecole.sn"
+                                value={email}
+                                onChange={e => setEmail(e.target.value)}
+                                className="w-full bg-slate-950 border border-white/5 rounded-lg pl-8 pr-2 py-1.5 text-white text-[11px] focus:outline-none focus:border-emerald-500"
+                              />
+                            </div>
                           </div>
                         </div>
                       </>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="space-y-0.5">
+                          <label className="text-gray-300 font-semibold">Adresse e-mail :</label>
+                          <div className="relative">
+                            <Mail className="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="email"
+                              required
+                              placeholder="contact@ecole.sn"
+                              value={email}
+                              onChange={e => setEmail(e.target.value)}
+                              className="w-full bg-slate-950 border border-white/5 rounded-lg pl-8 pr-2 py-1.5 text-white text-[11px] focus:outline-none focus:border-emerald-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     )}
 
-                    {/* Email Field */}
-                    <div className="space-y-1">
-                      <label className="block text-gray-300 font-bold text-[11px]">
-                        Adresse e-mail :
-                      </label>
+                    <div className="space-y-0.5">
+                      <label className="text-gray-300 font-semibold">Mot de passe :</label>
                       <div className="relative">
-                        <Mail className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                        <input
-                          type="email"
-                          required
-                          placeholder="contact@etablissement.sn"
-                          value={email}
-                          onChange={e => setEmail(e.target.value)}
-                          className="w-full bg-slate-950 border border-white/10 rounded-xl pl-9 pr-3 py-2.5 text-white text-xs focus:outline-none focus:border-emerald-500"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Password Field */}
-                    <div className="space-y-1">
-                      <label className="block text-gray-300 font-bold text-[11px]">
-                        Mot de passe :
-                      </label>
-                      <div className="relative">
-                        <Lock className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <Lock className="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
                         <input
                           type={showPassword ? 'text' : 'password'}
                           required
                           placeholder="••••••••"
                           value={password}
                           onChange={e => setPassword(e.target.value)}
-                          className="w-full bg-slate-950 border border-white/10 rounded-xl pl-9 pr-10 py-2.5 text-white text-xs focus:outline-none focus:border-emerald-500"
+                          className="w-full bg-slate-950 border border-white/5 rounded-lg pl-8 pr-9 py-1.5 text-white text-[11px] focus:outline-none focus:border-emerald-500"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
                         >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                         </button>
                       </div>
                     </div>
 
-                    <div className="pt-2">
+                    <div className="pt-1">
                       <button
                         type="submit"
                         disabled={loading}
-                        className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99] disabled:opacity-50"
+                        className="w-full py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-[11px] shadow-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                       >
                         {loading ? (
-                          <span>Traitement en cours...</span>
+                          <span>Vérification...</span>
                         ) : isSignUp ? (
                           <>
-                            <UserPlus className="w-4 h-4" />
-                            <span>Créer mon compte et continuer</span>
-                            <ArrowRight className="w-4 h-4 ml-0.5" />
+                            <UserPlus className="w-3.5 h-3.5" />
+                            <span>Créer mon compte &amp; Continuer</span>
                           </>
                         ) : (
                           <>
-                            <LogIn className="w-4 h-4" />
-                            <span>Se connecter et continuer</span>
-                            <ArrowRight className="w-4 h-4 ml-0.5" />
+                            <LogIn className="w-3.5 h-3.5" />
+                            <span>Se connecter &amp; Continuer</span>
                           </>
                         )}
                       </button>
@@ -559,124 +566,110 @@ export default function LicensePurchaseModal({
           {/* STEP 2: ORDER SUMMARY & PAYMENT INITIATION               */}
           {/* ========================================================= */}
           {currentStep === 2 && (
-            <form onSubmit={handlePaymentSubmit} className="space-y-4 text-xs relative z-10 flex-1 overflow-y-auto pr-1">
+            <form onSubmit={handlePaymentSubmit} className="space-y-3.5 text-[11px] relative z-10 flex-1">
               
               {/* Order Recap Card */}
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-950 to-slate-900 border border-emerald-500/20 space-y-3 shadow-inner">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400 font-mono text-[11px] uppercase">Formule Sélectionnée</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    {plan.name}
-                  </span>
+              <div className="p-3 rounded-xl bg-gradient-to-br from-slate-950 to-slate-900 border border-emerald-500/10 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-gray-400 font-mono block">FORMULE</span>
+                  <span className="font-extrabold text-white text-xs">{plan.name}</span>
                 </div>
-
-                <div className="flex items-baseline justify-between border-t border-white/5 pt-2">
-                  <span className="text-gray-300">Montant à régler :</span>
-                  <div className="text-right">
-                    <span className="text-lg font-black text-emerald-400 font-mono">
-                      {plan.monthlyPriceFCFA.toLocaleString('fr-FR')} FCFA
-                    </span>
-                    <span className="block text-[10px] text-gray-400">
-                      ~ {Math.round(plan.monthlyPriceFCFA / 655.957)} € / mois
-                    </span>
-                  </div>
+                <div className="text-right">
+                  <span className="text-sm font-black text-emerald-400 font-mono block">
+                    {plan.monthlyPriceFCFA.toLocaleString('fr-FR')} FCFA
+                  </span>
+                  <span className="text-[9px] text-gray-400 block">
+                    ~ {Math.round(plan.monthlyPriceFCFA / 655.957)} € / mois
+                  </span>
                 </div>
               </div>
 
               {/* Delivery Contact Verification */}
-              <div className="p-4 rounded-2xl bg-slate-950/80 border border-white/10 space-y-3">
-                <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <Shield className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Coordonnées de Livraison de la Clé</span>
-                </h4>
-
-                <div className="space-y-1">
-                  <label className="block text-gray-400 text-[10px]">Nom de l'établissement :</label>
+              <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-slate-950/80 border border-white/5">
+                <div className="space-y-0.5">
+                  <label className="text-gray-400 text-[10px] block">Établissement :</label>
                   <input
                     type="text"
                     required
                     value={schoolName}
                     onChange={e => setSchoolName(e.target.value)}
-                    placeholder="Nom de l'établissement"
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-slate-900 border border-white/5 rounded-lg px-2.5 py-1 text-white text-[11px] focus:outline-none focus:border-emerald-500 font-medium"
                   />
                 </div>
-
-                <div className="space-y-1">
-                  <label className="block text-gray-400 text-[10px]">Numéro WhatsApp pour recevoir la clé :</label>
+                <div className="space-y-0.5">
+                  <label className="text-gray-400 text-[10px] block">WhatsApp de livraison :</label>
                   <input
                     type="tel"
                     required
                     value={whatsapp}
                     onChange={e => setWhatsapp(e.target.value)}
-                    placeholder="+221 77 123 45 67"
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500 font-mono text-emerald-300 font-bold"
+                    className="w-full bg-slate-900 border border-white/5 rounded-lg px-2.5 py-1 text-white text-[11px] focus:outline-none focus:border-emerald-500 font-mono text-emerald-300 font-bold"
                   />
                 </div>
               </div>
 
               {/* Payment Method Choice */}
-              <div className="space-y-2">
-                <label className="block text-gray-300 font-bold text-[11px]">
+              <div className="space-y-1.5">
+                <label className="text-gray-300 font-semibold text-[10px] block uppercase font-mono">
                   Mode de Paiement :
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('Wave')}
-                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-2.5 ${
+                    className={`p-2 rounded-lg border text-left transition-all cursor-pointer flex items-center gap-2 ${
                       paymentMethod === 'Wave'
-                        ? 'bg-sky-500/20 border-sky-400 text-white shadow-md'
-                        : 'bg-slate-950/60 border-white/10 text-gray-400 hover:text-white'
+                        ? 'bg-sky-500/10 border-sky-400/30 text-white shadow-sm'
+                        : 'bg-slate-950/60 border-white/5 text-gray-400 hover:text-white'
                     }`}
                   >
-                    <span className="w-3 h-3 rounded-full border border-sky-400 flex items-center justify-center">
+                    <span className="w-2.5 h-2.5 rounded-full border border-sky-400 flex items-center justify-center shrink-0">
                       {paymentMethod === 'Wave' && <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
                     </span>
                     <div>
-                      <div className="font-bold text-xs">Wave Sénégal</div>
-                      <div className="text-[10px] text-gray-400">Paiement instantané</div>
+                      <div className="font-bold text-[10px]">Wave</div>
+                      <div className="text-[9px] text-gray-500">Sénégal &amp; Côte d'Ivoire</div>
                     </div>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('Orange Money')}
-                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-2.5 ${
+                    className={`p-2 rounded-lg border text-left transition-all cursor-pointer flex items-center gap-2 ${
                       paymentMethod === 'Orange Money'
-                        ? 'bg-orange-500/20 border-orange-400 text-white shadow-md'
-                        : 'bg-slate-950/60 border-white/10 text-gray-400 hover:text-white'
+                        ? 'bg-orange-500/10 border-orange-400/30 text-white shadow-sm'
+                        : 'bg-slate-950/60 border-white/5 text-gray-400 hover:text-white'
                     }`}
                   >
-                    <span className="w-3 h-3 rounded-full border border-orange-400 flex items-center justify-center">
+                    <span className="w-2.5 h-2.5 rounded-full border border-orange-400 flex items-center justify-center shrink-0">
                       {paymentMethod === 'Orange Money' && <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />}
                     </span>
                     <div>
-                      <div className="font-bold text-xs">Orange Money</div>
-                      <div className="text-[10px] text-gray-400">OM Sénégal &amp; UEMOA</div>
+                      <div className="font-bold text-[10px]">Orange Money</div>
+                      <div className="text-[9px] text-gray-500">Sénégal &amp; Zone UEMOA</div>
                     </div>
                   </button>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-3 pt-2">
+              <div className="flex items-center gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => setCurrentStep(1)}
-                  className="px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1 shrink-0"
                 >
-                  <ArrowLeft className="w-4 h-4" />
+                  <ArrowLeft className="w-3.5 h-3.5" />
                   <span>Retour</span>
                 </button>
 
                 <button
                   type="submit"
-                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99]"
+                  className="flex-1 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-[11px] shadow flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-[0.99]"
                 >
-                  <CreditCard className="w-4 h-4" />
-                  <span>Passer au paiement ({plan.monthlyPriceFCFA.toLocaleString('fr-FR')} FCFA)</span>
-                  <ArrowRight className="w-4 h-4 ml-0.5" />
+                  <CreditCard className="w-3.5 h-3.5" />
+                  <span>Confirmer &amp; Payer ({plan.monthlyPriceFCFA.toLocaleString('fr-FR')} F)</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </form>
@@ -686,86 +679,65 @@ export default function LicensePurchaseModal({
           {/* STEP 3: ORDER CONFIRMED & PAYMENT LINK                   */}
           {/* ========================================================= */}
           {currentStep === 3 && (
-            <div className="space-y-4 text-xs relative z-10 flex-1 overflow-y-auto pr-1 pb-1 text-center animate-in fade-in">
+            <div className="space-y-3.5 text-[11px] relative z-10 flex-1 text-center animate-in fade-in">
               
               {/* Header Badge */}
-              <div className="py-2 text-emerald-400 space-y-1.5">
-                <div className="w-12 h-12 mx-auto rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-500/10">
-                  <CheckCircle2 className="w-7 h-7" />
+              <div className="space-y-1">
+                <div className="w-10 h-10 mx-auto rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-sm">
+                  <CheckCircle2 className="w-6 h-6" />
                 </div>
-                <h4 className="text-base font-black text-white">Commande Enregistrée avec Succès !</h4>
-                <p className="text-xs text-gray-300 max-w-sm mx-auto">
-                  Votre demande d'activation pour <strong>{schoolName}</strong> a bien été transmise au Super-Administrateur.
+                <h4 className="text-sm font-black text-white">Commande Enregistrée !</h4>
+                <p className="text-[10px] text-gray-300 max-w-xs mx-auto">
+                  Votre demande d'activation pour <strong>{schoolName}</strong> a été transmise.
                 </p>
               </div>
 
               {/* Payment Box */}
-              <div className="p-4 rounded-2xl bg-slate-950/90 border border-emerald-500/30 text-left space-y-3 shadow-inner">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-gray-400 font-medium">Formule commandée :</span>
-                  <span className="font-extrabold text-white px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
-                    {plan.name}
-                  </span>
+              <div className="p-3.5 rounded-xl bg-slate-950/90 border border-emerald-500/20 flex items-center justify-between text-left">
+                <div>
+                  <span className="text-[9px] text-gray-400 block font-mono">FORMULE ET MONTANT</span>
+                  <strong className="text-white text-[11px]">{plan.name}</strong>
+                  <span className="text-emerald-400 font-mono font-extrabold ml-1.5">{plan.monthlyPriceFCFA.toLocaleString('fr-FR')} FCFA</span>
                 </div>
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-gray-400 font-medium">Montant à régler :</span>
-                  <span className="font-extrabold text-emerald-400 font-mono text-base">
-                    {plan.monthlyPriceFCFA.toLocaleString('fr-FR')} FCFA
-                  </span>
-                </div>
-
-                <div className="pt-1.5">
-                  <a
-                    href={waveLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-black text-xs shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer decoration-0 hover:scale-[1.01] active:scale-95"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    <span>Finaliser mon paiement sur Wave</span>
-                  </a>
-                </div>
+                <a
+                  href={waveLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="py-1.5 px-3.5 rounded-lg bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-extrabold text-[10px] flex items-center gap-1 cursor-pointer transition-all active:scale-95 shrink-0"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  <span>Payer sur Wave</span>
+                </a>
               </div>
 
-              {/* Professional, Warm & Reassuring Delivery Guarantee Card */}
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/40 to-slate-950/80 border border-indigo-500/30 text-left space-y-2.5 shadow-md">
-                <div className="flex items-center gap-2 text-indigo-300 font-extrabold text-xs">
-                  <ShieldCheck className="w-4 h-4 text-indigo-400 shrink-0" />
-                  <span>Validation &amp; Envoi Direct de votre Clé</span>
+              {/* Delivery Guarantee info */}
+              <div className="p-3 rounded-xl bg-gradient-to-br from-indigo-950/30 to-slate-950/70 border border-indigo-500/20 text-left space-y-2">
+                <div className="flex items-center gap-1.5 text-indigo-300 font-extrabold text-[10px] uppercase font-mono tracking-wider">
+                  <ShieldCheck className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                  <span>Validation &amp; Envoi Direct</span>
                 </div>
                 
-                <p className="text-[11px] text-gray-300 leading-relaxed">
+                <p className="text-[10px] text-gray-300 leading-normal">
                   Dès réception et vérification de votre paiement, nous validerons votre commande et vous ferons parvenir votre clé de licence officielle. Merci pour la confiance.
                 </p>
 
-                <div className="pt-1 border-t border-white/10 space-y-1.5 text-[11px]">
-                  <div className="flex items-center justify-between text-gray-300">
-                    <span className="text-gray-400 flex items-center gap-1.5">
-                      <Smartphone className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      Livraison sur WhatsApp :
-                    </span>
-                    <strong className="text-emerald-300 font-mono font-bold">{whatsapp}</strong>
+                <div className="pt-1.5 border-t border-white/5 space-y-1 text-[10px] font-mono">
+                  <div className="flex items-center justify-between text-gray-400">
+                    <span>WhatsApp de livraison :</span>
+                    <strong className="text-emerald-300 font-bold">{whatsapp}</strong>
                   </div>
-                  <div className="flex items-center justify-between text-gray-300">
-                    <span className="text-gray-400 flex items-center gap-1.5">
-                      <Mail className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                      Confirmation e-mail :
-                    </span>
-                    <strong className="text-white font-mono text-[10px] truncate max-w-[180px]">{email}</strong>
+                  <div className="flex items-center justify-between text-gray-400">
+                    <span>E-mail de confirmation :</span>
+                    <strong className="text-white truncate max-w-[170px]">{email}</strong>
                   </div>
-                </div>
-
-                <div className="pt-2 text-[10px] text-indigo-200/80 italic flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3 text-indigo-400 shrink-0" />
-                  <span>Notre équipe reste à votre écoute pour vous accompagner dans vos emplois du temps.</span>
                 </div>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-1">
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-all cursor-pointer shadow hover:scale-[1.01] active:scale-95"
+                  className="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-[11px] transition-all cursor-pointer shadow active:scale-95"
                 >
                   Fermer &amp; Accéder à mon Espace
                 </button>
