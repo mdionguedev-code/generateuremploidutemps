@@ -73,7 +73,10 @@ import {
   dbCreateLicenseKey,
   dbUpdateGlobalSettings,
   dbRedeemLicenseKey,
-  dbUserUpdatePassword
+  dbUserUpdatePassword,
+  dbSubmitActivationRequest,
+  dbAdminDeliverActivationRequest,
+  dbAdminGenerateLicenseKeys
 } from '@/lib/supabase/dbService';
 import {
   SaaSPlan,
@@ -628,8 +631,8 @@ export default function TimetableDashboard({
     }
   };
 
-  // Create an activation, upgrade or renewal request
-  const handleCreateActivationRequest = (params: {
+  // Create an activation, upgrade or renewal request and save to Supabase
+  const handleCreateActivationRequest = async (params: {
     type: 'new_activation' | 'upgrade' | 'renewal';
     schoolName: string;
     adminName?: string;
@@ -647,8 +650,32 @@ export default function TimetableDashboard({
     const now = new Date();
     const dateFormatted = `${now.toLocaleDateString('fr-FR')} ${now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
 
+    let generatedId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+    // Submit permanently to Supabase Database
+    try {
+      const res = await dbSubmitActivationRequest({
+        type: params.type,
+        schoolName: params.schoolName,
+        adminName: params.adminName,
+        adminEmail: params.adminEmail,
+        whatsapp: params.whatsapp,
+        planId: params.planId,
+        amountFCFA: amount,
+        durationMonths: duration,
+        paymentMethod: params.paymentMethod || 'Wave',
+        userId: params.clientId
+      });
+
+      if (res.requestId) {
+        generatedId = res.requestId;
+      }
+    } catch (e) {
+      console.error('Error submitting activation request to Supabase:', e);
+    }
+
     const newRequest: SaaSActivationRequest = {
-      id: `req_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: generatedId,
       type: params.type,
       schoolName: params.schoolName,
       adminName: params.adminName || `Admin ${params.schoolName}`,
@@ -667,15 +694,12 @@ export default function TimetableDashboard({
 
     const updated = [newRequest, ...saasActivationRequests];
     setSaasActivationRequests(updated);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('saas_activation_requests', JSON.stringify(updated));
-    }
 
-    showNotification(`Demande d'activation enregistrée pour ${params.schoolName} !`, 'success');
+    showNotification(`Demande d'activation transmise avec succès à l'administration pour ${params.schoolName} !`, 'success');
   };
 
   // Validate request, deliver key and automatically register client (Gated until key redemption)
-  const handleValidateAndDeliverRequest = (requestId: string, deliveryType?: 'whatsapp' | 'email') => {
+  const handleValidateAndDeliverRequest = async (requestId: string, deliveryType?: 'whatsapp' | 'email') => {
     const req = saasActivationRequests.find(r => r.id === requestId);
     if (!req) return;
 
@@ -702,11 +726,14 @@ export default function TimetableDashboard({
         const targetPlan = saasPlans.find(p => p.id === req.planId);
         keyToSend = `SCH-${targetPlan?.code || 'KEY'}-${year}-${block1}-${block2}`;
 
+        // Save generated key into database
+        await dbAdminGenerateLicenseKeys(req.planId, (req.durationMonths || 1) * 30, [keyToSend]);
+
         const newKeyObj: SaaSLicenseKey = {
           id: `key_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
           key: keyToSend,
           planId: req.planId,
-          durationDays: req.durationMonths * 30,
+          durationDays: (req.durationMonths || 1) * 30,
           generatedAt: nowStr,
           status: 'unused' // Must remain 'unused' until the client enters it!
         };
@@ -714,7 +741,10 @@ export default function TimetableDashboard({
       }
     }
 
-    // 2. Mark request as delivered
+    // Deliver activation request in DB
+    await dbAdminDeliverActivationRequest(requestId, keyToSend);
+
+    // 2. Mark request as delivered in local state
     const updatedRequests = saasActivationRequests.map(r => r.id === requestId ? {
       ...r,
       status: 'delivered' as const,

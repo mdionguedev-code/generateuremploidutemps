@@ -676,6 +676,76 @@ export async function dbUserUpdatePassword(
   };
 }
 
+export async function dbSubmitActivationRequest(params: {
+  type: string;
+  schoolName: string;
+  adminName?: string;
+  adminEmail: string;
+  whatsapp: string;
+  planId: string;
+  amountFCFA: number;
+  durationMonths?: number;
+  paymentMethod?: string;
+  userId?: string;
+  cityCountry?: string;
+  notes?: string;
+}): Promise<{ success: boolean; message: string; requestId?: string }> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('submit_activation_request', {
+    p_type: params.type,
+    p_school_name: params.schoolName,
+    p_admin_name: params.adminName || 'Directeur',
+    p_admin_email: params.adminEmail,
+    p_whatsapp: params.whatsapp,
+    p_plan_id: params.planId,
+    p_amount_fcfa: params.amountFCFA,
+    p_duration_months: params.durationMonths || 1,
+    p_payment_method: params.paymentMethod || 'Wave',
+    p_user_id: params.userId || null,
+    p_city_country: params.cityCountry || 'Sénégal',
+    p_notes: params.notes || null
+  });
+
+  if (error) {
+    console.error('Error in dbSubmitActivationRequest:', error);
+    return {
+      success: false,
+      message: error.message || "Erreur lors de la transmission de la demande d'activation."
+    };
+  }
+
+  return {
+    success: data?.success ?? true,
+    message: data?.message || "Demande transmise avec succès !",
+    requestId: data?.request_id
+  };
+}
+
+export async function dbAdminDeliverActivationRequest(
+  requestId: string,
+  assignedKey?: string
+): Promise<{ success: boolean; message: string }> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('admin_deliver_activation_request', {
+    p_request_id: requestId,
+    p_assigned_key: assignedKey || null
+  });
+
+  if (error) {
+    console.error('Error in dbAdminDeliverActivationRequest:', error);
+    return {
+      success: false,
+      message: error.message || "Erreur lors de la livraison de la clé."
+    };
+  }
+
+  return {
+    success: data?.success ?? true,
+    message: data?.message || "Demande validée !"
+  };
+}
+
+
 
 
 
