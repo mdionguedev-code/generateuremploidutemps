@@ -37,6 +37,7 @@ import {
   FileText,
   Shield,
   Key,
+  Eraser,
   CreditCard,
   Zap,
   Radio,
@@ -2692,71 +2693,94 @@ export default function TimetableDashboard({
               </div>
             </div>
 
-            {/* LIGNE 2 : Éléments fonctionnels (Mode Sombre, Reset, Wipe, Déconnexion) décalés à droite */}
+            {/* LIGNE 2 : Éléments fonctionnels (Mode Sombre, Activer clé, Wipe, Déconnexion) décalés à droite */}
             <div className="flex items-center justify-start xl:justify-end gap-2 w-full shrink-0">
               {/* Bascule Mode Clair / Mode Sombre */}
-              <button
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                className="px-2.5 py-1 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 transition-all flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer shadow-sm hover:-translate-y-0.5"
-                title={theme === 'dark' ? "Passer en mode clair" : "Passer en mode sombre"}
-              >
-                {theme === 'dark' ? (
-                  <>
-                    <Sun className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Mode Clair</span>
-                  </>
-                ) : (
-                  <>
-                    <Moon className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Mode Sombre</span>
-                  </>
-                )}
-              </button>
+              <div className="relative group">
+                <button
+                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                  className="px-2.5 py-1 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 transition-all flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer shadow-sm hover:-translate-y-0.5"
+                >
+                  {theme === 'dark' ? (
+                    <>
+                      <Sun className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Mode Clair</span>
+                    </>
+                  ) : (
+                    <>
+                      <Moon className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Mode Sombre</span>
+                    </>
+                  )}
+                </button>
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-slate-950/95 text-gray-300 text-[10px] py-1 px-2.5 rounded-lg border border-white/10 whitespace-nowrap shadow-xl z-50 pointer-events-none">
+                  {theme === 'dark' ? "Passer en thème d'affichage clair" : "Passer en thème d'affichage sombre"}
+                </div>
+              </div>
 
               <div className="h-4 w-px bg-white/10 mx-0.5" />
 
               {/* Documentation Hub */}
-              <button
-                onClick={() => setIsDocViewOpen(true)}
-                className="px-2.5 py-1 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-white border border-indigo-500/20 transition-all flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer shadow-sm hover:-translate-y-0.5"
-                title="Consulter la documentation officielle"
-              >
-                <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Documentation</span>
-              </button>
+              <div className="relative group">
+                <button
+                  onClick={() => setIsDocViewOpen(true)}
+                  className="px-2.5 py-1 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-white border border-indigo-500/20 transition-all flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer shadow-sm hover:-translate-y-0.5"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Documentation</span>
+                </button>
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-slate-950/95 text-gray-300 text-[10px] py-1 px-2.5 rounded-lg border border-white/10 whitespace-nowrap shadow-xl z-50 pointer-events-none">
+                  Consulter la notice et le guide d'utilisation
+                </div>
+              </div>
 
               <div className="h-4 w-px bg-white/10 mx-0.5" />
 
-              {/* Réinitialisation Démo */}
-              <button
-                onClick={handleResetToDefaults}
-                className="p-1 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 transition-colors cursor-pointer"
-                title="Données démo d'origine"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-              </button>
+              {/* Activer une clé */}
+              <div className="relative group">
+                <button
+                  onClick={() => setIsClientSubModalOpen(true)}
+                  className="px-2.5 py-1 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 hover:text-white border border-emerald-500/20 transition-all flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer shadow-sm hover:-translate-y-0.5"
+                >
+                  <Key className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Activer une clé</span>
+                </button>
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-slate-950/95 text-gray-300 text-[10px] py-1 px-2.5 rounded-lg border border-white/10 whitespace-nowrap shadow-xl z-50 pointer-events-none">
+                  Saisir une clé d'activation ou renouveler l'offre
+                </div>
+              </div>
+
+              <div className="h-4 w-px bg-white/10 mx-0.5" />
 
               {/* Effacer tout */}
-              <button
-                onClick={handleWipeAll}
-                className="p-1 rounded-xl bg-red-950/20 hover:bg-red-900/30 text-red-400 hover:text-red-300 border border-red-500/20 transition-colors cursor-pointer"
-                title="Réinitialiser à blanc"
-              >
-                <Trash className="w-3.5 h-3.5" />
-              </button>
+              <div className="relative group">
+                <button
+                  onClick={handleWipeAll}
+                  className="p-1.5 rounded-xl bg-red-950/20 hover:bg-red-900/30 text-red-400 hover:text-red-300 border border-red-500/20 transition-colors cursor-pointer flex items-center justify-center"
+                >
+                  <Eraser className="w-3.5 h-3.5" />
+                </button>
+                <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block bg-slate-950/95 text-gray-300 text-[10px] py-1 px-2.5 rounded-lg border border-white/10 whitespace-nowrap shadow-xl z-50 pointer-events-none">
+                  Réinitialiser à blanc (effacer toutes vos données)
+                </div>
+              </div>
 
               {/* Déconnexion */}
               {saasPortalMode === 'client' && (
                 <>
                   <div className="h-4 w-px bg-white/10 mx-0.5" />
-                  <button
-                    onClick={handleGoToLanding}
-                    className="px-2.5 py-1 rounded-xl bg-red-950/25 hover:bg-red-900/35 text-red-400 hover:text-red-300 border border-red-500/20 transition-all flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer shadow-sm hover:-translate-y-0.5"
-                    title="Se déconnecter et retourner à l'accueil"
-                  >
-                    <LogOut className="w-3.5 h-3.5 animate-pulse" />
-                    <span>Déconnexion</span>
-                  </button>
+                  <div className="relative group">
+                    <button
+                      onClick={handleGoToLanding}
+                      className="px-2.5 py-1 rounded-xl bg-red-950/25 hover:bg-red-900/35 text-red-400 hover:text-red-300 border border-red-500/20 transition-all flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer shadow-sm hover:-translate-y-0.5"
+                    >
+                      <LogOut className="w-3.5 h-3.5 animate-pulse" />
+                      <span>Déconnexion</span>
+                    </button>
+                    <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block bg-slate-950/95 text-gray-300 text-[10px] py-1 px-2.5 rounded-lg border border-white/10 whitespace-nowrap shadow-xl z-50 pointer-events-none">
+                      Se déconnecter de votre espace établissement
+                    </div>
+                  </div>
                 </>
               )}
             </div>
