@@ -276,34 +276,71 @@ export default function SaaSAdminPortal({
   const metrics = useMemo(() => {
     let mrrFCFA = 0;
     let totalRevenueFCFA = 0;
+    let todayRevenueFCFA = 0;
     let activeClients = 0;
     let trialClients = 0;
+    let paidClientsCount = 0;
     let suspendedClients = 0;
     let expiredClients = 0;
 
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayFr = new Date().toLocaleDateString('fr-FR');
+
+    // 1. Calculate revenue from transactions & activation requests for today
+    (transactions || []).forEach(tx => {
+      if (tx.status === 'completed') {
+        totalRevenueFCFA += tx.amountFCFA || 0;
+        if (tx.date === todayStr || tx.date === todayFr) {
+          todayRevenueFCFA += tx.amountFCFA || 0;
+        }
+      }
+    });
+
+    (activationRequests || []).forEach(req => {
+      const reqDate = req.deliveredAt || req.requestedAt || '';
+      if ((reqDate.includes(todayStr) || reqDate.includes(todayFr)) && req.status === 'delivered') {
+        if (!(transactions || []).some(t => t.id === `tx_${req.id}`)) {
+          todayRevenueFCFA += req.amountFCFA || 0;
+          totalRevenueFCFA += req.amountFCFA || 0;
+        }
+      }
+    });
+
+    // Fallback if totalRevenueFCFA is still 0
+    if (totalRevenueFCFA === 0) {
+      clients.forEach(c => {
+        totalRevenueFCFA += c.totalPaidFCFA || 0;
+      });
+    }
+
+    // 2. Client and MRR status
     clients.forEach(client => {
+      const plan = plans.find(p => p.id === client.planId);
+      const isPaidPlan = plan && plan.monthlyPriceFCFA > 0 && client.planId !== 'plan_free' && client.planId !== 'plan_trial';
+
       if (client.status === 'active') {
         activeClients++;
-        const plan = plans.find(p => p.id === client.planId);
-        if (plan) {
+        if (isPaidPlan) {
+          paidClientsCount++;
           mrrFCFA += plan.monthlyPriceFCFA;
         }
-      } else if (client.status === 'trial') {
+      } else if (client.status === 'trial' || client.status === 'pending_key') {
         trialClients++;
       } else if (client.status === 'suspended') {
         suspendedClients++;
       } else if (client.status === 'expired') {
         expiredClients++;
       }
-
-      totalRevenueFCFA += client.totalPaidFCFA || 0;
     });
 
     const arrFCFA = mrrFCFA * 12;
     const totalClientsCount = clients.length || 1;
+    const conversionRatePercent = Math.round((paidClientsCount / totalClientsCount) * 100);
     const churnRatePercent = Math.round((expiredClients / totalClientsCount) * 100);
 
     return {
+      todayRevenueFCFA,
+      todayRevenueEUR: Math.round(todayRevenueFCFA / 655.957),
       mrrFCFA,
       mrrEUR: Math.round(mrrFCFA / 655.957),
       arrFCFA,
@@ -312,11 +349,13 @@ export default function SaaSAdminPortal({
       totalRevenueEUR: Math.round(totalRevenueFCFA / 655.957),
       activeClients,
       trialClients,
+      paidClientsCount,
+      conversionRatePercent,
       suspendedClients,
       expiredClients,
       churnRatePercent
     };
-  }, [clients, plans]);
+  }, [clients, plans, transactions, activationRequests]);
 
   // Revenue chart data simulation
   const revenueChartData = useMemo(() => [
@@ -798,19 +837,48 @@ export default function SaaSAdminPortal({
       {adminSubTab === 'overview' && (
         <div className="space-y-6">
           
-          {/* TOP SAAS FINANCIAL KPIS */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* TOP SAAS FINANCIAL KPIS - 5 CARDS GRID */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             
-            {/* KPI 1: MRR */}
-            <div className="p-5 rounded-2xl bg-slate-900/60 border border-white/10 shadow-lg relative overflow-hidden">
+            {/* KPI 1: REVENU DU JOUR */}
+            <div className={`p-4 sm:p-5 rounded-2xl border shadow-lg relative overflow-hidden transition-all ${
+              theme === 'light'
+                ? 'bg-white border-amber-200 shadow-amber-500/5'
+                : 'bg-slate-900/60 border-amber-500/20'
+            }`}>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-mono text-gray-400 font-bold uppercase tracking-wider">MRR (Mensuel)</span>
+                <span className="text-[11px] font-mono text-amber-400 font-bold uppercase tracking-wider">Revenu du Jour</span>
+                <span className="p-2 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
+                  <Zap className="w-4 h-4" />
+                </span>
+              </div>
+              <div className="mt-3.5">
+                <div className="text-xl font-extrabold text-white font-mono tracking-tight">
+                  {metrics.todayRevenueFCFA.toLocaleString('fr-FR')} <span className="text-xs text-amber-400 font-normal">FCFA</span>
+                </div>
+                <div className="text-xs text-gray-400 mt-1 flex items-center justify-between">
+                  <span>~ {metrics.todayRevenueEUR} € aujourd'hui</span>
+                  <span className="text-amber-400 font-bold flex items-center gap-0.5 text-[10px]">
+                    <Clock className="w-3 h-3" /> En direct
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* KPI 2: REVENU MENSUEL (MRR) */}
+            <div className={`p-4 sm:p-5 rounded-2xl border shadow-lg relative overflow-hidden transition-all ${
+              theme === 'light'
+                ? 'bg-white border-indigo-200 shadow-indigo-500/5'
+                : 'bg-slate-900/60 border-indigo-500/20'
+            }`}>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono text-indigo-300 font-bold uppercase tracking-wider">Revenu Mensuel (MRR)</span>
                 <span className="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20">
                   <DollarSign className="w-4 h-4" />
                 </span>
               </div>
-              <div className="mt-4">
-                <div className="text-2xl font-extrabold text-white font-mono">
+              <div className="mt-3.5">
+                <div className="text-xl font-extrabold text-white font-mono tracking-tight">
                   {metrics.mrrFCFA.toLocaleString('fr-FR')} <span className="text-xs text-indigo-400 font-normal">FCFA/mois</span>
                 </div>
                 <div className="text-xs text-gray-400 mt-1 flex items-center justify-between">
@@ -822,16 +890,20 @@ export default function SaaSAdminPortal({
               </div>
             </div>
 
-            {/* KPI 2: ARR */}
-            <div className="p-5 rounded-2xl bg-slate-900/60 border border-white/10 shadow-lg relative overflow-hidden">
+            {/* KPI 3: PROJECTION ANNUELLE (ARR) */}
+            <div className={`p-4 sm:p-5 rounded-2xl border shadow-lg relative overflow-hidden transition-all ${
+              theme === 'light'
+                ? 'bg-white border-purple-200 shadow-purple-500/5'
+                : 'bg-slate-900/60 border-purple-500/20'
+            }`}>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-mono text-gray-400 font-bold uppercase tracking-wider">ARR (Projection Annuelle)</span>
+                <span className="text-[11px] font-mono text-purple-300 font-bold uppercase tracking-wider">Projection Annuelle (ARR)</span>
                 <span className="p-2 bg-purple-500/10 text-purple-400 rounded-xl border border-purple-500/20">
                   <TrendingUp className="w-4 h-4" />
                 </span>
               </div>
-              <div className="mt-4">
-                <div className="text-2xl font-extrabold text-white font-mono">
+              <div className="mt-3.5">
+                <div className="text-xl font-extrabold text-white font-mono tracking-tight">
                   {metrics.arrFCFA.toLocaleString('fr-FR')} <span className="text-xs text-purple-400 font-normal">FCFA/an</span>
                 </div>
                 <div className="text-xs text-gray-400 mt-1 flex items-center justify-between">
@@ -843,44 +915,54 @@ export default function SaaSAdminPortal({
               </div>
             </div>
 
-            {/* KPI 3: CLIENTS ACTIFS & ESSAIS */}
-            <div className="p-5 rounded-2xl bg-slate-900/60 border border-white/10 shadow-lg relative overflow-hidden">
+            {/* KPI 4: TOTAL ENCAISSÉ */}
+            <div className={`p-4 sm:p-5 rounded-2xl border shadow-lg relative overflow-hidden transition-all ${
+              theme === 'light'
+                ? 'bg-white border-emerald-200 shadow-emerald-500/5'
+                : 'bg-slate-900/60 border-emerald-500/20'
+            }`}>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-mono text-gray-400 font-bold uppercase tracking-wider">Clients Établissements</span>
+                <span className="text-[11px] font-mono text-emerald-300 font-bold uppercase tracking-wider">Total Encaissé</span>
                 <span className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20">
-                  <Building2 className="w-4 h-4" />
-                </span>
-              </div>
-              <div className="mt-4">
-                <div className="text-2xl font-extrabold text-white font-mono">
-                  {metrics.activeClients} <span className="text-xs text-emerald-400 font-normal">Actifs</span>
-                  <span className="text-sm font-normal text-amber-400 ml-2">({metrics.trialClients} en essai)</span>
-                </div>
-                <div className="text-xs text-gray-400 mt-1 flex items-center justify-between">
-                  <span>Total Répertoire: {clients.length}</span>
-                  <span className="text-amber-400 font-bold text-[10px]">
-                    Taux conversion: ~65%
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* KPI 4: REVENUS TOTAUX ENCAISSÉS */}
-            <div className="p-5 rounded-2xl bg-slate-900/60 border border-white/10 shadow-lg relative overflow-hidden">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-mono text-gray-400 font-bold uppercase tracking-wider">Volume Encaissé Total</span>
-                <span className="p-2 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
                   <CreditCard className="w-4 h-4" />
                 </span>
               </div>
-              <div className="mt-4">
-                <div className="text-2xl font-extrabold text-white font-mono">
-                  {metrics.totalRevenueFCFA.toLocaleString('fr-FR')} <span className="text-xs text-amber-400 font-normal">FCFA</span>
+              <div className="mt-3.5">
+                <div className="text-xl font-extrabold text-white font-mono tracking-tight">
+                  {metrics.totalRevenueFCFA.toLocaleString('fr-FR')} <span className="text-xs text-emerald-400 font-normal">FCFA</span>
                 </div>
                 <div className="text-xs text-gray-400 mt-1 flex items-center justify-between">
                   <span>~ {metrics.totalRevenueEUR} € cumulés</span>
                   <span className="text-gray-400 text-[10px]">
                     Churn: {metrics.churnRatePercent}%
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* KPI 5: CLIENTS ACTIFS (TAUX DE CONVERSION) */}
+            <div className={`p-4 sm:p-5 rounded-2xl border shadow-lg relative overflow-hidden transition-all ${
+              theme === 'light'
+                ? 'bg-white border-sky-200 shadow-sky-500/5'
+                : 'bg-slate-900/60 border-sky-500/20'
+            }`}>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono text-sky-300 font-bold uppercase tracking-wider">Clients Actifs</span>
+                <span className="p-2 bg-sky-500/10 text-sky-400 rounded-xl border border-sky-500/20">
+                  <Building2 className="w-4 h-4" />
+                </span>
+              </div>
+              <div className="mt-3.5">
+                <div className="text-xl font-extrabold text-white font-mono tracking-tight">
+                  {metrics.activeClients} <span className="text-xs text-sky-400 font-normal">Actifs</span>
+                  {metrics.trialClients > 0 && (
+                    <span className="text-xs font-normal text-amber-300 ml-1.5">({metrics.trialClients} essai)</span>
+                  )}
+                </div>
+                <div className="text-xs text-gray-400 mt-1 flex items-center justify-between">
+                  <span className="text-sky-300 font-semibold text-[11px]">Taux conversion: {metrics.conversionRatePercent}%</span>
+                  <span className="text-gray-400 text-[10px]">
+                    Total: {clients.length}
                   </span>
                 </div>
               </div>

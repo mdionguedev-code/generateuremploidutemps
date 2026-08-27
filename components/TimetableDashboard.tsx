@@ -345,6 +345,7 @@ export default function TimetableDashboard({
         if (saasData.clients.length > 0) setSaasClients(saasData.clients);
         setSaasLicenseKeys(saasData.licenseKeys);
         setSaasActivationRequests(saasData.activationRequests);
+        if (saasData.transactions && saasData.transactions.length > 0) setSaasTransactions(saasData.transactions);
         setSaasSettings(saasData.settings);
 
         // 2. If user is authenticated, fetch their real establishment data from Supabase

@@ -359,34 +359,6 @@ export async function getSaaSAdminLivePlatformData() {
     .from('teachers')
     .select('user_id');
 
-  const clients: SaaSClient[] = (profilesData || []).map(profile => {
-    const userSettings = (settingsData || []).find(s => s.user_id === profile.id);
-    const userClasses = (classesData || []).filter(c => c.user_id === profile.id).length;
-    const userTeachers = (teachersData || []).filter(t => t.user_id === profile.id).length;
-
-    return {
-      id: profile.id,
-      schoolName: userSettings?.school_name || `École de ${profile.email.split('@')[0]}`,
-      logoIcon: userSettings?.school_logo_icon || 'GraduationCap',
-      adminName: profile.email.split('@')[0],
-      adminEmail: profile.email,
-      phone: '+221 -- --- -- --',
-      cityCountry: 'Dakar, Sénégal',
-      planId: userSettings?.plan_id || 'plan_trial',
-      status: (userSettings?.status as any) || 'active',
-      startDate: profile.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
-      trialEndDate: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
-      subscriptionEndDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-      paymentMethod: 'Gratuit',
-      totalPaidFCFA: 0,
-      createdAt: profile.created_at || new Date().toISOString(),
-      lastActiveAt: profile.created_at || new Date().toISOString(),
-      classesCount: userClasses,
-      teachersCount: userTeachers,
-      notes: profile.role === 'admin' ? 'Compte Super-Administrateur Plateforme' : 'Utilisateur Établissement'
-    };
-  });
-
   // 3. Fetch License Keys
   const { data: keysData } = await supabase
     .from('saas_license_keys')
@@ -431,6 +403,69 @@ export async function getSaaSAdminLivePlatformData() {
     notes: r.notes
   }));
 
+  // Build real transactions from activation requests
+  const transactions: SaaSPaymentTransaction[] = (requestsData || [])
+    .filter(r => (r.amount_fcfa || 0) > 0)
+    .map((r, idx) => {
+      const plan = plans.find(p => p.id === r.plan_id);
+      const reqDate = r.delivered_at || r.requested_at || new Date().toISOString();
+      const dateStr = reqDate.includes(' ') ? reqDate.split(' ')[0] : reqDate.split('T')[0];
+      return {
+        id: `tx_${r.id}`,
+        invoiceRef: `INV-2026-${1000 + idx}`,
+        clientId: r.user_id || `cli_${r.id}`,
+        clientName: r.school_name,
+        amountFCFA: r.amount_fcfa,
+        amountEUR: Math.round(r.amount_fcfa / 655.957),
+        paymentMethod: (r.payment_method || 'Wave') as any,
+        status: (r.status === 'delivered' ? 'completed' : r.status === 'pending' ? 'pending' : 'failed') as any,
+        date: dateStr,
+        planName: plan?.name || 'Abonnement',
+        period: `${r.duration_months || 1} mois`
+      };
+    });
+
+  const clients: SaaSClient[] = (profilesData || []).map(profile => {
+    const userSettings = (settingsData || []).find(s => s.user_id === profile.id);
+    const userClasses = (classesData || []).filter(c => c.user_id === profile.id).length;
+    const userTeachers = (teachersData || []).filter(t => t.user_id === profile.id).length;
+
+    // Find any delivered requests for this user
+    const userReqs = (requestsData || []).filter(r => 
+      (r.user_id === profile.id || (profile.email && r.admin_email?.toLowerCase() === profile.email.toLowerCase())) &&
+      r.status === 'delivered'
+    );
+    const totalPaidFCFA = userReqs.reduce((sum, r) => sum + (r.amount_fcfa || 0), 0);
+    const lastPaymentMethod = userReqs[0]?.payment_method || (userSettings?.plan_id && userSettings?.plan_id !== 'plan_free' ? 'Wave' : 'Gratuit');
+
+    const profileAny = profile as any;
+    const effectivePlanId = userSettings?.plan_id || profileAny.plan_id || 'plan_free';
+    const effectiveStatus = (userSettings?.status as any) || (profileAny.subscription_status as any) || 'active';
+
+    return {
+      id: profile.id,
+      schoolName: userSettings?.school_name || (profile.email ? `École ${profile.email.split('@')[0]}` : 'Établissement'),
+      logoIcon: userSettings?.school_logo_icon || 'GraduationCap',
+      adminName: profile.email?.split('@')[0] || 'Directeur',
+      adminEmail: profile.email || '',
+      phone: userReqs[0]?.whatsapp || '+221 -- --- -- --',
+      whatsapp: userReqs[0]?.whatsapp || '',
+      cityCountry: userReqs[0]?.city_country || 'Sénégal',
+      planId: effectivePlanId,
+      status: effectiveStatus,
+      startDate: profile.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+      trialEndDate: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
+      subscriptionEndDate: profileAny.subscription_end_date ? profileAny.subscription_end_date.split('T')[0] : new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+      paymentMethod: lastPaymentMethod as any,
+      totalPaidFCFA: totalPaidFCFA,
+      createdAt: profile.created_at || new Date().toISOString(),
+      lastActiveAt: 'Récemment',
+      classesCount: userClasses,
+      teachersCount: userTeachers,
+      notes: profile.role === 'admin' ? 'Compte Super-Administrateur Plateforme' : 'Établissement Enregistré'
+    };
+  });
+
   // 5. Fetch Global Settings
   const { data: settingsRow } = await supabase
     .from('saas_settings')
@@ -460,6 +495,7 @@ export async function getSaaSAdminLivePlatformData() {
     clients,
     licenseKeys,
     activationRequests,
+    transactions,
     settings
   };
 }
