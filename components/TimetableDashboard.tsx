@@ -2449,7 +2449,7 @@ export default function TimetableDashboard({
       );
     }
     
-    const iconClass = "w-5 h-5 text-white";
+    const iconClass = theme === 'light' ? "w-5 h-5 text-indigo-600" : "w-5 h-5 text-white";
     switch (schoolLogoIcon) {
       case 'Building2':
         return <Building2 className={iconClass} />;
@@ -2481,6 +2481,8 @@ export default function TimetableDashboard({
       </div>
     );
   }
+
+  const isLight = theme === 'light';
 
   return (
     <div className="min-h-screen pb-16 relative">
@@ -2585,28 +2587,34 @@ export default function TimetableDashboard({
 
         {/* --- PENDING ACTIVATION REQUEST BANNER --- */}
         {saasPortalMode === 'client' && pendingActivationRequest && (
-          <div className="mb-6 p-4 rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-500/10 via-slate-900/40 to-emerald-500/10 text-slate-200 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 relative overflow-hidden">
+          <div className={`mb-6 p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 relative overflow-hidden ${
+            isLight ? 'bg-indigo-50/70 border-indigo-200 text-slate-800 shadow-sm' : 'border-indigo-500/30 bg-gradient-to-r from-indigo-500/10 via-slate-900/40 to-emerald-500/10 text-slate-200 shadow-xl'
+          }`}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-xl pointer-events-none" />
             <div className="flex items-center gap-3.5 relative z-10">
-              <div className="p-3 rounded-2xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0 shadow-sm animate-pulse">
+              <div className={`p-3 rounded-2xl shrink-0 shadow-sm animate-pulse ${
+                isLight ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+              }`}>
                 <Clock className="w-5 h-5" />
               </div>
               <div className="text-left">
-                <h4 className="text-sm font-black text-white flex items-center gap-2">
+                <h4 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
                   <span>Demande d'activation en cours de traitement</span>
-                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-mono border border-indigo-500/30 uppercase font-black">
+                  <span className={`text-[9px] px-2 py-0.5 rounded-full font-mono uppercase font-bold ${
+                    isLight ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-black'
+                  }`}>
                     En attente
                   </span>
                 </h4>
-                <p className="text-xs text-gray-300 mt-1 max-w-2xl leading-relaxed">
-                  Nous avons bien reçu votre demande d'activation pour la formule <strong className="text-white">{(saasPlans.find(p => p.id === pendingActivationRequest.planId)?.name) || 'Abonnement'}</strong> de l'établissement <strong className="text-white">{pendingActivationRequest.schoolName}</strong>. Notre équipe procède actuellement à la vérification de votre paiement. Votre clé de licence officielle vous sera transmise sur votre WhatsApp (<strong className="text-emerald-400 font-mono">{pendingActivationRequest.whatsapp}</strong>) très prochainement. Merci pour votre patience et votre confiance !
+                <p className={`text-xs mt-1 max-w-2xl leading-relaxed ${isLight ? 'text-slate-600' : 'text-gray-300'}`}>
+                  Nous avons bien reçu votre demande d'activation pour la formule <strong className={isLight ? 'text-indigo-700 font-semibold' : 'text-white'}>{(saasPlans.find(p => p.id === pendingActivationRequest.planId)?.name) || 'Abonnement'}</strong> de l'établissement <strong className={isLight ? 'text-slate-800 font-semibold' : 'text-white'}>{pendingActivationRequest.schoolName}</strong>. Notre équipe procède actuellement à la vérification de votre paiement. Votre clé de licence officielle vous sera transmise sur votre WhatsApp (<strong className={`font-mono ${isLight ? 'text-emerald-700 font-semibold' : 'text-emerald-400'}`}>{pendingActivationRequest.whatsapp}</strong>) très prochainement. Merci pour votre patience et votre confiance !
                 </p>
               </div>
             </div>
             
             <button
               onClick={() => setIsClientSubModalOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-extrabold text-xs shadow-lg transition-all flex items-center gap-1.5 cursor-pointer shrink-0 active:scale-95 border border-indigo-400/20"
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold text-xs shadow-lg transition-all flex items-center gap-1.5 cursor-pointer shrink-0 active:scale-95 border border-indigo-400/20"
             >
               <Key className="w-4 h-4 text-indigo-200" />
               <span>Activer ma clé</span>
@@ -2616,26 +2624,32 @@ export default function TimetableDashboard({
 
         {/* --- PENDING KEY ACTIVATION ALERT BANNER --- */}
         {saasPortalMode === 'client' && currentClient.status === 'pending_key' && !pendingActivationRequest && (
-          <div className="mb-6 p-4 rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-600/10 to-orange-500/10 text-amber-200 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
+          <div className={`mb-6 p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 ${
+            isLight ? 'bg-amber-50/80 border-amber-200 text-slate-800 shadow-sm' : 'border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-600/10 to-orange-500/10 text-amber-200 shadow-xl'
+          }`}>
             <div className="flex items-center gap-3.5">
-              <div className="p-3 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0 shadow-sm">
+              <div className={`p-3 rounded-2xl shrink-0 shadow-sm ${
+                isLight ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+              }`}>
                 <Key className="w-5 h-5 animate-bounce" />
               </div>
               <div>
-                <h4 className="text-sm font-black text-white flex items-center gap-2">
+                <h4 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
                   <span>Clé d'activation requise</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono border border-amber-500/30">
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono ${
+                    isLight ? 'bg-amber-100 text-amber-800 border border-amber-200 font-semibold' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  }`}>
                     Forfait Gratuit Restreint
                   </span>
                 </h4>
-                <p className="text-xs text-gray-300 mt-0.5">
+                <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-600' : 'text-gray-300'}`}>
                   Votre achat est enregistré mais l'offre payante reste verrouillée tant que vous n'avez pas renseigné votre clé de licence.
                 </p>
               </div>
             </div>
             <button
               onClick={() => setIsClientSubModalOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-lg transition-all flex items-center gap-2 cursor-pointer shrink-0 active:scale-95"
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs shadow-lg transition-all flex items-center gap-2 cursor-pointer shrink-0 active:scale-95"
             >
               <Key className="w-4 h-4" />
               <span>Saisir ma clé d'activation</span>
@@ -2644,17 +2658,17 @@ export default function TimetableDashboard({
         )}
 
         {/* --- HEADER BAR (CLIENT WORKSPACE HEADER MATCHING ADMIN DESIGN) --- */}
-        <header className="flex flex-col xl:flex-row xl:items-center xl:justify-between mb-8 p-4 sm:p-5 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl gap-4">
+        <header className={`flex flex-col xl:flex-row xl:items-center xl:justify-between mb-4 sm:mb-6 p-4 sm:p-5 rounded-2xl ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'} backdrop-blur-xl border gap-4`}>
           {/* Left: School identity with 2-line title */}
           <div className="flex items-center gap-3.5 w-full xl:w-auto xl:max-w-xs shrink-0">
-            <span className="p-2.5 sm:p-3 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-600/20 border border-indigo-500/30 shadow-md text-indigo-300 flex items-center justify-center shrink-0">
+            <span className={`p-2.5 sm:p-3 rounded-2xl ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-gradient-to-br from-indigo-500/20 to-purple-600/20 border-indigo-500/30 text-indigo-300'} border shadow-md flex items-center justify-center shrink-0`}>
               {renderLogoIcon()}
             </span>
             <div className="min-w-0 max-w-[200px] sm:max-w-[230px] md:max-w-[260px]">
-              <h1 className="text-base sm:text-lg font-black tracking-tight text-white font-sans leading-tight break-words">
+              <h1 className={`text-base sm:text-lg font-bold tracking-tight ${isLight ? 'text-slate-800' : 'text-white'} font-sans leading-tight break-words`}>
                 {schoolName}
               </h1>
-              <p className="text-[11px] text-gray-400 mt-0.5 leading-tight truncate" title={schoolSlogan}>
+              <p className={`text-[11px] ${isLight ? 'text-slate-500 font-medium' : 'text-gray-400'} mt-0.5 leading-tight truncate`} title={schoolSlogan}>
                 {schoolSlogan || "Concepteur intelligent d'emploi du temps pour chef d'établissement"}
               </p>
             </div>
@@ -2667,29 +2681,29 @@ export default function TimetableDashboard({
               {/* Offre */}
               <div 
                 onClick={() => setIsClientSubModalOpen(true)}
-                className="bg-indigo-950/40 border border-indigo-500/30 hover:border-indigo-400 hover:bg-indigo-900/30 transition-all cursor-pointer rounded-xl px-2.5 py-1 font-mono text-[11px] flex items-center gap-1.5 shadow-sm shrink-0" 
+                className="bg-emerald-500 hover:bg-emerald-600 text-white border border-emerald-400 transition-all cursor-pointer rounded-xl px-2.5 py-1 font-mono text-[11px] flex items-center gap-1.5 shadow-sm shrink-0" 
                 title="Cliquez pour gérer votre abonnement"
               >
-                <Sparkles className="w-3 h-3 text-indigo-400 animate-pulse shrink-0" />
-                <span className="text-indigo-300">Offre :</span> <span className="text-white font-bold uppercase">{currentPlan.name}</span>
+                <Sparkles className="w-3 h-3 text-white animate-pulse shrink-0" />
+                <span className="font-bold text-white">Offre :</span> <span className="font-bold uppercase text-white">{currentPlan.name}</span>
               </div>
 
               {/* Générations */}
-              <div className="bg-slate-950/70 border border-white/10 rounded-xl px-2.5 py-1 font-mono text-[11px] flex items-center gap-1.5 shadow-sm shrink-0" title="Nombre de générations d'emplois du temps effectuées">
+              <div className={`rounded-xl px-2.5 py-1 font-mono text-[11px] flex items-center gap-1.5 shadow-sm shrink-0 border ${isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-slate-950/70 border-white/10 text-white'}`} title="Nombre de générations d'emplois du temps effectuées">
                 <span className="w-2 h-2 rounded-full bg-purple-400 shrink-0" />
-                <span className="text-gray-400">Générations :</span> <span className="text-white font-bold">{generationCount} / {maxGenerations >= 9999 ? 'Illimité' : maxGenerations}</span>
+                <span className={isLight ? 'text-slate-500 font-medium' : 'text-gray-400'}>Générations :</span> <span className={`font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{generationCount} / {maxGenerations >= 9999 ? 'Illimité' : maxGenerations}</span>
               </div>
 
               {/* Indication des exports faits et restants */}
-              <div className="bg-slate-950/70 border border-white/10 rounded-xl px-2.5 py-1 font-mono text-[11px] flex items-center gap-1.5 shadow-sm shrink-0" title="Nombre d'exports de documents réalisés">
+              <div className={`rounded-xl px-2.5 py-1 font-mono text-[11px] flex items-center gap-1.5 shadow-sm shrink-0 border ${isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-slate-950/70 border-white/10 text-white'}`} title="Nombre d'exports de documents réalisés">
                 <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
-                <span className="text-gray-400">Export PDF-Word-Excel :</span> <span className="text-white font-bold">{exportCount} / {maxExports >= 9999 ? 'Illimité' : maxExports}</span>
+                <span className={isLight ? 'text-slate-500 font-medium' : 'text-gray-400'}>Export PDF-Word-Excel :</span> <span className={`font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{exportCount} / {maxExports >= 9999 ? 'Illimité' : maxExports}</span>
               </div>
 
               {/* Taux de Remplissage */}
-              <div className="bg-slate-950/70 border border-white/10 rounded-xl px-2.5 py-1 font-mono text-[11px] flex items-center gap-1.5 shadow-sm shrink-0" title="Taux de remplissage et conformité globale">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                <span className="text-gray-400">Taux Remplissage :</span> <span className="text-emerald-400 font-black">{generationScore}%</span>
+              <div className={`rounded-xl px-2.5 py-1 font-mono text-[11px] flex items-center gap-1.5 shadow-sm shrink-0 border ${isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-slate-950/70 border-white/10 text-white'}`} title="Taux de remplissage et conformité globale">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <span className={isLight ? 'text-slate-500 font-medium' : 'text-gray-400'}>Taux Remplissage :</span> <span className={`font-bold ${isLight ? 'text-emerald-700' : 'text-emerald-400'}`}>{generationScore}%</span>
               </div>
             </div>
 
@@ -2699,7 +2713,7 @@ export default function TimetableDashboard({
               <div className="relative group">
                 <button
                   onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                  className="px-2.5 py-1 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 transition-all flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer shadow-sm hover:-translate-y-0.5"
+                  className={`px-3 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer shadow-sm hover:-translate-y-0.5 ${isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200' : 'bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border-white/10'}`}
                 >
                   {theme === 'dark' ? (
                     <>
@@ -2708,59 +2722,72 @@ export default function TimetableDashboard({
                     </>
                   ) : (
                     <>
-                      <Moon className="w-3.5 h-3.5 text-indigo-400" />
+                      <Moon className="w-3.5 h-3.5 text-indigo-600" />
                       <span>Mode Sombre</span>
                     </>
                   )}
                 </button>
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-slate-950/95 text-gray-300 text-[10px] py-1 px-2.5 rounded-lg border border-white/10 whitespace-nowrap shadow-xl z-50 pointer-events-none">
+                <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block text-[10px] font-normal py-1 px-2.5 rounded-lg whitespace-nowrap shadow-xl z-50 pointer-events-none ${
+                  isLight ? 'bg-slate-900/90 text-slate-100 border border-slate-700/50' : 'bg-slate-950/95 text-gray-300 border border-white/10'
+                }`}>
                   {theme === 'dark' ? "Passer en thème d'affichage clair" : "Passer en thème d'affichage sombre"}
                 </div>
               </div>
 
-              <div className="h-4 w-px bg-white/10 mx-0.5" />
+              <div className={`h-4 w-px mx-0.5 ${isLight ? 'bg-slate-200' : 'bg-white/10'}`} />
 
               {/* Documentation Hub */}
               <div className="relative group">
                 <button
                   onClick={() => setIsDocViewOpen(true)}
-                  className="px-2.5 py-1 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-white border border-indigo-500/20 transition-all flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer shadow-sm hover:-translate-y-0.5"
+                  className={`px-3 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer shadow-sm hover:-translate-y-0.5 ${isLight ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-white border-indigo-500/20'}`}
                 >
-                  <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
+                  <BookOpen className="w-3.5 h-3.5 text-indigo-500" />
                   <span>Documentation</span>
                 </button>
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-slate-950/95 text-gray-300 text-[10px] py-1 px-2.5 rounded-lg border border-white/10 whitespace-nowrap shadow-xl z-50 pointer-events-none">
+                <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block text-[10px] font-normal py-1 px-2.5 rounded-lg whitespace-nowrap shadow-xl z-50 pointer-events-none ${
+                  isLight ? 'bg-slate-900/90 text-slate-100 border border-slate-700/50' : 'bg-slate-950/95 text-gray-300 border border-white/10'
+                }`}>
                   Consulter la notice et le guide d'utilisation
                 </div>
               </div>
 
-              <div className="h-4 w-px bg-white/10 mx-0.5" />
+              <div className={`h-4 w-px mx-0.5 ${isLight ? 'bg-slate-200' : 'bg-white/10'}`} />
 
               {/* Activer une clé */}
               <div className="relative group">
                 <button
                   onClick={() => setIsClientSubModalOpen(true)}
-                  className="px-2.5 py-1 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 hover:text-white border border-emerald-500/20 transition-all flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer shadow-sm hover:-translate-y-0.5"
+                  className={`px-3 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer shadow-sm hover:-translate-y-0.5 ${isLight ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 hover:text-white border-emerald-500/20'}`}
                 >
-                  <Key className="w-3.5 h-3.5 text-emerald-400" />
+                  <Key className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Activer une clé</span>
                 </button>
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-slate-950/95 text-gray-300 text-[10px] py-1 px-2.5 rounded-lg border border-white/10 whitespace-nowrap shadow-xl z-50 pointer-events-none">
+                <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block text-[10px] font-normal py-1 px-2.5 rounded-lg whitespace-nowrap shadow-xl z-50 pointer-events-none ${
+                  isLight ? 'bg-slate-900/90 text-slate-100 border border-slate-700/50' : 'bg-slate-950/95 text-gray-300 border border-white/10'
+                }`}>
                   Saisir une clé d'activation ou renouveler l'offre
                 </div>
               </div>
 
-              <div className="h-4 w-px bg-white/10 mx-0.5" />
+              <div className={`h-4 w-px mx-0.5 ${isLight ? 'bg-slate-200' : 'bg-white/10'}`} />
 
               {/* Effacer tout */}
               <div className="relative group">
                 <button
                   onClick={handleWipeAll}
-                  className="p-1.5 rounded-xl bg-red-950/20 hover:bg-red-900/30 text-red-400 hover:text-red-300 border border-red-500/20 transition-colors cursor-pointer flex items-center justify-center"
+                  className={`px-3 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer shadow-sm hover:-translate-y-0.5 ${
+                    isLight 
+                      ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200' 
+                      : 'bg-red-500/10 hover:bg-red-500/20 text-red-300 hover:text-white border-red-500/20'
+                  }`}
                 >
-                  <Eraser className="w-3.5 h-3.5" />
+                  <Eraser className={`w-3.5 h-3.5 ${isLight ? 'text-rose-600' : 'text-red-400'}`} />
+                  <span>Réinitialiser</span>
                 </button>
-                <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block bg-slate-950/95 text-gray-300 text-[10px] py-1 px-2.5 rounded-lg border border-white/10 whitespace-nowrap shadow-xl z-50 pointer-events-none">
+                <div className={`absolute bottom-full right-0 mb-2 hidden group-hover:block text-[10px] font-normal py-1 px-2.5 rounded-lg whitespace-nowrap shadow-xl z-50 pointer-events-none ${
+                  isLight ? 'bg-slate-900/90 text-slate-100 border border-slate-700/50' : 'bg-slate-950/95 text-gray-300 border border-white/10'
+                }`}>
                   Réinitialiser à blanc (effacer toutes vos données)
                 </div>
               </div>
@@ -2768,16 +2795,18 @@ export default function TimetableDashboard({
               {/* Déconnexion */}
               {saasPortalMode === 'client' && (
                 <>
-                  <div className="h-4 w-px bg-white/10 mx-0.5" />
+                  <div className={`h-4 w-px mx-0.5 ${isLight ? 'bg-slate-200' : 'bg-white/10'}`} />
                   <div className="relative group">
                     <button
                       onClick={handleGoToLanding}
-                      className="px-2.5 py-1 rounded-xl bg-red-950/25 hover:bg-red-900/35 text-red-400 hover:text-red-300 border border-red-500/20 transition-all flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer shadow-sm hover:-translate-y-0.5"
+                      className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 !text-white border border-red-700 transition-all flex items-center gap-1.5 text-[11px] font-bold cursor-pointer shadow-sm hover:-translate-y-0.5"
                     >
-                      <LogOut className="w-3.5 h-3.5 animate-pulse" />
+                      <LogOut className="w-3.5 h-3.5" />
                       <span>Déconnexion</span>
                     </button>
-                    <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block bg-slate-950/95 text-gray-300 text-[10px] py-1 px-2.5 rounded-lg border border-white/10 whitespace-nowrap shadow-xl z-50 pointer-events-none">
+                    <div className={`absolute bottom-full right-0 mb-2 hidden group-hover:block text-[10px] font-normal py-1 px-2.5 rounded-lg whitespace-nowrap shadow-xl z-50 pointer-events-none ${
+                      isLight ? 'bg-slate-900/90 text-slate-100 border border-slate-700/50' : 'bg-slate-950/95 text-gray-300 border border-white/10'
+                    }`}>
                       Se déconnecter de votre espace établissement
                     </div>
                   </div>
@@ -2810,169 +2839,169 @@ export default function TimetableDashboard({
         ) : (
           <div className="flex flex-col gap-6">
             {/* WORKFLOW STEP PROGRESS BAR (5 STEPS) */}
-            <div className="p-4 rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-white/10 shadow-xl overflow-x-auto select-none">
+            <div className={`p-4 rounded-2xl backdrop-blur-xl border select-none overflow-x-auto ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/60 border-white/10 shadow-xl'}`}>
               <div className="flex items-center justify-between min-w-[900px] gap-2.5">
                 {/* Step 1: Jours & Horaires */}
                 <button
                   onClick={() => setActiveTab('scheduleConfig')}
                   className={`flex-1 p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 relative ${
                     activeTab === 'scheduleConfig'
-                      ? 'bg-indigo-500/20 border-indigo-400 text-white shadow-xl shadow-indigo-500/20 ring-2 ring-indigo-400/70 ring-offset-2 ring-offset-slate-900 scale-[1.02]'
+                      ? `bg-indigo-500/20 border-indigo-500 shadow-xl shadow-indigo-500/20 ring-2 ring-indigo-400/70 ring-offset-2 scale-[1.02] ${isLight ? 'text-indigo-950 ring-offset-white' : 'text-white ring-offset-slate-900'}`
                       : activeDays.length > 0
-                      ? 'bg-slate-950/40 border-emerald-500/30 text-gray-300 hover:bg-white/5 hover:border-white/20'
-                      : 'bg-slate-950/30 border-white/5 text-gray-400 hover:bg-white/5'
+                      ? isLight ? 'bg-slate-50 border-emerald-500/40 text-slate-700 hover:bg-slate-100' : 'bg-slate-950/40 border-emerald-500/30 text-gray-300 hover:bg-white/5 hover:border-white/20'
+                      : isLight ? 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100' : 'bg-slate-950/30 border-white/5 text-gray-400 hover:bg-white/5'
                   }`}
                 >
                   {activeTab === 'scheduleConfig' && (
                     <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-indigo-500 border-2 border-slate-900 shadow-sm"></span>
+                      <span className={`relative inline-flex rounded-full h-3.5 w-3.5 bg-indigo-500 border-2 shadow-sm ${isLight ? 'border-white' : 'border-slate-900'}`}></span>
                     </span>
                   )}
                   <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 ${
                     activeTab === 'scheduleConfig'
                       ? 'bg-indigo-600 text-white border border-indigo-300 shadow-md shadow-indigo-500/30 animate-pulse'
                       : activeDays.length > 0 
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
-                      : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                      ? isLight ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
+                      : isLight ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                   }`}>
                     {activeDays.length > 0 && activeTab !== 'scheduleConfig' ? '✓' : '1'}
                   </span>
                   <div className="min-w-0">
-                    <div className="text-xs font-bold text-white flex items-center gap-1.5 truncate">
+                    <div className={`text-xs flex items-center gap-1.5 truncate ${isLight ? (activeTab === 'scheduleConfig' ? 'text-indigo-950 font-bold' : 'text-slate-800 font-semibold') : 'text-white font-bold'}`}>
                       <span>1. Jours & Horaires</span>
-                      <span className="text-[10px] font-mono text-indigo-300 bg-indigo-500/10 px-1.5 py-0.2 rounded">({activeDays.length}j)</span>
+                      <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${isLight ? 'text-indigo-700 bg-indigo-50' : 'text-indigo-300 bg-indigo-500/10'}`}>({activeDays.length}j)</span>
                     </div>
-                    <p className="text-[10px] text-gray-400 truncate mt-0.5">{startHour}h-{endHour}h ({totalSlots}h/j)</p>
+                    <p className={`text-xs leading-relaxed truncate mt-0.5 ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>{startHour}h-{endHour}h ({totalSlots}h/j)</p>
                   </div>
                 </button>
 
-                <div className="w-2.5 h-0.5 bg-white/10 shrink-0" />
+                <div className={`w-2.5 h-0.5 shrink-0 ${isLight ? 'bg-slate-200' : 'bg-white/10'}`} />
 
                 {/* Step 2: Matières */}
                 <button
                   onClick={() => setActiveTab('subjects')}
                   className={`flex-1 p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 relative ${
                     activeTab === 'subjects'
-                      ? 'bg-indigo-500/20 border-indigo-400 text-white shadow-xl shadow-indigo-500/20 ring-2 ring-indigo-400/70 ring-offset-2 ring-offset-slate-900 scale-[1.02]'
+                      ? `bg-indigo-500/20 border-indigo-500 shadow-xl shadow-indigo-500/20 ring-2 ring-indigo-400/70 ring-offset-2 scale-[1.02] ${isLight ? 'text-indigo-950 ring-offset-white' : 'text-white ring-offset-slate-900'}`
                       : subjects.length > 0
-                      ? 'bg-slate-950/40 border-emerald-500/30 text-gray-300 hover:bg-white/5 hover:border-white/20'
-                      : 'bg-slate-950/30 border-white/5 text-gray-400 hover:bg-white/5'
+                      ? isLight ? 'bg-slate-50 border-emerald-500/40 text-slate-700 hover:bg-slate-100' : 'bg-slate-950/40 border-emerald-500/30 text-gray-300 hover:bg-white/5 hover:border-white/20'
+                      : isLight ? 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100' : 'bg-slate-950/30 border-white/5 text-gray-400 hover:bg-white/5'
                   }`}
                 >
                   {activeTab === 'subjects' && (
                     <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-indigo-500 border-2 border-slate-900 shadow-sm"></span>
+                      <span className={`relative inline-flex rounded-full h-3.5 w-3.5 bg-indigo-500 border-2 shadow-sm ${isLight ? 'border-white' : 'border-slate-900'}`}></span>
                     </span>
                   )}
                   <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 ${
                     activeTab === 'subjects'
                       ? 'bg-indigo-600 text-white border border-indigo-300 shadow-md shadow-indigo-500/30 animate-pulse'
                       : subjects.length > 0 
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
-                      : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                      ? isLight ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
+                      : isLight ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                   }`}>
                     {subjects.length > 0 && activeTab !== 'subjects' ? '✓' : '2'}
                   </span>
                   <div className="min-w-0">
-                    <div className="text-xs font-bold text-white flex items-center gap-1.5 truncate">
+                    <div className={`text-xs flex items-center gap-1.5 truncate ${isLight ? (activeTab === 'subjects' ? 'text-indigo-950 font-bold' : 'text-slate-800 font-semibold') : 'text-white font-bold'}`}>
                       <span>2. Matières</span>
-                      <span className="text-[10px] font-mono text-indigo-300 bg-indigo-500/10 px-1.5 py-0.2 rounded">({subjects.length})</span>
+                      <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${isLight ? 'text-indigo-700 bg-indigo-50' : 'text-indigo-300 bg-indigo-500/10'}`}>({subjects.length})</span>
                     </div>
-                    <p className="text-[10px] text-gray-400 truncate mt-0.5">Référentiel des cours</p>
+                    <p className={`text-xs leading-relaxed truncate mt-0.5 ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>Référentiel des cours</p>
                   </div>
                 </button>
 
-                <div className="w-2.5 h-0.5 bg-white/10 shrink-0" />
+                <div className={`w-2.5 h-0.5 shrink-0 ${isLight ? 'bg-slate-200' : 'bg-white/10'}`} />
 
                 {/* Step 3: Professeurs */}
                 <button
                   onClick={() => setActiveTab('teachers')}
                   className={`flex-1 p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 relative ${
                     activeTab === 'teachers'
-                      ? 'bg-indigo-500/20 border-indigo-400 text-white shadow-xl shadow-indigo-500/20 ring-2 ring-indigo-400/70 ring-offset-2 ring-offset-slate-900 scale-[1.02]'
+                      ? `bg-indigo-500/20 border-indigo-500 shadow-xl shadow-indigo-500/20 ring-2 ring-indigo-400/70 ring-offset-2 scale-[1.02] ${isLight ? 'text-indigo-950 ring-offset-white' : 'text-white ring-offset-slate-900'}`
                       : teachers.length > 0
-                      ? 'bg-slate-950/40 border-emerald-500/30 text-gray-300 hover:bg-white/5 hover:border-white/20'
-                      : 'bg-slate-950/30 border-white/5 text-gray-400 hover:bg-white/5'
+                      ? isLight ? 'bg-slate-50 border-emerald-500/40 text-slate-700 hover:bg-slate-100' : 'bg-slate-950/40 border-emerald-500/30 text-gray-300 hover:bg-white/5 hover:border-white/20'
+                      : isLight ? 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100' : 'bg-slate-950/30 border-white/5 text-gray-400 hover:bg-white/5'
                   }`}
                 >
                   {activeTab === 'teachers' && (
                     <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-indigo-500 border-2 border-slate-900 shadow-sm"></span>
+                      <span className={`relative inline-flex rounded-full h-3.5 w-3.5 bg-indigo-500 border-2 shadow-sm ${isLight ? 'border-white' : 'border-slate-900'}`}></span>
                     </span>
                   )}
                   <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 ${
                     activeTab === 'teachers'
                       ? 'bg-indigo-600 text-white border border-indigo-300 shadow-md shadow-indigo-500/30 animate-pulse'
                       : teachers.length > 0 
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
-                      : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                      ? isLight ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
+                      : isLight ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                   }`}>
                     {teachers.length > 0 && activeTab !== 'teachers' ? '✓' : '3'}
                   </span>
                   <div className="min-w-0">
-                    <div className="text-xs font-bold text-white flex items-center gap-1.5 truncate">
+                    <div className={`text-xs flex items-center gap-1.5 truncate ${isLight ? (activeTab === 'teachers' ? 'text-indigo-950 font-bold' : 'text-slate-800 font-semibold') : 'text-white font-bold'}`}>
                       <span>3. Professeurs</span>
-                      <span className="text-[10px] font-mono text-indigo-300 bg-indigo-500/10 px-1.5 py-0.2 rounded">({teachers.length})</span>
+                      <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${isLight ? 'text-indigo-700 bg-indigo-50' : 'text-indigo-300 bg-indigo-500/10'}`}>({teachers.length})</span>
                     </div>
-                    <p className="text-[10px] text-gray-400 truncate mt-0.5">Quotas & disponibilités</p>
+                    <p className={`text-xs leading-relaxed truncate mt-0.5 ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>Quotas & disponibilités</p>
                   </div>
                 </button>
 
-                <div className="w-2.5 h-0.5 bg-white/10 shrink-0" />
+                <div className={`w-2.5 h-0.5 shrink-0 ${isLight ? 'bg-slate-200' : 'bg-white/10'}`} />
 
                 {/* Step 4: Classes & Affectations */}
                 <button
                   onClick={() => setActiveTab('classes')}
                   className={`flex-1 p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 relative ${
                     activeTab === 'classes'
-                      ? 'bg-indigo-500/20 border-indigo-400 text-white shadow-xl shadow-indigo-500/20 ring-2 ring-indigo-400/70 ring-offset-2 ring-offset-slate-900 scale-[1.02]'
+                      ? `bg-indigo-500/20 border-indigo-500 shadow-xl shadow-indigo-500/20 ring-2 ring-indigo-400/70 ring-offset-2 scale-[1.02] ${isLight ? 'text-indigo-950 ring-offset-white' : 'text-white ring-offset-slate-900'}`
                       : classes.length > 0
-                      ? 'bg-slate-950/40 border-emerald-500/30 text-gray-300 hover:bg-white/5 hover:border-white/20'
-                      : 'bg-slate-950/30 border-white/5 text-gray-400 hover:bg-white/5'
+                      ? isLight ? 'bg-slate-50 border-emerald-500/40 text-slate-700 hover:bg-slate-100' : 'bg-slate-950/40 border-emerald-500/30 text-gray-300 hover:bg-white/5 hover:border-white/20'
+                      : isLight ? 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100' : 'bg-slate-950/30 border-white/5 text-gray-400 hover:bg-white/5'
                   }`}
                 >
                   {activeTab === 'classes' && (
                     <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-indigo-500 border-2 border-slate-900 shadow-sm"></span>
+                      <span className={`relative inline-flex rounded-full h-3.5 w-3.5 bg-indigo-500 border-2 shadow-sm ${isLight ? 'border-white' : 'border-slate-900'}`}></span>
                     </span>
                   )}
                   <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 ${
                     activeTab === 'classes'
                       ? 'bg-indigo-600 text-white border border-indigo-300 shadow-md shadow-indigo-500/30 animate-pulse'
                       : classes.length > 0 
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
-                      : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                      ? isLight ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
+                      : isLight ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                   }`}>
                     {classes.length > 0 && activeTab !== 'classes' ? '✓' : '4'}
                   </span>
                   <div className="min-w-0">
-                    <div className="text-xs font-bold text-white flex items-center gap-1.5 truncate">
+                    <div className={`text-xs flex items-center gap-1.5 truncate ${isLight ? (activeTab === 'classes' ? 'text-indigo-950 font-bold' : 'text-slate-800 font-semibold') : 'text-white font-bold'}`}>
                       <span>4. Classes</span>
-                      <span className="text-[10px] font-mono text-indigo-300 bg-indigo-500/10 px-1.5 py-0.2 rounded">({classes.length})</span>
+                      <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${isLight ? 'text-indigo-700 bg-indigo-50' : 'text-indigo-300 bg-indigo-500/10'}`}>({classes.length})</span>
                     </div>
-                    <p className="text-[10px] text-gray-400 truncate mt-0.5">Affectation des matières</p>
+                    <p className={`text-xs leading-relaxed truncate mt-0.5 ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>Affectation des matières</p>
                   </div>
                 </button>
 
-                <div className="w-2.5 h-0.5 bg-white/10 shrink-0" />
+                <div className={`w-2.5 h-0.5 shrink-0 ${isLight ? 'bg-slate-200' : 'bg-white/10'}`} />
 
                 {/* Step 5: Emploi du Temps */}
                 <button
                   onClick={() => setActiveTab('timetable')}
                   className={`flex-1 p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 relative ${
                     activeTab === 'timetable'
-                      ? 'bg-indigo-500/20 border-indigo-400 text-white shadow-xl shadow-indigo-500/20 ring-2 ring-indigo-400/70 ring-offset-2 ring-offset-slate-900 scale-[1.02]'
-                      : 'bg-slate-950/30 border-white/5 text-gray-400 hover:bg-white/5 hover:border-white/20'
+                      ? `bg-indigo-500/20 border-indigo-500 shadow-xl shadow-indigo-500/20 ring-2 ring-indigo-400/70 ring-offset-2 scale-[1.02] ${isLight ? 'text-indigo-950 ring-offset-white' : 'text-white ring-offset-slate-900'}`
+                      : isLight ? 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:border-slate-300' : 'bg-slate-950/30 border-white/5 text-gray-400 hover:bg-white/5 hover:border-white/20'
                   }`}
                 >
                   {activeTab === 'timetable' && (
                     <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-indigo-500 border-2 border-slate-900 shadow-sm"></span>
+                      <span className={`relative inline-flex rounded-full h-3.5 w-3.5 bg-indigo-500 border-2 shadow-sm ${isLight ? 'border-white' : 'border-slate-900'}`}></span>
                     </span>
                   )}
                   <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 shadow-md shadow-indigo-500/20 ${
@@ -2983,11 +3012,11 @@ export default function TimetableDashboard({
                     5
                   </span>
                   <div className="min-w-0">
-                    <div className="text-xs font-bold text-white flex items-center gap-1.5 truncate">
+                    <div className={`text-xs flex items-center gap-1.5 truncate ${isLight ? (activeTab === 'timetable' ? 'text-indigo-950 font-bold' : 'text-slate-800 font-semibold') : 'text-white font-bold'}`}>
                       <span>5. Emploi du Temps</span>
-                      <span className="text-[10px] font-mono text-emerald-400 font-bold">{generationScore}%</span>
+                      <span className="text-[10px] font-mono text-emerald-500 font-bold">{generationScore}%</span>
                     </div>
-                    <p className="text-[10px] text-gray-400 truncate mt-0.5">Génération & Grille</p>
+                    <p className={`text-xs leading-relaxed truncate mt-0.5 ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>Génération & Grille</p>
                   </div>
                 </button>
               </div>
@@ -2995,17 +3024,19 @@ export default function TimetableDashboard({
 
 
             <div className="flex flex-wrap lg:flex-nowrap gap-6 items-start">
-            <nav className="w-full lg:w-64 shrink-0 flex flex-row lg:flex-col gap-1.5 p-2 bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-x-auto select-none shadow-xl">
+            <nav className={`w-full lg:w-64 shrink-0 flex flex-row lg:flex-col gap-1.5 p-2 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/60 border-white/10 shadow-xl'} backdrop-blur-xl border rounded-2xl overflow-x-auto select-none`}>
               {/* 1. Jours & Horaires */}
               <button
                 onClick={() => setActiveTab('scheduleConfig')}
                 className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === 'scheduleConfig'
                     ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+                    : isLight
+                    ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
+                    : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
                 }`}
               >
-                <Clock className="w-4 h-4 shrink-0" />
+                <Clock className={`w-4 h-4 shrink-0 ${activeTab === 'scheduleConfig' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
                 <span className="hidden sm:inline lg:inline">1. Jours & Horaires</span>
               </button>
 
@@ -3015,10 +3046,12 @@ export default function TimetableDashboard({
                 className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === 'subjects'
                     ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+                    : isLight
+                    ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
+                    : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
                 }`}
               >
-                <BookOpen className="w-4 h-4 shrink-0" />
+                <BookOpen className={`w-4 h-4 shrink-0 ${activeTab === 'subjects' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
                 <span className="hidden sm:inline lg:inline">2. Matières ({subjects.length})</span>
               </button>
 
@@ -3028,10 +3061,12 @@ export default function TimetableDashboard({
                 className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === 'teachers'
                     ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+                    : isLight
+                    ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
+                    : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
                 }`}
               >
-                <GraduationCap className="w-4 h-4 shrink-0" />
+                <GraduationCap className={`w-4 h-4 shrink-0 ${activeTab === 'teachers' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
                 <span className="hidden sm:inline lg:inline">3. Enseignants ({teachers.length})</span>
               </button>
 
@@ -3041,10 +3076,12 @@ export default function TimetableDashboard({
                 className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === 'classes'
                     ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+                    : isLight
+                    ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
+                    : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
                 }`}
               >
-                <Users className="w-4 h-4 shrink-0" />
+                <Users className={`w-4 h-4 shrink-0 ${activeTab === 'classes' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
                 <span className="hidden sm:inline lg:inline">4. Classes ({classes.length})</span>
               </button>
 
@@ -3054,24 +3091,28 @@ export default function TimetableDashboard({
                 className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === 'timetable'
                     ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+                    : isLight
+                    ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
+                    : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
                 }`}
               >
-                <Grid className="w-4 h-4 shrink-0" />
+                <Grid className={`w-4 h-4 shrink-0 ${activeTab === 'timetable' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
                 <span className="hidden sm:inline lg:inline">5. Emploi du Temps</span>
               </button>
 
-              <div className="h-px bg-white/10 my-1 hidden lg:block" />
+              <div className={`h-px my-1 hidden lg:block ${isLight ? 'bg-slate-200' : 'bg-white/10'}`} />
 
               <button
                 onClick={() => setActiveTab('stats')}
                 className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === 'stats'
                     ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+                    : isLight
+                    ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
+                    : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
                 }`}
               >
-                <BarChart className="w-4 h-4 shrink-0" />
+                <BarChart className={`w-4 h-4 shrink-0 ${activeTab === 'stats' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
                 <span className="hidden sm:inline lg:inline">Synthèse Chef</span>
               </button>
 
@@ -3080,11 +3121,15 @@ export default function TimetableDashboard({
                 className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === 'ai'
                     ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25 border border-emerald-400/30'
-                    : 'text-emerald-400 hover:text-emerald-200 hover:bg-emerald-500/10 border border-transparent'
+                    : isLight
+                    ? 'bg-transparent text-emerald-600 hover:text-emerald-700 hover:bg-slate-100/80 border border-transparent'
+                    : 'bg-transparent text-emerald-400 hover:text-emerald-300 hover:bg-white/5 border border-transparent'
                 }`}
               >
-                <Sparkles className="w-4 h-4 shrink-0" />
-                <span>Conseils IA Gemini</span>
+                <Sparkles className={`w-4 h-4 shrink-0 ${activeTab === 'ai' ? 'text-white' : isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
+                <span className={activeTab === 'ai' ? 'text-white' : isLight ? 'text-emerald-600 font-bold' : 'text-emerald-400 font-bold'}>
+                  Conseils IA Gemini
+                </span>
               </button>
 
               <button
@@ -3092,10 +3137,12 @@ export default function TimetableDashboard({
                 className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === 'settings'
                     ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/25 border border-purple-400/30'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+                    : isLight
+                    ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
+                    : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
                 }`}
               >
-                <Settings className="w-4 h-4 shrink-0" />
+                <Settings className={`w-4 h-4 shrink-0 ${activeTab === 'settings' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
                 <span>Paramètres</span>
               </button>
             </nav>
@@ -3107,20 +3154,20 @@ export default function TimetableDashboard({
             {activeTab === 'scheduleConfig' && (
               <div className="space-y-6">
                 {/* HEADER BANNER WITH STEP-BY-STEP BEGINNER GUIDE */}
-                <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl space-y-4">
-                  <div className="flex items-center justify-between gap-4 flex-wrap pb-4 border-b border-white/10">
+                <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'}`}>
+                  <div className={`flex items-center justify-between gap-4 flex-wrap pb-4 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
                     <div className="flex items-center gap-4">
-                      <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0">
+                      <div className={`p-3 rounded-2xl border shrink-0 ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'}`}>
                         <Clock className="w-6 h-6" />
                       </div>
                       <div>
-                        <h2 className="text-lg font-bold text-white flex items-center gap-2 flex-wrap">
+                        <h2 className={`text-lg font-bold flex items-center gap-2 flex-wrap ${isLight ? 'text-slate-900' : 'text-white'}`}>
                           <span>Étape 1 : Configuration des Jours & Plages Horaires</span>
-                          <span className="text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 px-2.5 py-0.5 rounded-full border border-indigo-500/30">
+                          <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'}`}>
                             Fondation de l'Établissement
                           </span>
                         </h2>
-                        <p className="text-sm text-gray-400 mt-0.5">
+                        <p className={`text-sm mt-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
                           Définissez les jours ouvrés et l'amplitude horaire de votre école. Toutes les grilles s'adapteront à ces paramètres.
                         </p>
                       </div>
@@ -3136,8 +3183,10 @@ export default function TimetableDashboard({
                         }}
                         className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                           activeDays.length === 5 && !activeDays.includes("Samedi")
-                            ? 'bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-600/30'
-                            : 'bg-slate-950/40 border-white/10 text-gray-400 hover:text-white hover:bg-white/5'
+                            ? 'bg-indigo-600 !text-white border-indigo-500 shadow-md shadow-indigo-600/30 ring-2 ring-indigo-400/40'
+                            : isLight
+                              ? 'bg-slate-50 border-slate-200 text-slate-700 hover:text-indigo-600 hover:bg-indigo-50/50'
+                              : 'bg-slate-950/40 border-white/10 text-gray-400 hover:text-white hover:bg-white/5'
                         }`}
                       >
                         Lundi - Vendredi (5j)
@@ -3150,8 +3199,10 @@ export default function TimetableDashboard({
                         }}
                         className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                           activeDays.length === 6
-                            ? 'bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-600/30'
-                            : 'bg-slate-950/40 border-white/10 text-gray-400 hover:text-white hover:bg-white/5'
+                            ? 'bg-indigo-600 !text-white border-indigo-500 shadow-md shadow-indigo-600/30 ring-2 ring-indigo-400/40'
+                            : isLight
+                              ? 'bg-slate-50 border-slate-200 text-slate-700 hover:text-indigo-600 hover:bg-indigo-50/50'
+                              : 'bg-slate-950/40 border-white/10 text-gray-400 hover:text-white hover:bg-white/5'
                         }`}
                       >
                         Lundi - Samedi (6j)
@@ -3160,36 +3211,36 @@ export default function TimetableDashboard({
                   </div>
 
                   {/* GUIDE DÉBUTANT PAS-À-PAS */}
-                  <div className="bg-slate-950/50 rounded-xl p-4 border border-indigo-500/20">
-                    <div className="flex items-center gap-2 text-xs font-mono font-bold text-indigo-300 uppercase tracking-wider mb-2.5">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>Guide Débutant : Ce que vous devez faire sur cette étape</span>
+                  <div className={`rounded-xl p-4 border ${isLight ? 'bg-blue-50/60 border-blue-200/80' : 'bg-slate-950/50 border-indigo-500/20'}`}>
+                    <div className={`flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider mb-2.5 ${isLight ? 'text-blue-600' : 'text-indigo-300'}`}>
+                      <Sparkles className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-indigo-400'}`} />
+                      <span className="font-bold">Guide Débutant : Ce que vous devez faire sur cette étape</span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                      <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1">
-                        <div className="font-bold text-white flex items-center gap-1.5">
-                          <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-mono flex items-center justify-center font-bold">1</span>
-                          <span>Choisir les jours ouverts</span>
+                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>1</span>
+                          <span className="font-bold">Choisir les jours ouverts</span>
                         </div>
-                        <p className="text-gray-400 text-[11px] leading-relaxed">
+                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
                           Cochez les jours où l'école dispense des cours (ex: du Lundi au Samedi ou 5 jours).
                         </p>
                       </div>
-                      <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1">
-                        <div className="font-bold text-white flex items-center gap-1.5">
-                          <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-mono flex items-center justify-center font-bold">2</span>
-                          <span>Régler la plage horaire</span>
+                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>2</span>
+                          <span className="font-bold">Régler la plage horaire</span>
                         </div>
-                        <p className="text-gray-400 text-[11px] leading-relaxed">
+                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
                           Sélectionnez l'heure du premier cours (ex: 8h) et l'heure de sortie (ex: 18h).
                         </p>
                       </div>
-                      <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1">
-                        <div className="font-bold text-white flex items-center gap-1.5">
-                          <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-mono flex items-center justify-center font-bold">3</span>
-                          <span>Passer à l'étape 2 (Matières)</span>
+                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>3</span>
+                          <span className="font-bold">Passer à l'étape 2 (Matières)</span>
                         </div>
-                        <p className="text-gray-400 text-[11px] leading-relaxed">
+                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
                           Vérifiez la capacité hebdomadaire générée, puis cliquez sur le bouton pour continuer.
                         </p>
                       </div>
@@ -3201,20 +3252,20 @@ export default function TimetableDashboard({
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                   {/* 1. SELECTION DES JOURS OUVRÉS (7 COLS) */}
                   <div className="lg:col-span-7 space-y-6">
-                    <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl space-y-5">
-                      <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-5 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'}`}>
+                      <div className={`flex items-center justify-between pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
                         <div className="flex items-center gap-2">
-                          <Calendar className="w-5 h-5 text-indigo-400" />
-                          <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+                          <Calendar className={`w-5 h-5 ${isLight ? 'text-indigo-600' : 'text-indigo-400'}`} />
+                          <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
                             1. Jours de Cours Actifs
                           </h3>
                         </div>
-                        <span className="text-xs font-mono text-indigo-300 font-bold bg-indigo-500/10 px-2.5 py-0.5 rounded-full border border-indigo-500/20">
+                        <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20'}`}>
                           {activeDays.length} jours configurés
                         </span>
                       </div>
 
-                      <p className="text-xs text-gray-400">
+                      <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
                         Cochez ou décochez les jours durant lesquels votre établissement dispense des cours.
                       </p>
 
@@ -3239,19 +3290,27 @@ export default function TimetableDashboard({
                               }}
                               className={`p-4 rounded-xl border flex flex-col items-start justify-between gap-3 transition-all cursor-pointer select-none ${
                                 isSelected
-                                  ? 'bg-gradient-to-br from-indigo-900/40 to-indigo-950/60 border-indigo-500/80 text-white ring-1 ring-indigo-500/40 shadow-md shadow-indigo-950/50'
-                                  : 'bg-slate-950/40 border-white/5 text-gray-500 hover:border-white/20 hover:text-gray-300'
+                                  ? 'bg-indigo-600 hover:bg-indigo-700 border-indigo-500 !text-white ring-2 ring-indigo-400/50 shadow-md shadow-indigo-600/30'
+                                  : isLight
+                                    ? 'bg-slate-50 border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50/40'
+                                    : 'bg-slate-950/40 border-white/10 text-gray-400 hover:border-white/20 hover:text-gray-300'
                               }`}
                             >
                               <div className="flex items-center justify-between w-full">
-                                <span className="font-bold text-sm">{day}</span>
+                                <span className={`font-bold text-sm ${isSelected ? '!text-white' : (isLight ? 'text-slate-800' : 'text-gray-300')}`}>
+                                  {day}
+                                </span>
                                 <span className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold ${
-                                  isSelected ? 'bg-indigo-500 text-white' : 'border border-white/10 bg-slate-900'
+                                  isSelected 
+                                    ? 'bg-white/25 !text-white border border-white/50' 
+                                    : isLight
+                                      ? 'border border-slate-300 bg-white text-transparent'
+                                      : 'border border-white/10 bg-slate-900 text-transparent'
                                 }`}>
-                                  {isSelected && <Check className="w-3.5 h-3.5" />}
+                                  {isSelected && <Check className="w-3.5 h-3.5 !text-white stroke-[2.5]" />}
                                 </span>
                               </div>
-                              <span className={`text-[11px] font-mono ${isSelected ? 'text-indigo-300' : 'text-gray-600'}`}>
+                              <span className={`text-[11px] font-mono ${isSelected ? '!text-white font-semibold' : (isLight ? 'text-slate-400' : 'text-gray-600')}`}>
                                 {isSelected ? `${totalSlots}h / jour` : 'Fermé'}
                               </span>
                             </button>
@@ -3261,22 +3320,22 @@ export default function TimetableDashboard({
                     </div>
 
                     {/* 2. PLAGE HORAIRE DE LA JOURNÉE (8h à 22h) */}
-                    <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl space-y-5">
-                      <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-5 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'}`}>
+                      <div className={`flex items-center justify-between pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
                         <div className="flex items-center gap-2">
-                          <Clock className="w-5 h-5 text-indigo-400" />
-                          <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+                          <Clock className={`w-5 h-5 ${isLight ? 'text-indigo-600' : 'text-indigo-400'}`} />
+                          <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
                             2. Amplitude Horaire Quotidienne (8h à 22h)
                           </h3>
                         </div>
-                        <span className="text-xs font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                        <span className="text-xs font-mono text-emerald-600 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
                           {startHour}h00 → {endHour}h00 ({totalSlots} créneaux d'1h)
                         </span>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-xs font-medium text-gray-300 mb-2">
+                          <label className={`block text-xs font-medium mb-2 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
                             Heure de début des cours (Matin)
                           </label>
                           <select
@@ -3289,7 +3348,7 @@ export default function TimetableDashboard({
                               }
                               setStartHour(val);
                             }}
-                            className="w-full bg-slate-950 border border-white/10 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors shadow-inner font-mono cursor-pointer"
+                            className={`w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors shadow-inner font-mono cursor-pointer border ${isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-slate-950 border-white/10 text-white'}`}
                           >
                             {[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21].map((h) => (
                               <option key={h} value={h} disabled={h >= endHour}>
@@ -3300,7 +3359,7 @@ export default function TimetableDashboard({
                         </div>
 
                         <div>
-                          <label className="block text-xs font-medium text-gray-300 mb-2">
+                          <label className={`block text-xs font-medium mb-2 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
                             Heure de fin des cours (Soir)
                           </label>
                           <select
@@ -3313,7 +3372,7 @@ export default function TimetableDashboard({
                               }
                               setEndHour(val);
                             }}
-                            className="w-full bg-slate-950 border border-white/10 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors shadow-inner font-mono cursor-pointer"
+                            className={`w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors shadow-inner font-mono cursor-pointer border ${isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-slate-950 border-white/10 text-white'}`}
                           >
                             {[9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22].map((h) => (
                               <option key={h} value={h} disabled={h <= startHour}>
@@ -3326,14 +3385,14 @@ export default function TimetableDashboard({
 
                       {/* VISUAL PILL OF GENERATED SLOTS */}
                       <div className="pt-2">
-                        <label className="block text-xs font-medium text-gray-400 mb-2">
+                        <label className={`block text-xs font-medium mb-2 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
                           Créneaux horaires d'1 heure générés :
                         </label>
-                        <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2.5 bg-slate-950/60 rounded-xl border border-white/5">
+                        <div className={`flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2.5 rounded-xl border ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-white/5'}`}>
                           {slotLabels.map((label, idx) => (
                             <span
                               key={idx}
-                              className="px-2.5 py-1 rounded-lg text-xs font-mono bg-indigo-500/10 text-indigo-300 border border-indigo-500/20"
+                              className={`px-2.5 py-1 rounded-lg text-xs font-mono border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20'}`}
                             >
                               Créneau {idx + 1} : {label}
                             </span>
@@ -3345,31 +3404,31 @@ export default function TimetableDashboard({
 
                   {/* 3. SYNTHÈSE DE CAPACITÉ & PASSAGE ÉTAPE 2 (5 COLS) */}
                   <div className="lg:col-span-5 space-y-6">
-                    <div className="p-6 rounded-2xl bg-gradient-to-br from-indigo-950/40 via-slate-900/60 to-purple-950/40 backdrop-blur-xl border border-indigo-500/20 shadow-xl space-y-5">
-                      <div className="flex items-center gap-2 pb-3 border-b border-white/10">
-                        <Sparkles className="w-5 h-5 text-indigo-400" />
-                        <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+                    <div className={`p-6 rounded-2xl backdrop-blur-xl border shadow-xl space-y-5 ${isLight ? 'bg-gradient-to-br from-indigo-50/80 via-white to-purple-50/80 border-indigo-200/90 text-slate-900 shadow-indigo-950/5' : 'bg-gradient-to-br from-indigo-950/40 via-slate-900/60 to-purple-950/40 border-indigo-500/20 text-white'}`}>
+                      <div className={`flex items-center gap-2 pb-3 border-b ${isLight ? 'border-indigo-100' : 'border-white/10'}`}>
+                        <Sparkles className={`w-5 h-5 ${isLight ? 'text-indigo-600' : 'text-indigo-400'}`} />
+                        <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
                           Capacité Hebdomadaire
                         </h3>
                       </div>
 
                       <div className="space-y-4">
-                        <div className="p-4 rounded-xl bg-slate-950/60 border border-white/10 space-y-3">
+                        <div className={`p-4 rounded-xl border space-y-3 ${isLight ? 'bg-white/90 border-indigo-100 shadow-xs' : 'bg-slate-950/60 border-white/10'}`}>
                           <div className="flex items-center justify-between text-xs">
-                            <span className="text-gray-400">Jours de cours :</span>
-                            <span className="font-bold text-white font-mono">{activeDays.length} jours / semaine</span>
+                            <span className={isLight ? 'text-slate-500' : 'text-gray-400'}>Jours de cours :</span>
+                            <span className={`font-bold font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>{activeDays.length} jours / semaine</span>
                           </div>
                           <div className="flex items-center justify-between text-xs">
-                            <span className="text-gray-400">Amplitude quotidienne :</span>
-                            <span className="font-bold text-indigo-400 font-mono">{startHour}h00 → {endHour}h00 ({totalSlots}h)</span>
+                            <span className={isLight ? 'text-slate-500' : 'text-gray-400'}>Amplitude quotidienne :</span>
+                            <span className="font-bold text-indigo-600 font-mono">{startHour}h00 → {endHour}h00 ({totalSlots}h)</span>
                           </div>
-                          <div className="flex items-center justify-between text-xs border-t border-white/10 pt-2.5">
-                            <span className="text-gray-300 font-medium">Capacité totale par classe :</span>
-                            <span className="font-black text-emerald-400 font-mono text-sm">{activeDays.length * totalSlots} créneaux/sem</span>
+                          <div className={`flex items-center justify-between text-xs border-t pt-2.5 ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                            <span className={`font-medium ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>Capacité totale par classe :</span>
+                            <span className="font-black text-emerald-600 font-mono text-sm">{activeDays.length * totalSlots} créneaux/sem</span>
                           </div>
                         </div>
 
-                        <div className="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-200 leading-relaxed">
+                        <div className={`p-3.5 rounded-xl border text-xs leading-relaxed ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-200'}`}>
                           💡 <strong>Prise en compte globale :</strong> Toutes les grilles, filtres d'indisponibilité et le moteur d'optimisation mathématique s'ajustent instantanément à cette amplitude horaire.
                         </div>
 
@@ -3381,7 +3440,7 @@ export default function TimetableDashboard({
                               setActiveTab('subjects');
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             }}
-                            className="w-full py-4 px-5 rounded-2xl bg-gradient-to-r from-indigo-500 via-purple-600 to-indigo-600 hover:from-indigo-400 hover:via-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 cursor-pointer group border border-indigo-400/30"
+                            className="w-full py-4 px-5 rounded-2xl bg-gradient-to-r from-indigo-500 via-purple-600 to-indigo-600 hover:from-indigo-400 hover:via-purple-500 hover:to-indigo-500 !text-white font-bold text-xs shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 cursor-pointer group border border-indigo-400/30"
                           >
                             <span>👉 Passer à l'Étape 2 : Référentiel des Matières</span>
                             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform animate-pulse" />
@@ -3399,20 +3458,20 @@ export default function TimetableDashboard({
               <div className="space-y-6">
                 
                 {/* HEADER BANNER WITH STEP-BY-STEP BEGINNER GUIDE */}
-                <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl space-y-4">
-                  <div className="flex items-center justify-between gap-4 flex-wrap pb-4 border-b border-white/10">
+                <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
+                  <div className={`flex items-center justify-between gap-4 flex-wrap pb-4 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
                     <div className="flex items-center gap-4">
-                      <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0">
+                      <div className={`p-3 rounded-2xl border shrink-0 ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'}`}>
                         <Grid className="w-6 h-6" />
                       </div>
                       <div>
-                        <h2 className="text-lg font-bold text-white flex items-center gap-2 flex-wrap">
+                        <h2 className={`text-lg font-bold flex items-center gap-2 flex-wrap ${isLight ? 'text-slate-800' : 'text-white'}`}>
                           <span>Étape 5 : Emploi du Temps & Résolution Automatique</span>
-                          <span className="text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 px-2.5 py-0.5 rounded-full border border-indigo-500/30">
+                          <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'}`}>
                             Génération & Exports
                           </span>
                         </h2>
-                        <p className="text-sm text-gray-400 mt-0.5">
+                        <p className={`text-sm mt-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
                           Générez automatiquement un emploi du temps 100% optimisé et sans aucun conflit, ajustez au besoin par glisser-déposer, et téléchargez vos documents officiels.
                         </p>
                       </div>
@@ -3420,36 +3479,36 @@ export default function TimetableDashboard({
                   </div>
 
                   {/* GUIDE DÉBUTANT PAS-À-PAS */}
-                  <div className="bg-slate-950/50 rounded-xl p-4 border border-indigo-500/20">
-                    <div className="flex items-center gap-2 text-xs font-mono font-bold text-indigo-300 uppercase tracking-wider mb-2.5">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>Guide Débutant : Ce que vous devez faire sur cette étape</span>
+                  <div className={`rounded-xl p-4 border ${isLight ? 'bg-blue-50/60 border-blue-200/80' : 'bg-slate-950/50 border-indigo-500/20'}`}>
+                    <div className={`flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider mb-2.5 ${isLight ? 'text-blue-600' : 'text-indigo-300'}`}>
+                      <Sparkles className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-indigo-400'}`} />
+                      <span className="font-bold">Guide Débutant : Ce que vous devez faire sur cette étape</span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                      <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1">
-                        <div className="font-bold text-white flex items-center gap-1.5">
-                          <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-mono flex items-center justify-center font-bold">1</span>
-                          <span>Générer le planning</span>
+                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>1</span>
+                          <span className="font-bold">Générer le planning</span>
                         </div>
-                        <p className="text-gray-400 text-[11px] leading-relaxed">
+                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
                           Cliquez sur le bouton violet "Générer l'Emploi du Temps" ci-dessous pour calculer l'emploi du temps optimal sans chevauchement.
                         </p>
                       </div>
-                      <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1">
-                        <div className="font-bold text-white flex items-center gap-1.5">
-                          <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-mono flex items-center justify-center font-bold">2</span>
-                          <span>Ajuster par Glisser-Déposer</span>
+                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>2</span>
+                          <span className="font-bold">Ajuster par Glisser-Déposer</span>
                         </div>
-                        <p className="text-gray-400 text-[11px] leading-relaxed">
+                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
                           Glissez un cours vers un autre créneau à la souris : le système anti-conflit valide instantanément en vert ou vous bloque en rouge.
                         </p>
                       </div>
-                      <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1">
-                        <div className="font-bold text-white flex items-center gap-1.5">
-                          <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-mono flex items-center justify-center font-bold">3</span>
-                          <span>Exporter les documents</span>
+                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>3</span>
+                          <span className="font-bold">Exporter les documents</span>
                         </div>
-                        <p className="text-gray-400 text-[11px] leading-relaxed">
+                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
                           Cliquez sur les boutons d'export PDF, Word (.doc) ou Excel (.xlsx) pour imprimer vos emplois du temps prêts pour la rentrée.
                         </p>
                       </div>
@@ -4040,20 +4099,20 @@ export default function TimetableDashboard({
               <div className="space-y-6">
                 
                 {/* HEADER BANNER WITH STEP-BY-STEP BEGINNER GUIDE */}
-                <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl space-y-4">
-                  <div className="flex items-center justify-between gap-4 flex-wrap pb-4 border-b border-white/10">
+                <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
+                  <div className={`flex items-center justify-between gap-4 flex-wrap pb-4 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
                     <div className="flex items-center gap-4">
-                      <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0">
+                      <div className={`p-3 rounded-2xl border shrink-0 ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'}`}>
                         <Users className="w-6 h-6" />
                       </div>
                       <div>
-                        <h2 className="text-lg font-bold text-white flex items-center gap-2 flex-wrap">
+                        <h2 className={`text-lg font-bold flex items-center gap-2 flex-wrap ${isLight ? 'text-slate-800' : 'text-white'}`}>
                           <span>Étape 4 : Configuration des Classes & Affectations Pédagogiques</span>
-                          <span className="text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 px-2.5 py-0.5 rounded-full border border-indigo-500/30">
+                          <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'}`}>
                             Groupes & Volumes Horaires
                           </span>
                         </h2>
-                        <p className="text-sm text-gray-400 mt-0.5">
+                        <p className={`text-sm mt-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
                           Déclarez vos classes et attribuez à chaque groupe les cours à suivre (Matière + Professeur + Heures par semaine).
                         </p>
                       </div>
@@ -4061,46 +4120,46 @@ export default function TimetableDashboard({
                   </div>
 
                   {/* GUIDE DÉBUTANT PAS-À-PAS */}
-                  <div className="bg-slate-950/50 rounded-xl p-4 border border-indigo-500/20">
-                    <div className="flex items-center gap-2 text-xs font-mono font-bold text-indigo-300 uppercase tracking-wider mb-2.5">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>Guide Débutant : Ce que vous devez faire sur cette étape</span>
+                  <div className={`rounded-xl p-4 border ${isLight ? 'bg-blue-50/60 border-blue-200/80' : 'bg-slate-950/50 border-indigo-500/20'}`}>
+                    <div className={`flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider mb-2.5 ${isLight ? 'text-blue-600' : 'text-indigo-300'}`}>
+                      <Sparkles className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-indigo-400'}`} />
+                      <span className="font-bold">Guide Débutant : Ce que vous devez faire sur cette étape</span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
-                      <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1">
-                        <div className="font-bold text-white flex items-center gap-1.5">
-                          <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-mono flex items-center justify-center font-bold">1</span>
-                          <span>Créer la classe</span>
+                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>1</span>
+                          <span className="font-bold">Créer la classe</span>
                         </div>
-                        <p className="text-gray-400 text-[11px] leading-relaxed">
+                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
                           Saisissez le libellé de la classe (ex: Terminale S1, 6ème A, 3ème B).
                         </p>
                       </div>
-                      <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1">
-                        <div className="font-bold text-white flex items-center gap-1.5">
-                          <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-mono flex items-center justify-center font-bold">2</span>
-                          <span>Affecter les cours</span>
+                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>2</span>
+                          <span className="font-bold">Affecter les cours</span>
                         </div>
-                        <p className="text-gray-400 text-[11px] leading-relaxed">
-                          Pour chaque matière, choisissez le professeur assigné et le nombre d'heures par semaine (ex: Maths 5h).
+                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                          Pour chaque matière, choisissez le professeur assigné et le nombre d'heures.
                         </p>
                       </div>
-                      <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1">
-                        <div className="font-bold text-white flex items-center gap-1.5">
-                          <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-mono flex items-center justify-center font-bold">3</span>
-                          <span>Fermetures (Optionnel)</span>
+                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>3</span>
+                          <span className="font-bold">Fermetures</span>
                         </div>
-                        <p className="text-gray-400 text-[11px] leading-relaxed">
+                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
                           Marquez les créneaux où cette classe n'a jamais cours (ex: fermeture après-midi).
                         </p>
                       </div>
-                      <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1">
-                        <div className="font-bold text-white flex items-center gap-1.5">
-                          <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-mono flex items-center justify-center font-bold">4</span>
-                          <span>Passer à l'Étape 5</span>
+                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>4</span>
+                          <span className="font-bold">Passer à l'Étape 5</span>
                         </div>
-                        <p className="text-gray-400 text-[11px] leading-relaxed">
-                          Cliquez sur "Ajouter la classe". Quand toutes les classes sont créées, filez à l'Étape 5 pour générer !
+                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                          Cliquez sur "Ajouter la classe". Quand tout est prêt, filez à l'Étape 5 !
                         </p>
                       </div>
                     </div>
@@ -4423,20 +4482,20 @@ export default function TimetableDashboard({
               <div className="space-y-6">
                 
                 {/* HEADER BANNER WITH STEP-BY-STEP BEGINNER GUIDE */}
-                <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl space-y-4">
-                  <div className="flex items-center justify-between gap-4 flex-wrap pb-4 border-b border-white/10">
+                <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
+                  <div className={`flex items-center justify-between gap-4 flex-wrap pb-4 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
                     <div className="flex items-center gap-4">
-                      <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0">
+                      <div className={`p-3 rounded-2xl border shrink-0 ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'}`}>
                         <GraduationCap className="w-6 h-6" />
                       </div>
                       <div>
-                        <h2 className="text-lg font-bold text-white flex items-center gap-2 flex-wrap">
+                        <h2 className={`text-lg font-bold flex items-center gap-2 flex-wrap ${isLight ? 'text-slate-800' : 'text-white'}`}>
                           <span>Étape 3 : Fiches Enseignants & Disponibilités</span>
-                          <span className="text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 px-2.5 py-0.5 rounded-full border border-indigo-500/30">
+                          <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'}`}>
                             Professeurs & Quotas
                           </span>
                         </h2>
-                        <p className="text-sm text-gray-400 mt-0.5">
+                        <p className={`text-sm mt-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
                           Enregistrez les professeurs, leurs matières habilitées, leur quota d'heures par semaine et leurs temps libres.
                         </p>
                       </div>
@@ -4444,46 +4503,46 @@ export default function TimetableDashboard({
                   </div>
 
                   {/* GUIDE DÉBUTANT PAS-À-PAS */}
-                  <div className="bg-slate-950/50 rounded-xl p-4 border border-indigo-500/20">
-                    <div className="flex items-center gap-2 text-xs font-mono font-bold text-indigo-300 uppercase tracking-wider mb-2.5">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>Guide Débutant : Ce que vous devez faire sur cette étape</span>
+                  <div className={`rounded-xl p-4 border ${isLight ? 'bg-blue-50/60 border-blue-200/80' : 'bg-slate-950/50 border-indigo-500/20'}`}>
+                    <div className={`flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider mb-2.5 ${isLight ? 'text-blue-600' : 'text-indigo-300'}`}>
+                      <Sparkles className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-indigo-400'}`} />
+                      <span className="font-bold">Guide Débutant : Ce que vous devez faire sur cette étape</span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
-                      <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1">
-                        <div className="font-bold text-white flex items-center gap-1.5">
-                          <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-mono flex items-center justify-center font-bold">1</span>
-                          <span>Nom de l'enseignant</span>
+                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>1</span>
+                          <span className="font-bold">Nom de l'enseignant</span>
                         </div>
-                        <p className="text-gray-400 text-[11px] leading-relaxed">
+                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
                           Saisissez le nom (ex: M. Diongue, Mme Sow) dans le formulaire à gauche.
                         </p>
                       </div>
-                      <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1">
-                        <div className="font-bold text-white flex items-center gap-1.5">
-                          <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-mono flex items-center justify-center font-bold">2</span>
-                          <span>Quota & Matières</span>
+                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>2</span>
+                          <span className="font-bold">Quota & Matières</span>
                         </div>
-                        <p className="text-gray-400 text-[11px] leading-relaxed">
+                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
                           Indiquez son volume d'heures/semaine visé (ex: 18h) et cochez les matières qu'il enseigne.
                         </p>
                       </div>
-                      <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1">
-                        <div className="font-bold text-white flex items-center gap-1.5">
-                          <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-mono flex items-center justify-center font-bold">3</span>
-                          <span>Temps libres (Optionnel)</span>
+                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>3</span>
+                          <span className="font-bold">Temps libres</span>
                         </div>
-                        <p className="text-gray-400 text-[11px] leading-relaxed">
-                          Cliquez sur la petite grille pour griser (X) les créneaux où ce prof ne peut pas être programmé.
+                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                          Cliquez sur la grille pour griser (X) les créneaux où ce prof ne peut pas enseigner.
                         </p>
                       </div>
-                      <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1">
-                        <div className="font-bold text-white flex items-center gap-1.5">
-                          <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-mono flex items-center justify-center font-bold">4</span>
-                          <span>Enregistrer le prof</span>
+                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>4</span>
+                          <span className="font-bold">Enregistrer le prof</span>
                         </div>
-                        <p className="text-gray-400 text-[11px] leading-relaxed">
-                          Cliquez sur "Ajouter l'enseignant". Dès que l'équipe est créée, passez à l'Étape 4 (Classes).
+                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                          Cliquez sur "Ajouter l'enseignant". Dès que l'équipe est créée, passez à l'Étape 4.
                         </p>
                       </div>
                     </div>
@@ -4789,20 +4848,20 @@ export default function TimetableDashboard({
               <div className="space-y-6">
                 
                 {/* HEADER BANNER WITH STEP-BY-STEP BEGINNER GUIDE */}
-                <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl space-y-4">
-                  <div className="flex items-center justify-between gap-4 flex-wrap pb-4 border-b border-white/10">
+                <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
+                  <div className={`flex items-center justify-between gap-4 flex-wrap pb-4 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
                     <div className="flex items-center gap-4">
-                      <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0">
+                      <div className={`p-3 rounded-2xl border shrink-0 ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'}`}>
                         <BookOpen className="w-6 h-6" />
                       </div>
                       <div>
-                        <h2 className="text-lg font-bold text-white flex items-center gap-2 flex-wrap">
+                        <h2 className={`text-lg font-bold flex items-center gap-2 flex-wrap ${isLight ? 'text-slate-800' : 'text-white'}`}>
                           <span>Étape 2 : Référentiel des Matières d'Enseignement</span>
-                          <span className="text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 px-2.5 py-0.5 rounded-full border border-indigo-500/30">
+                          <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'}`}>
                             Disciplines & Couleurs
                           </span>
                         </h2>
-                        <p className="text-sm text-gray-400 mt-0.5">
+                        <p className={`text-sm mt-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
                           Enregistrez la liste de toutes les disciplines proposées dans votre école et associez-leur des couleurs visuelles.
                         </p>
                       </div>
@@ -4810,36 +4869,36 @@ export default function TimetableDashboard({
                   </div>
 
                   {/* GUIDE DÉBUTANT PAS-À-PAS */}
-                  <div className="bg-slate-950/50 rounded-xl p-4 border border-indigo-500/20">
-                    <div className="flex items-center gap-2 text-xs font-mono font-bold text-indigo-300 uppercase tracking-wider mb-2.5">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>Guide Débutant : Ce que vous devez faire sur cette étape</span>
+                  <div className={`rounded-xl p-4 border ${isLight ? 'bg-blue-50/60 border-blue-200/80' : 'bg-slate-950/50 border-indigo-500/20'}`}>
+                    <div className={`flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider mb-2.5 ${isLight ? 'text-blue-600' : 'text-indigo-300'}`}>
+                      <Sparkles className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-indigo-400'}`} />
+                      <span className="font-bold">Guide Débutant : Ce que vous devez faire sur cette étape</span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                      <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1">
-                        <div className="font-bold text-white flex items-center gap-1.5">
-                          <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-mono flex items-center justify-center font-bold">1</span>
-                          <span>Nommer la matière</span>
+                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>1</span>
+                          <span className="font-bold">Nommer la matière</span>
                         </div>
-                        <p className="text-gray-400 text-[11px] leading-relaxed">
+                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
                           Écrivez le nom de la matière dans le formulaire de gauche (ex: Mathématiques, Français, SVT).
                         </p>
                       </div>
-                      <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1">
-                        <div className="font-bold text-white flex items-center gap-1.5">
-                          <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-mono flex items-center justify-center font-bold">2</span>
-                          <span>Choisir une couleur</span>
+                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>2</span>
+                          <span className="font-bold">Choisir une couleur</span>
                         </div>
-                        <p className="text-gray-400 text-[11px] leading-relaxed">
+                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
                           Cliquez sur une pastille de couleur pour identifier visuellement les cours sur l'emploi du temps.
                         </p>
                       </div>
-                      <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1">
-                        <div className="font-bold text-white flex items-center gap-1.5">
-                          <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-mono flex items-center justify-center font-bold">3</span>
-                          <span>Valider & Continuer</span>
+                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>3</span>
+                          <span className="font-bold">Valider & Continuer</span>
                         </div>
-                        <p className="text-gray-400 text-[11px] leading-relaxed">
+                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
                           Cliquez sur "Ajouter la matière". Une fois toutes vos matières saisies, passez à l'Étape 3 (Professeurs).
                         </p>
                       </div>
@@ -4965,12 +5024,18 @@ export default function TimetableDashboard({
               const CustomChartTooltip = ({ active, payload, label }: any) => {
                 if (active && payload && payload.length) {
                   return (
-                    <div className="bg-slate-950/95 border border-white/10 p-3 rounded-xl shadow-2xl backdrop-blur-md">
-                      <p className="font-bold text-xs text-white mb-1.5 font-sans border-b border-white/5 pb-1">{label}</p>
+                    <div className={`p-2.5 rounded-xl shadow-xl backdrop-blur-md border ${
+                      isLight ? 'bg-white/95 border-slate-200 text-slate-700' : 'bg-slate-950/95 border-white/10 text-white'
+                    }`}>
+                      <p className={`text-[11px] font-semibold mb-1 pb-1 border-b font-sans ${
+                        isLight ? 'text-slate-800 border-slate-100' : 'text-white border-white/5'
+                      }`}>{label}</p>
                       {payload.map((item: any, index: number) => (
-                        <p key={index} className="text-[11px] font-mono flex items-center gap-1.5" style={{ color: item.color || item.fill || '#cbd5e1' }}>
-                          <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: item.color || item.fill || '#cbd5e1' }} />
-                          {item.name} : <span className="font-bold">{item.value}h</span>
+                        <p key={index} className={`text-[10px] font-mono flex items-center gap-1.5 font-normal ${
+                          isLight ? 'text-slate-600' : ''
+                        }`} style={{ color: !isLight ? (item.color || item.fill || '#cbd5e1') : undefined }}>
+                          <span className="w-1.5 h-1.5 rounded-full inline-block shrink-0" style={{ backgroundColor: item.color || item.fill || '#64748b' }} />
+                          <span>{item.name} : <span className="font-normal">{item.value}h</span></span>
                         </p>
                       ))}
                     </div>
@@ -5032,180 +5097,183 @@ export default function TimetableDashboard({
               }
 
               return (
-                <div className="space-y-6">
+                <div className="space-y-6 pb-12">
                   
                   {/* DYNAMIC HEADER OVERVIEW */}
-                  <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+                  <div className={`p-6 rounded-2xl backdrop-blur-xl border flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden ${
+                    isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'
+                  }`}>
                     <div className="absolute top-0 right-0 w-80 h-40 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
                     
                     <div className="space-y-1 z-10">
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] uppercase tracking-widest bg-indigo-500/10 text-indigo-400 border border-indigo-500/25 font-mono px-3 py-1 rounded-full font-bold">
+                        <span className={`text-[10px] uppercase tracking-widest font-mono px-3 py-1 rounded-full font-bold ${
+                          isLight ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/25'
+                        }`}>
                           Tableau de Bord Exécutif
                         </span>
                         <span className={`text-[10px] uppercase tracking-wider font-mono px-3 py-1 rounded-full font-bold ${qualityBg}`}>
                           {qualityLabel}
                         </span>
                       </div>
-                      <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2 mt-2">
-                        <Award className="w-6 h-6 text-indigo-400" />
+                      <h2 className={`text-xl font-bold tracking-tight flex items-center gap-2 mt-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                        <Award className="w-6 h-6 text-indigo-500" />
                         <span>{"Contrôle Global du Chef d'Établissement"}</span>
                       </h2>
-                      <p className="text-xs text-gray-400 leading-relaxed max-w-2xl">
+                      <p className={`text-xs leading-relaxed max-w-2xl ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
                         {"Analysez la répartition des heures, détectez les écarts contractuels et supervisez l'avancement global du planning de vos divisions d'un seul coup d'œil."}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-4 shrink-0 z-10">
-                      <div className="bg-slate-950/70 border border-indigo-500/30 p-4 rounded-2xl font-mono text-center shadow-lg relative min-w-[130px]">
-                        <span className="block text-[9px] uppercase text-gray-400 font-bold mb-1 tracking-wider">Index Qualité</span>
-                        <span className="text-3xl font-extrabold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                    <div className="flex flex-wrap items-center gap-3 shrink-0 z-10">
+                      <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!currentPlan.features.pdfExport) {
+                              triggerNotification("L'export PDF des rapports statistiques requiert la formule supérieure.", "error");
+                              setIsClientSubModalOpen(true);
+                              return;
+                            }
+                            setChefDetailModalType('weekly_load');
+                          }}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer hover:-translate-y-0.5 ${
+                            isLight 
+                              ? 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200' 
+                              : 'bg-red-950/40 hover:bg-red-900/50 text-red-300 border border-red-500/30'
+                          }`}
+                          title="Télécharger le rapport statistique complet au format PDF"
+                        >
+                          <Download className={`w-3.5 h-3.5 ${isLight ? 'text-red-600' : 'text-red-400'}`} />
+                          <span>Rapport PDF (Stats)</span>
+                          {!currentPlan.features.pdfExport && (
+                            <span className={`flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded font-mono ml-0.5 ${
+                              isLight ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            }`}>
+                              <Lock className="w-2.5 h-2.5" /> VIP
+                            </span>
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!currentPlan.features.excelExport) {
+                              triggerNotification("L'export Excel (.xlsx) des statistiques requiert la formule supérieure.", "error");
+                              setIsClientSubModalOpen(true);
+                              return;
+                            }
+                            setChefDetailModalType('weekly_load');
+                          }}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer hover:-translate-y-0.5 ${
+                            isLight 
+                              ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                              : 'bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border border-emerald-500/30'
+                          }`}
+                          title="Télécharger toutes les données analytiques au format Excel (.xlsx)"
+                        >
+                          <FileSpreadsheet className={`w-3.5 h-3.5 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
+                          <span>Données Excel (Stats)</span>
+                          {!currentPlan.features.excelExport && (
+                            <span className={`flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded font-mono ml-0.5 ${
+                              isLight ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            }`}>
+                              <Lock className="w-2.5 h-2.5" /> VIP
+                            </span>
+                          )}
+                        </button>
+                      </div>
+
+                      <div className={`p-3.5 rounded-2xl font-mono text-center shadow-lg relative min-w-[120px] ${
+                        isLight ? 'bg-indigo-50/70 border border-indigo-200' : 'bg-slate-950/70 border border-indigo-500/30'
+                      }`}>
+                        <span className={`block text-[9px] uppercase font-bold mb-0.5 tracking-wider ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>Index Qualité</span>
+                        <span className="text-2xl font-extrabold bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">
                           {generationScore}%
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* 4 COLUMNS KPI GRID */}
+                  {/* 4 CARDS GRID - LIGHT/DARK MODE */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    
-                    {/* KPI 1: GLOBAL COMPLETION RATIO */}
-                    <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl flex flex-col justify-between aspect-square transition-all hover:border-white/20">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-mono text-gray-400 font-bold uppercase tracking-wider">Couverture Classes</span>
-                        <span className="p-2.5 bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20">
-                          <Building2 className="w-4 h-4" />
-                        </span>
+                    {/* KPI 1: Violet/Indigo */}
+                    <div className="rounded-xl overflow-hidden bg-gradient-to-r from-purple-500 to-indigo-500 shadow-md p-5 text-white relative h-32 flex flex-col justify-between">
+                      <div className="absolute top-4 right-4 opacity-10">
+                         <Users className="w-16 h-16" />
                       </div>
-                      <div className="mt-4 flex-1 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-baseline gap-1.5 mt-2">
-                            <span className="text-3xl font-black text-white">{globalCompletionRatio}%</span>
-                            <span className="text-xs text-gray-400 font-medium">planifié</span>
-                          </div>
-                          <p className="text-[10px] text-gray-400 mt-1 font-mono">
-                            {totalPlannedHours}h sur {totalTargetHours}h requises
-                          </p>
-                        </div>
-                        
-                        {/* Custom micro progress bar */}
-                        <div className="h-2 bg-slate-950 rounded-full mt-auto overflow-hidden border border-white/5">
-                          <div 
-                            className="h-full bg-gradient-to-r from-indigo-500 to-indigo-400 transition-all duration-500"
-                            style={{ width: `${globalCompletionRatio}%` }}
-                          />
-                        </div>
+                      <p className="text-sm font-medium z-10 relative !text-white">Couverture Classes</p>
+                      <h3 className="text-3xl font-bold z-10 relative !text-white">{globalCompletionRatio}%</h3>
+                      <div className="flex items-center justify-between text-[11px] z-10 relative opacity-100 !text-white mt-1 font-medium">
+                        <span>{totalPlannedHours}h planifiées</span>
+                        <span>Objectif {totalTargetHours}h</span>
+                      </div>
+                      <div className="absolute bottom-0 left-0 w-full h-1 bg-white/20">
+                         <div className="h-full bg-white/50 rounded-r-full" style={{ width: `${globalCompletionRatio}%` }} />
                       </div>
                     </div>
 
-                    {/* KPI 2: TEACHERS STATUS */}
-                    <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl flex flex-col justify-between aspect-square transition-all hover:border-white/20">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-mono text-gray-400 font-bold uppercase tracking-wider">Respect Contrats</span>
-                        <span className="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20">
-                          <Users className="w-4 h-4" />
-                        </span>
+                    {/* KPI 2: Bleu clair/Cyan */}
+                    <div className="rounded-xl overflow-hidden bg-gradient-to-r from-sky-400 to-blue-500 shadow-md p-5 text-white relative h-32 flex flex-col justify-between">
+                      <div className="absolute top-4 right-4 opacity-10">
+                         <CheckCircle2 className="w-16 h-16" />
                       </div>
-                      <div className="mt-4 flex-1 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-baseline gap-1.5 mt-2">
-                            <span className="text-3xl font-black text-white">{conformingTeachersCount} / {teachers.length}</span>
-                            <span className="text-xs text-gray-400 font-medium">conformes</span>
-                          </div>
-                          <p className="text-[10px] text-gray-400 mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
-                            <span className="text-amber-400 font-mono">-{underloadedTeachersCount} sous-ch.</span>
-                            <span className="text-rose-400 font-mono">+{overloadedTeachersCount} sur-ch.</span>
-                          </p>
-                        </div>
-
-                        <div className="h-2 bg-slate-950 rounded-full mt-auto overflow-hidden flex border border-white/5">
-                          <div 
-                            className="h-full bg-emerald-500" 
-                            style={{ width: `${(conformingTeachersCount / (teachers.length || 1)) * 100}%` }}
-                          />
-                          <div 
-                            className="h-full bg-amber-500" 
-                            style={{ width: `${(underloadedTeachersCount / (teachers.length || 1)) * 100}%` }}
-                          />
-                          <div 
-                            className="h-full bg-rose-500" 
-                            style={{ width: `${(overloadedTeachersCount / (teachers.length || 1)) * 100}%` }}
-                          />
-                        </div>
+                      <p className="text-sm font-medium z-10 relative !text-white">Profs Conformes</p>
+                      <h3 className="text-3xl font-bold z-10 relative !text-white">{conformingTeachersCount} / {teachers.length || 1}</h3>
+                      <div className="flex items-center justify-between text-[11px] z-10 relative opacity-100 !text-white mt-1 font-medium">
+                        <span>-{underloadedTeachersCount} ss-ch.</span>
+                        <span>+{overloadedTeachersCount} sur-ch.</span>
+                      </div>
+                      <div className="absolute bottom-0 left-0 w-full h-1 bg-white/20">
+                         <div className="h-full bg-white/50 rounded-r-full" style={{ width: `${(conformingTeachersCount / (teachers.length || 1)) * 100}%` }} />
                       </div>
                     </div>
 
-                    {/* KPI 3: TOP SUBJECT */}
-                    <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl flex flex-col justify-between aspect-square transition-all hover:border-white/20">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-mono text-gray-400 font-bold uppercase tracking-wider">Matière Dominante</span>
-                        <span className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
-                          <BookOpen className="w-4 h-4" />
-                        </span>
+                    {/* KPI 3: Orange/Rouge */}
+                    <div className="rounded-xl overflow-hidden bg-gradient-to-r from-orange-400 to-red-400 shadow-md p-5 text-white relative h-32 flex flex-col justify-between">
+                      <div className="absolute top-4 right-4 opacity-10">
+                         <BookOpen className="w-16 h-16" />
                       </div>
-                      <div className="mt-4 flex-1 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-baseline gap-1.5 mt-2 overflow-hidden">
-                            <span className="text-xl font-bold text-white truncate block max-w-full" title={topSubject.name}>
-                              {topSubject.name}
-                            </span>
-                          </div>
-                          <p className="text-[10px] text-gray-400 mt-1 font-mono">
-                            {topSubject.value} heures hebdomadaires
-                          </p>
-                        </div>
-                        
-                        <div className="h-2 bg-slate-950 rounded-full mt-auto overflow-hidden border border-white/5">
-                          <div 
-                            className="h-full bg-amber-500 transition-all duration-500"
-                            style={{ width: `${totalPlannedHours > 0 ? (topSubject.value / totalPlannedHours) * 100 : 0}%` }}
-                          />
-                        </div>
+                      <p className="text-sm font-medium z-10 relative !text-white">Matière Dominante</p>
+                      <h3 className="text-2xl font-bold z-10 relative truncate max-w-[150px] overflow-hidden whitespace-nowrap block !text-white" title={topSubject.name}>{topSubject.name || '-'}</h3>
+                      <div className="flex items-center justify-between text-[11px] z-10 relative opacity-100 !text-white mt-1 font-medium">
+                        <span>{topSubject.value}h hebdo</span>
+                      </div>
+                      <div className="absolute bottom-0 left-0 w-full h-1 bg-white/20">
+                         <div className="h-full bg-white/50 rounded-r-full" style={{ width: `${totalPlannedHours > 0 ? (topSubject.value / totalPlannedHours) * 100 : 0}%` }} />
                       </div>
                     </div>
 
-                    {/* KPI 4: PLANNED CLASSES STATS */}
-                    <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl flex flex-col justify-between aspect-square transition-all hover:border-white/20">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-mono text-gray-400 font-bold uppercase tracking-wider">Classes Complètes</span>
-                        <span className="p-2.5 bg-rose-500/10 text-rose-400 rounded-xl border border-rose-500/20">
-                          <FileText className="w-4 h-4" />
-                        </span>
+                    {/* KPI 4: Vert */}
+                    <div className="rounded-xl overflow-hidden bg-gradient-to-r from-emerald-400 to-green-500 shadow-md p-5 text-white relative h-32 flex flex-col justify-between">
+                      <div className="absolute top-4 right-4 opacity-10">
+                         <FileText className="w-16 h-16" />
                       </div>
-                      <div className="mt-4 flex-1 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-baseline gap-1.5 mt-2">
-                            <span className="text-3xl font-black text-white">
-                              {statistics.classStats.filter(c => c.assigned === c.targetHours).length} / {classes.length}
-                            </span>
-                            <span className="text-xs text-gray-400 font-medium">divisions</span>
-                          </div>
-                          <p className="text-[10px] text-gray-400 mt-1 font-mono">
-                            {statistics.classStats.filter(c => c.assigned < c.targetHours).length} classes incomplètes
-                          </p>
-                        </div>
-                        
-                        <div className="h-2 bg-slate-950 rounded-full mt-auto overflow-hidden border border-white/5">
-                          <div 
-                            className="h-full bg-rose-500 transition-all duration-500"
-                            style={{ width: `${(statistics.classStats.filter(c => c.assigned === c.targetHours).length / (classes.length || 1)) * 100}%` }}
-                          />
-                        </div>
+                      <p className="text-sm font-medium z-10 relative !text-white">Classes Complètes</p>
+                      <h3 className="text-3xl font-bold z-10 relative !text-white">{statistics.classStats.filter(c => c.assigned === c.targetHours).length}</h3>
+                      <div className="flex items-center justify-between text-[11px] z-10 relative opacity-100 !text-white mt-1 font-medium">
+                        <span>sur {classes.length} divisions</span>
+                      </div>
+                      <div className="absolute bottom-0 left-0 w-full h-1 bg-white/20">
+                         <div className="h-full bg-white/50 rounded-r-full" style={{ width: `${(statistics.classStats.filter(c => c.assigned === c.targetHours).length / (classes.length || 1)) * 100}%` }} />
                       </div>
                     </div>
-
                   </div>
+
+                  {/* MIDDLE SECTION: Line Chart & Donut / Bar Charts Grid */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     
                     {/* CHART 1: CLASS HOURS COMPARATIVE */}
-                    <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl">
+                    <div className={`p-6 rounded-2xl backdrop-blur-xl border ${
+                      isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'
+                    }`}>
                       <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
                         <div>
-                          <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                            <Building2 className="w-4.5 h-4.5 text-indigo-400" />
+                          <h3 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                            <Building2 className="w-4.5 h-4.5 text-indigo-500" />
                             <span>Couverture Horaire des Divisions</span>
                           </h3>
-                          <p className="text-[11px] text-gray-400 mt-0.5">
+                          <p className={`text-xs leading-relaxed mt-0.5 ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
                             {"Comparaison entre les heures planifiées et les volumes horaires visés par classe."}
                           </p>
                         </div>
@@ -5213,13 +5281,19 @@ export default function TimetableDashboard({
                           <button
                             type="button"
                             onClick={() => setChefDetailModalType('classes')}
-                            className="px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 hover:text-white border border-indigo-500/30 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-105 active:scale-95 ${
+                              isLight 
+                                ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200' 
+                                : 'bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 hover:text-white border border-indigo-500/30'
+                            }`}
                             title="Ouvrir le graphique global de toutes les classes avec explications simples"
                           >
-                            <Maximize2 className="w-3.5 h-3.5 text-indigo-400" />
+                            <Maximize2 className="w-3.5 h-3.5 text-indigo-500" />
                             <span>PLUS DE DÉTAILS</span>
                           </button>
-                          <span className="text-[10px] bg-indigo-500/10 text-indigo-400 font-mono px-2.5 py-1 rounded-full border border-indigo-500/20 font-bold hidden sm:inline-block">
+                          <span className={`text-[10px] font-mono px-2.5 py-1 rounded-full font-bold hidden sm:inline-block ${
+                            isLight ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                          }`}>
                             Heures / Semaine
                           </span>
                         </div>
@@ -5227,16 +5301,16 @@ export default function TimetableDashboard({
 
                       <div className="h-72 w-full">
                         {classChartData.length === 0 ? (
-                          <div className="h-full flex items-center justify-center text-xs text-gray-500 italic">
+                          <div className={`h-full flex items-center justify-center text-xs italic ${isLight ? 'text-slate-400' : 'text-gray-500'}`}>
                             Aucune donnée de classe disponible.
                           </div>
                         ) : (
                           <ResponsiveContainer width="100%" height="100%">
                             <RechartsBarChart data={classChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)'} vertical={false} />
-                              <XAxis dataKey="name" stroke={theme === 'dark' ? '#64748b' : '#475569'} fontSize={10} tickLine={false} />
-                              <YAxis stroke={theme === 'dark' ? '#64748b' : '#475569'} fontSize={10} tickLine={false} />
-                              <Tooltip content={<CustomChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
+                              <CartesianGrid strokeDasharray="3 3" stroke={isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)'} vertical={false} />
+                              <XAxis dataKey="name" stroke={isLight ? '#64748b' : '#64748b'} fontSize={10} tickLine={false} />
+                              <YAxis stroke={isLight ? '#64748b' : '#64748b'} fontSize={10} tickLine={false} />
+                              <Tooltip content={<CustomChartTooltip />} cursor={{ fill: isLight ? '#f8fafc' : 'rgba(255,255,255,0.02)' }} />
                               <Legend iconType="circle" wrapperStyle={{ fontSize: 10, paddingTop: 10 }} />
                               <Bar dataKey="Planifié" fill="#10b981" radius={[4, 4, 0, 0]} name="Volume Planifié" />
                               <Bar dataKey="Cible" fill="#6366f1" radius={[4, 4, 0, 0]} name="Volume Cible Visé" />
@@ -5247,14 +5321,16 @@ export default function TimetableDashboard({
                     </div>
 
                     {/* CHART 2: TEACHERS RESPECT CONTROLLER */}
-                    <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl">
+                    <div className={`p-6 rounded-2xl backdrop-blur-xl border ${
+                      isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'
+                    }`}>
                       <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
                         <div>
-                          <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                            <Users className="w-4.5 h-4.5 text-emerald-400" />
+                          <h3 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                            <Users className="w-4.5 h-4.5 text-emerald-500" />
                             <span>Charges Enseignants vs Contrats</span>
                           </h3>
-                          <p className="text-[11px] text-gray-400 mt-0.5">
+                          <p className={`text-xs leading-relaxed mt-0.5 ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
                             {"Suivi des heures de cours hebdomadaires attribuées comparées aux quotas contractuels."}
                           </p>
                         </div>
@@ -5262,13 +5338,19 @@ export default function TimetableDashboard({
                           <button
                             type="button"
                             onClick={() => setChefDetailModalType('teachers')}
-                            className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 hover:text-white border border-emerald-500/30 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-105 active:scale-95 ${
+                              isLight 
+                                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                                : 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 hover:text-white border border-emerald-500/30'
+                            }`}
                             title="Ouvrir le graphique global des enseignants avec audit et explications textuelles"
                           >
-                            <Maximize2 className="w-3.5 h-3.5 text-emerald-400" />
+                            <Maximize2 className="w-3.5 h-3.5 text-emerald-500" />
                             <span>PLUS DE DÉTAILS</span>
                           </button>
-                          <span className="text-[10px] bg-emerald-500/10 text-emerald-400 font-mono px-2.5 py-1 rounded-full border border-emerald-500/20 font-bold hidden sm:inline-block">
+                          <span className={`text-[10px] font-mono px-2.5 py-1 rounded-full font-bold hidden sm:inline-block ${
+                            isLight ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          }`}>
                             Code Couleur Dédié
                           </span>
                         </div>
@@ -5276,16 +5358,16 @@ export default function TimetableDashboard({
 
                       <div className="h-72 w-full">
                         {teacherChartData.length === 0 ? (
-                          <div className="h-full flex items-center justify-center text-xs text-gray-500 italic">
+                          <div className={`h-full flex items-center justify-center text-xs italic ${isLight ? 'text-slate-400' : 'text-gray-500'}`}>
                             Aucune donnée de professeur disponible.
                           </div>
                         ) : (
                           <ResponsiveContainer width="100%" height="100%">
                             <RechartsBarChart data={teacherChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)'} vertical={false} />
-                              <XAxis dataKey="name" stroke={theme === 'dark' ? '#64748b' : '#475569'} fontSize={10} tickLine={false} />
-                              <YAxis stroke={theme === 'dark' ? '#64748b' : '#475569'} fontSize={10} tickLine={false} />
-                              <Tooltip content={<CustomChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
+                              <CartesianGrid strokeDasharray="3 3" stroke={isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)'} vertical={false} />
+                              <XAxis dataKey="name" stroke={isLight ? '#64748b' : '#64748b'} fontSize={10} tickLine={false} />
+                              <YAxis stroke={isLight ? '#64748b' : '#64748b'} fontSize={10} tickLine={false} />
+                              <Tooltip content={<CustomChartTooltip />} cursor={{ fill: isLight ? '#f8fafc' : 'rgba(255,255,255,0.02)' }} />
                               <Legend iconType="circle" wrapperStyle={{ fontSize: 10, paddingTop: 10 }} />
                               <Bar dataKey="Planifié" name="Volume Planifié" radius={[4, 4, 0, 0]}>
                                 {teacherChartData.map((entry, index) => {
@@ -5306,24 +5388,30 @@ export default function TimetableDashboard({
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                     
                     {/* DISCIPLINE HOUR BREAKDOWN */}
-                    <div className="lg:col-span-5 p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl flex flex-col justify-between">
+                    <div className={`lg:col-span-5 p-6 rounded-2xl backdrop-blur-xl border flex flex-col justify-between ${
+                      isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'
+                    }`}>
                       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                         <div>
-                          <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-2">
-                            <BookOpen className="w-4.5 h-4.5 text-amber-400" />
+                          <h3 className={`text-sm font-bold mb-1 flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                            <BookOpen className="w-4.5 h-4.5 text-amber-500" />
                             <span>Répartition des Disciplines</span>
                           </h3>
-                          <p className="text-[11px] text-gray-400">
+                          <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
                             {"Proportions relatives des volumes horaires dispensés par matière."}
                           </p>
                         </div>
                         <button
                           type="button"
                           onClick={() => setChefDetailModalType('subjects')}
-                          className="px-3 py-1.5 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 hover:text-white border border-amber-500/30 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-105 active:scale-95 shrink-0"
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-105 active:scale-95 shrink-0 ${
+                            isLight 
+                              ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200' 
+                              : 'bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 hover:text-white border border-amber-500/30'
+                          }`}
                           title="Ouvrir le graphique global des matières avec explications détaillées"
                         >
-                          <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
+                          <Maximize2 className="w-3.5 h-3.5 text-amber-500" />
                           <span>PLUS DE DÉTAILS</span>
                         </button>
                       </div>
@@ -5351,15 +5439,15 @@ export default function TimetableDashboard({
                           </ResponsiveContainer>
                           {/* Centered Total label inside Donut */}
                           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                            <span className="text-[10px] uppercase text-gray-500 font-bold">Total</span>
-                            <span className="text-base font-black text-white">{totalPlannedHours}h</span>
+                            <span className={`text-[10px] uppercase font-bold ${isLight ? 'text-slate-400' : 'text-gray-500'}`}>Total</span>
+                            <span className={`text-base font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>{totalPlannedHours}h</span>
                           </div>
                         </div>
 
                         {/* Custom visual legend */}
                         <div className="sm:col-span-7 space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
                           {subjectHoursData.length === 0 ? (
-                            <p className="text-[11px] text-gray-500 italic">Aucune matière planifiée.</p>
+                            <p className={`text-xs italic ${isLight ? 'text-slate-500 font-normal' : 'text-gray-500'}`}>Aucune matière planifiée.</p>
                           ) : (
                             subjectHoursData.map((s, idx) => {
                               const percent = totalPlannedHours > 0 ? Math.round((s.value / totalPlannedHours) * 100) : 0;
@@ -5370,9 +5458,9 @@ export default function TimetableDashboard({
                                       className="w-2.5 h-2.5 rounded-full shrink-0" 
                                       style={{ backgroundColor: SUBJECT_COLORS[idx % SUBJECT_COLORS.length] }} 
                                     />
-                                    <span className="text-gray-300 truncate" title={s.name}>{s.name}</span>
+                                    <span className={`truncate ${isLight ? 'text-slate-700' : 'text-gray-300'}`} title={s.name}>{s.name}</span>
                                   </div>
-                                  <span className="text-gray-500 font-mono text-[10px]">
+                                  <span className={`font-mono text-[10px] ${isLight ? 'text-slate-500' : 'text-gray-500'}`}>
                                     {s.value}h ({percent}%)
                                   </span>
                                 </div>
@@ -5384,35 +5472,45 @@ export default function TimetableDashboard({
                     </div>
 
                     {/* SUPERVISOR AUDIT & ALERTS */}
-                    <div className="lg:col-span-7 p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl flex flex-col justify-between">
+                    <div className={`lg:col-span-7 p-6 rounded-2xl backdrop-blur-xl border flex flex-col justify-between ${
+                      isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'
+                    }`}>
                       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                         <div>
-                          <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-2">
-                            <AlertCircle className="w-4.5 h-4.5 text-rose-400" />
+                          <h3 className={`text-sm font-bold mb-1 flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                            <AlertCircle className="w-4.5 h-4.5 text-rose-500" />
                             <span>{"Registre d'Audit & Alertes de Planification"}</span>
                           </h3>
-                          <p className="text-[11px] text-gray-400">
+                          <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
                             {"Conflits, sous-charges ou dépassements de volumes détectés automatiquement par notre moteur."}
                           </p>
                         </div>
                         <button
                           type="button"
                           onClick={() => setChefDetailModalType('weekly_load')}
-                          className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 hover:text-white border border-emerald-500/30 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-105 active:scale-95 shrink-0"
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-105 active:scale-95 shrink-0 ${
+                            isLight 
+                              ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                              : 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 hover:text-white border border-emerald-500/30'
+                          }`}
                           title="Ouvrir le graphique de charge hebdomadaire par jour"
                         >
-                          <Maximize2 className="w-3.5 h-3.5 text-emerald-400" />
+                          <Maximize2 className="w-3.5 h-3.5 text-emerald-500" />
                           <span>PLUS DE DÉTAILS</span>
                         </button>
                       </div>
 
                       <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
                         {criticalAlerts.length === 0 ? (
-                          <div className="p-6 text-center rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-emerald-400 font-medium flex flex-col items-center justify-center gap-1.5 h-[160px]">
-                            <span className="w-8 h-8 rounded-full bg-emerald-500/15 flex items-center justify-center text-emerald-400 animate-pulse text-lg font-bold">✓</span>
+                          <div className={`p-6 text-center rounded-xl font-medium flex flex-col items-center justify-center gap-1.5 h-[160px] ${
+                            isLight ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-emerald-500/5 border border-emerald-500/10 text-emerald-400'
+                          }`}>
+                            <span className={`w-8 h-8 rounded-full flex items-center justify-center animate-pulse text-lg font-bold ${
+                              isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500/15 text-emerald-400'
+                            }`}>✓</span>
                             <div>
-                              <p className="text-xs font-bold text-white">Établissement 100% Conforme !</p>
-                              <p className="text-[10px] text-gray-400 mt-0.5">Aucune surcharge ou anomalie de quota horaire détectée.</p>
+                              <p className={`text-xs font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>Établissement 100% Conforme !</p>
+                              <p className={`text-xs leading-relaxed mt-0.5 ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>Aucune surcharge ou anomalie de quota horaire détectée.</p>
                             </div>
                           </div>
                         ) : (
@@ -5421,16 +5519,20 @@ export default function TimetableDashboard({
                               key={alert.id} 
                               className={`p-3.5 rounded-xl border-l-4 flex gap-3 text-xs font-medium leading-relaxed ${
                                 alert.severity === 'error' 
-                                  ? 'bg-rose-500/10 border-rose-500/20 border-l-rose-500 text-rose-300' 
-                                  : 'bg-amber-500/10 border-amber-500/20 border-l-amber-500 text-amber-300'
+                                  ? isLight 
+                                    ? 'bg-rose-50 border-rose-200 border-l-rose-500 text-rose-800' 
+                                    : 'bg-rose-500/10 border-rose-500/20 border-l-rose-500 text-rose-300' 
+                                  : isLight 
+                                    ? 'bg-amber-50 border-amber-200 border-l-amber-500 text-amber-800' 
+                                    : 'bg-amber-500/10 border-amber-500/20 border-l-amber-500 text-amber-300'
                               }`}
                             >
                               <span className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${alert.severity === 'error' ? 'bg-rose-500' : 'bg-amber-500'}`} />
                               <div>
-                                <p className="text-white text-[11px] font-bold uppercase tracking-wider mb-0.5 font-mono">
+                                <p className={`text-[11px] font-bold uppercase tracking-wider mb-0.5 font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
                                   {alert.type === 'class' ? 'Alerte Classe' : 'Alerte Professeur'}
                                 </p>
-                                <p className="text-[11px] text-gray-300 leading-snug">{alert.message}</p>
+                                <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>{alert.message}</p>
                               </div>
                             </div>
                           ))
@@ -5551,7 +5653,7 @@ export default function TimetableDashboard({
                     <div className="py-12 text-center max-w-md mx-auto">
                       <Sparkles className="w-10 h-10 text-emerald-500 mx-auto opacity-40 mb-3 animate-bounce" />
                       <h4 className="text-white font-bold mb-1">{"Aucune suggestion active"}</h4>
-                      <p className="text-xs text-gray-400">
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
                         {"Cliquez sur le bouton ci-dessus pour lancer une analyse approfondie de l'emploi du temps actuel par Gemini."}
                       </p>
                     </div>
@@ -5559,13 +5661,13 @@ export default function TimetableDashboard({
                 </div>
 
                 {/* CHIRURGICAL PROBLEM WRITER */}
-                <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-900/50 to-indigo-950/15 border border-white/5 shadow-glass space-y-4">
+                <div className={`p-6 rounded-2xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-gradient-to-br from-slate-900/50 to-indigo-950/15 border-white/5 shadow-glass'}`}>
                   <div>
-                    <h3 className="text-md font-bold text-white flex items-center gap-2">
-                      <MessageSquare className="w-4.5 h-4.5 text-indigo-400" />
+                    <h3 className={`text-md font-bold flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                      <MessageSquare className="w-4.5 h-4.5 text-indigo-500" />
                       {"Soumettre une contrainte complexe ou un problème spécifique"}
                     </h3>
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className={`text-xs leading-relaxed mt-1 ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
                       {"Précisez une contrainte humaine compliquée ou un conflit que vous n'arrivez pas à résoudre civilement. L'Agent IA étudiera le planning et relocalisera activement les cours."}
                     </p>
                   </div>
@@ -5663,15 +5765,15 @@ export default function TimetableDashboard({
               <div className="space-y-6">
                 
                 {/* SETTINGS BANNER HEADER */}
-                <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl flex items-center gap-4">
-                  <div className="p-3 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-400 shrink-0">
+                <div className={`p-6 rounded-2xl backdrop-blur-xl border flex items-center gap-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
+                  <div className={`p-3 rounded-2xl border shrink-0 ${isLight ? 'bg-purple-50 border-purple-200 text-purple-600' : 'bg-purple-500/10 border-purple-500/20 text-purple-400'}`}>
                     <Settings className="w-6 h-6" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-white">
+                    <h2 className={`text-lg font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
                       {"Paramètres Généraux & Configuration d'Établissement"}
                     </h2>
-                    <p className="text-sm text-gray-400 mt-0.5">
+                    <p className={`text-xs leading-relaxed mt-0.5 ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
                       {"Personnalisez l'identité de votre établissement, l'apparence visuelle, vos clés d'abonnement SaaS, et gérez vos sauvegardes de données."}
                     </p>
                   </div>
@@ -5683,17 +5785,17 @@ export default function TimetableDashboard({
                   <div className="lg:col-span-7 space-y-6">
                     
                     {/* SECTION 1: ÉTABLISSEMENT METADATA */}
-                    <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl space-y-5">
-                      <div className="flex items-center gap-2 pb-3 border-b border-white/10">
-                        <Building2 className="w-5 h-5 text-indigo-400" />
-                        <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-5 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
+                      <div className={`flex items-center gap-2 pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                        <Building2 className="w-5 h-5 text-indigo-500" />
+                        <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
                           {"1. Identité de l'Établissement"}
                         </h3>
                       </div>
 
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-xs font-medium text-gray-300 mb-1.5">
+                          <label className={`block text-xs font-medium mb-1.5 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
                             {"Nom de l'établissement d'enseignement"}
                           </label>
                           <input
@@ -5701,12 +5803,16 @@ export default function TimetableDashboard({
                             value={schoolName}
                             onChange={(e) => setSchoolName(e.target.value)}
                             placeholder="Ex: Lycée Excellence Diongue, Collège IziSchool"
-                            className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 transition-colors shadow-inner"
+                            className={`w-full rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-colors shadow-inner border ${
+                              isLight 
+                                ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-500' 
+                                : 'bg-slate-950/80 border-white/10 text-white focus:border-indigo-500'
+                            }`}
                           />
                         </div>
 
                         <div>
-                          <label className="block text-xs font-medium text-gray-300 mb-1.5">
+                          <label className={`block text-xs font-medium mb-1.5 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
                             {"Devise / Slogan institutionnel"}
                           </label>
                           <input
@@ -5714,12 +5820,16 @@ export default function TimetableDashboard({
                             value={schoolSlogan}
                             onChange={(e) => setSchoolSlogan(e.target.value)}
                             placeholder="Ex: Discipline - Travail - Succès"
-                            className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 transition-colors shadow-inner"
+                            className={`w-full rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-colors shadow-inner border ${
+                              isLight 
+                                ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-500' 
+                                : 'bg-slate-950/80 border-white/10 text-white focus:border-indigo-500'
+                            }`}
                           />
                         </div>
 
                         <div>
-                          <label className="block text-xs font-medium text-gray-300 mb-1.5">
+                          <label className={`block text-xs font-medium mb-1.5 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
                             {"Type d'embleme / Logo"}
                           </label>
                           <div className="flex gap-3 mb-3">
@@ -5728,8 +5838,8 @@ export default function TimetableDashboard({
                               onClick={() => setSchoolLogoType('icon')}
                               className={`flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition-all ${
                                 schoolLogoType === 'icon'
-                                  ? 'bg-indigo-500/20 border-indigo-500 text-white'
-                                  : 'bg-slate-950/50 border-white/10 text-gray-400 hover:text-white'
+                                  ? isLight ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-indigo-500/20 border-indigo-500 text-white'
+                                  : isLight ? 'bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-900' : 'bg-slate-950/50 border-white/10 text-gray-400 hover:text-white'
                               }`}
                             >
                               {"Icône Vectorielle"}
@@ -5746,11 +5856,11 @@ export default function TimetableDashboard({
                               }}
                               className={`flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                                 schoolLogoType === 'url'
-                                  ? 'bg-indigo-500/20 border-indigo-500 text-white'
-                                  : 'bg-slate-950/50 border-white/10 text-gray-400 hover:text-white'
+                                  ? isLight ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-indigo-500/20 border-indigo-500 text-white'
+                                  : isLight ? 'bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-900' : 'bg-slate-950/50 border-white/10 text-gray-400 hover:text-white'
                               }`}
                             >
-                              {!currentPlan.features.customBranding && <Lock className="w-3 h-3 text-amber-400" />}
+                              {!currentPlan.features.customBranding && <Lock className="w-3 h-3 text-amber-500" />}
                               {"URL d'image externe"}
                             </button>
                           </div>
@@ -5771,7 +5881,7 @@ export default function TimetableDashboard({
                                   className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${
                                     schoolLogoIcon === ic.name
                                       ? 'bg-indigo-600 text-white border-indigo-400 shadow-md'
-                                      : 'bg-slate-950/40 border-white/10 text-gray-400 hover:bg-white/5'
+                                      : isLight ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100' : 'bg-slate-950/40 border-white/10 text-gray-400 hover:bg-white/5'
                                   }`}
                                 >
                                   {ic.name === 'GraduationCap' && <GraduationCap className="w-5 h-5" />}
@@ -5789,7 +5899,11 @@ export default function TimetableDashboard({
                               value={schoolLogo}
                               onChange={(e) => setSchoolLogo(e.target.value)}
                               placeholder="https://domaine.com/logo.png"
-                              className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 transition-colors shadow-inner font-mono text-xs"
+                              className={`w-full rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-colors shadow-inner font-mono text-xs border ${
+                                isLight 
+                                  ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-500' 
+                                  : 'bg-slate-950/80 border-white/10 text-white focus:border-indigo-500'
+                              }`}
                             />
                           )}
                         </div>
@@ -5808,10 +5922,10 @@ export default function TimetableDashboard({
                     </div>
 
                     {/* SECTION 2: THEME & APPARENCE */}
-                    <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl space-y-4">
-                      <div className="flex items-center gap-2 pb-3 border-b border-white/10">
-                        <SlidersHorizontal className="w-5 h-5 text-indigo-400" />
-                        <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
+                      <div className={`flex items-center gap-2 pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                        <SlidersHorizontal className="w-5 h-5 text-indigo-500" />
+                        <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
                           {"2. Apparence Visuelle & Thème"}
                         </h3>
                       </div>
@@ -5823,14 +5937,14 @@ export default function TimetableDashboard({
                           className={`p-4 rounded-xl border flex items-center gap-3 transition-all cursor-pointer ${
                             theme === 'dark'
                               ? 'bg-slate-950 border-indigo-500 text-white ring-2 ring-indigo-500/50'
-                              : 'bg-slate-950/40 border-white/10 text-gray-400 hover:bg-slate-950'
+                              : isLight ? 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100' : 'bg-slate-950/40 border-white/10 text-gray-400 hover:bg-slate-950'
                           }`}
                         >
                           <div className="p-2.5 rounded-lg bg-indigo-500/20 text-indigo-400">
                             <Moon className="w-5 h-5" />
                           </div>
                           <div className="text-left">
-                            <div className="text-xs font-bold text-white">{"Thème Sombre (Night)"}</div>
+                            <div className={`text-xs font-bold ${theme === 'dark' ? 'text-white' : isLight ? 'text-slate-800' : 'text-white'}`}>{"Thème Sombre (Night)"}</div>
                             <div className="text-[10px] text-gray-400">{"Mode professionnel haute lisibilité"}</div>
                           </div>
                         </button>
@@ -5840,7 +5954,7 @@ export default function TimetableDashboard({
                           onClick={() => setTheme('light')}
                           className={`p-4 rounded-xl border flex items-center gap-3 transition-all cursor-pointer ${
                             theme === 'light'
-                              ? 'bg-white border-indigo-500 text-slate-900 ring-2 ring-indigo-500/50'
+                              ? 'bg-white border-indigo-500 text-slate-900 ring-2 ring-indigo-500/50 shadow-sm'
                               : 'bg-slate-950/40 border-white/10 text-gray-400 hover:bg-white/10'
                           }`}
                         >
@@ -5856,15 +5970,15 @@ export default function TimetableDashboard({
                     </div>
 
                     {/* SECTION 5: SÉCURITÉ & MODIFICATION DU MOT DE PASSE */}
-                    <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl space-y-4">
-                      <div className="flex items-center gap-2 pb-3 border-b border-white/10">
-                        <KeyRound className="w-5 h-5 text-emerald-400" />
-                        <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
+                      <div className={`flex items-center gap-2 pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                        <KeyRound className="w-5 h-5 text-emerald-500" />
+                        <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
                           {"5. Sécurité & Mot de Passe"}
                         </h3>
                       </div>
 
-                      <p className="text-xs text-gray-400 leading-relaxed">
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
                         {"Modifiez le mot de passe de votre compte utilisateur établissement. Le nouveau mot de passe sera immédiatement actif pour vos prochaines connexions."}
                       </p>
 
@@ -5885,7 +5999,7 @@ export default function TimetableDashboard({
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-xs font-medium text-gray-300 mb-1.5">
+                            <label className={`block text-xs font-medium mb-1.5 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
                               Nouveau mot de passe *
                             </label>
                             <div className="relative">
@@ -5896,7 +6010,11 @@ export default function TimetableDashboard({
                                 value={newPasswordInput}
                                 onChange={(e) => setNewPasswordInput(e.target.value)}
                                 placeholder="Au moins 6 caractères"
-                                className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl pl-3.5 pr-10 py-2.5 text-xs focus:outline-none focus:border-emerald-500 transition-colors shadow-inner"
+                                className={`w-full rounded-xl pl-3.5 pr-10 py-2.5 text-xs focus:outline-none transition-colors shadow-inner border ${
+                                  isLight 
+                                    ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-emerald-500' 
+                                    : 'bg-slate-950/80 border-white/10 text-white focus:border-emerald-500'
+                                }`}
                               />
                               <button
                                 type="button"
@@ -5910,7 +6028,7 @@ export default function TimetableDashboard({
                           </div>
 
                           <div>
-                            <label className="block text-xs font-medium text-gray-300 mb-1.5">
+                            <label className={`block text-xs font-medium mb-1.5 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
                               Confirmer le mot de passe *
                             </label>
                             <div className="relative">
@@ -5921,7 +6039,11 @@ export default function TimetableDashboard({
                                 value={confirmPasswordInput}
                                 onChange={(e) => setConfirmPasswordInput(e.target.value)}
                                 placeholder="Retapez le mot de passe"
-                                className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl pl-3.5 pr-10 py-2.5 text-xs focus:outline-none focus:border-emerald-500 transition-colors shadow-inner"
+                                className={`w-full rounded-xl pl-3.5 pr-10 py-2.5 text-xs focus:outline-none transition-colors shadow-inner border ${
+                                  isLight 
+                                    ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-emerald-500' 
+                                    : 'bg-slate-950/80 border-white/10 text-white focus:border-emerald-500'
+                                }`}
                               />
                               <button
                                 type="button"
@@ -5965,35 +6087,37 @@ export default function TimetableDashboard({
                   <div className="lg:col-span-5 space-y-6">
                     
                     {/* SECTION 3: ABONNEMENT & LICENCE SAAS */}
-                    <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl space-y-4">
-                      <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
+                      <div className={`flex items-center justify-between pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
                         <div className="flex items-center gap-2">
-                          <Shield className="w-5 h-5 text-indigo-400" />
-                          <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+                          <Shield className="w-5 h-5 text-indigo-500" />
+                          <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
                             {"3. Abonnement & Licences"}
                           </h3>
                         </div>
-                        <span className="text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 px-2.5 py-0.5 rounded-full border border-emerald-500/20 uppercase">
+                        <span className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border uppercase ${
+                          isLight ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        }`}>
                           {currentClient.status === 'active' ? 'Actif' : 'Essai'}
                         </span>
                       </div>
 
-                      <div className="p-4 rounded-xl bg-slate-950/60 border border-white/10 space-y-3">
+                      <div className={`p-4 rounded-xl border space-y-3 ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-white/10'}`}>
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-gray-400">Offre actuelle :</span>
-                          <span className="font-bold text-indigo-400 font-mono text-sm">
+                          <span className={`${isLight ? 'text-slate-500' : 'text-gray-400'}`}>Offre actuelle :</span>
+                          <span className="font-bold text-indigo-600 font-mono text-sm">
                             {saasPlans.find(p => p.id === currentClient.planId)?.name || 'Plan Découverte'}
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-gray-400">{"Échéance d'abonnement :"}</span>
-                          <span className="font-medium text-white font-mono">
+                          <span className={`${isLight ? 'text-slate-500' : 'text-gray-400'}`}>{"Échéance d'abonnement :"}</span>
+                          <span className={`font-medium font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>
                             {currentClient.subscriptionEndDate || 'Non définie'}
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-gray-400">{"Paiement / Mode :"}</span>
-                          <span className="font-medium text-gray-300">
+                          <span className={`${isLight ? 'text-slate-500' : 'text-gray-400'}`}>{"Paiement / Mode :"}</span>
+                          <span className={`font-medium ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
                             {currentClient.paymentMethod || 'Licence établissement'}
                           </span>
                         </div>
@@ -6012,15 +6136,15 @@ export default function TimetableDashboard({
                     </div>
 
                     {/* SECTION 4: SAUVEGARDE & RESTAURATION */}
-                    <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl space-y-4">
-                      <div className="flex items-center gap-2 pb-3 border-b border-white/10">
-                        <FileSpreadsheet className="w-5 h-5 text-indigo-400" />
-                        <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
+                      <div className={`flex items-center gap-2 pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                        <FileSpreadsheet className="w-5 h-5 text-indigo-500" />
+                        <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
                           {"4. Sauvegarde & Restauration"}
                         </h3>
                       </div>
 
-                      <p className="text-xs text-gray-400 leading-relaxed">
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
                         {"Exportez l'intégralité de la base de données de l'établissement (matières, profs, classes, emploi du temps) au format JSON sécurisé pour archivage ou migration."}
                       </p>
 
@@ -6028,7 +6152,11 @@ export default function TimetableDashboard({
                         <button
                           type="button"
                           onClick={handleExportBackup}
-                          className="w-full py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                          className={`w-full py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                            isLight 
+                              ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200' 
+                              : 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border-emerald-500/30'
+                          }`}
                         >
                           <Download className="w-4 h-4" />
                           <span>Exporter Sauvegarde (.json)</span>
@@ -6082,6 +6210,7 @@ export default function TimetableDashboard({
           maxGenerations={maxGenerations}
           exportCount={exportCount}
           maxExports={maxExports}
+          theme={theme}
           onApplyLicenseKey={handleApplyLicenseKey}
           onSimulatePayment={handleSimulatePayment}
           onRequestUpgradeOrRenewal={handleCreateActivationRequest}
@@ -6197,6 +6326,7 @@ export default function TimetableDashboard({
             setIsDocViewOpen(false);
             setIsClientSubModalOpen(true);
           }}
+          theme={theme}
         />
 
       </div>

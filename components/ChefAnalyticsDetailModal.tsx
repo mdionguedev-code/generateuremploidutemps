@@ -18,7 +18,8 @@ import {
   FileText,
   Lock,
   Crown,
-  Zap
+  Zap,
+  Building2
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import * as XLSX from 'xlsx';
@@ -62,6 +63,7 @@ export default function ChefAnalyticsDetailModal({
   clientPlanId = 'plan_premium',
   onUpgrade
 }: ChefAnalyticsDetailModalProps) {
+  const isLight = theme === 'light';
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'optimal' | 'under' | 'over'>('all');
   const [isUpgradePromptOpen, setIsUpgradePromptOpen] = useState(false);
@@ -247,21 +249,6 @@ export default function ChefAnalyticsDetailModal({
     });
   }, [classStats, searchTerm]);
 
-  // Helper conversion hex vers RGB
-  const hexToRgb = (hex: string): [number, number, number] => {
-    let c = (hex || '#4f46e5').replace('#', '');
-    if (c.length === 3) c = c.split('').map(x => x + x).join('');
-    const num = parseInt(c, 16);
-    if (isNaN(num)) return [79, 70, 229];
-    return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
-  };
-
-  const DISTINCT_TEACHER_COLORS = [
-    '#4f46e5', '#059669', '#d97706', '#e11d48', '#0284c7',
-    '#7c3aed', '#0d9488', '#ea580c', '#db2777', '#475569',
-    '#16a34a', '#9333ea', '#2563eb', '#c026d3', '#0891b2'
-  ];
-
   // --- FONCTION EXPORT PDF SOIGNÉE & ACADÉMIQUE ---
   const handleExportPDF = () => {
     if (!isPremiumOrSchool) {
@@ -277,8 +264,8 @@ export default function ChefAnalyticsDetailModal({
         year: 'numeric'
       });
 
-      // 1. EN-TÊTE COMPACT ET ÉPURÉ (Sans bandeau imposant, sans mention d'abonnement)
-      doc.setTextColor(15, 23, 42); // slate-900
+      // 1. EN-TÊTE COMPACT ET ÉPURÉ
+      doc.setTextColor(15, 23, 42);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(13);
       doc.text(schoolName.toUpperCase(), 14, 14);
@@ -290,11 +277,10 @@ export default function ChefAnalyticsDetailModal({
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10.5);
-      doc.setTextColor(71, 85, 105); // slate-600
+      doc.setTextColor(71, 85, 105);
       doc.text(`Rapport : ${reportTitle}  •  Édité le ${now}`, 14, 20);
 
-      // Ligne de séparation élégante et discrète
-      doc.setDrawColor(226, 232, 240); // slate-200
+      doc.setDrawColor(226, 232, 240);
       doc.setLineWidth(0.4);
       doc.line(14, 24, 196, 24);
 
@@ -302,7 +288,6 @@ export default function ChefAnalyticsDetailModal({
 
       // 2. CORPS ET TABLEAU SELON LE TYPE DE GRAPHIQUE
       if (chartType === 'teachers') {
-        // Synthèse en texte académique (taille 10.5 - 11)
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10.5);
         doc.setTextColor(15, 23, 42);
@@ -315,216 +300,179 @@ export default function ChefAnalyticsDetailModal({
         doc.text(`Conformité contractuelle : ${optimalTeachersCount} profs au quota exact  •  ${underTeachersCount} sous-chargé(s)  •  ${overTeachersCount} en surcharge`, 14, currentY);
         currentY += 8;
 
-        // En-tête de tableau moderne
-        doc.setFillColor(30, 41, 59); // slate-800
+        doc.setFillColor(30, 41, 59);
         doc.roundedRect(14, currentY, 182, 8, 1, 1, 'F');
         doc.setTextColor(255, 255, 255);
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.text("ENSEIGNANT", 20, currentY + 5.5);
+        doc.setFontSize(9);
+        doc.text("ENSEIGNANT", 18, currentY + 5.5);
         doc.text("DISCIPLINE(S)", 70, currentY + 5.5);
-        doc.text("AFFECTÉ", 125, currentY + 5.5);
-        doc.text("QUOTA", 148, currentY + 5.5);
+        doc.text("QUOTA", 125, currentY + 5.5);
+        doc.text("AFFECTÉ", 145, currentY + 5.5);
         doc.text("STATUT", 168, currentY + 5.5);
-        currentY += 9;
+        currentY += 10;
 
         teacherStats.forEach((t, i) => {
           if (currentY > 275) {
             doc.addPage();
-            currentY = 18;
+            currentY = 20;
           }
 
-          const profColorHex = t.color || DISTINCT_TEACHER_COLORS[i % DISTINCT_TEACHER_COLORS.length];
-          const [pr, pg, pb] = hexToRgb(profColorHex);
+          if (i % 2 === 1) {
+            doc.setFillColor(248, 250, 252);
+            doc.rect(14, currentY - 3.5, 182, 7, 'F');
+          }
 
-          // Ligne de fond alternée douce
-          doc.setFillColor(i % 2 === 0 ? 250 : 255, i % 2 === 0 ? 250 : 255, i % 2 === 0 ? 252 : 255);
-          doc.rect(14, currentY, 182, 8, 'F');
-
-          // Bande latérale colorée unique pour chaque professeur
-          doc.setFillColor(pr, pg, pb);
-          doc.rect(14, currentY, 2.5, 8, 'F');
-
-          // Nom Enseignant (Police 10.5 académique grasse)
           doc.setFont('helvetica', 'bold');
-          doc.setFontSize(10);
-          doc.setTextColor(15, 23, 42);
-          doc.text(String(t.name || '').substring(0, 24), 19, currentY + 5.3);
-
-          // Matières (Police 9.5 normale)
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(9.5);
-          doc.setTextColor(71, 85, 105);
-          doc.text(String(t.subjectsTaught || '').substring(0, 28), 70, currentY + 5.3);
-
-          // Heures affectées
-          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8.5);
           doc.setTextColor(30, 41, 59);
-          doc.text(`${t.assignedHours}h`, 128, currentY + 5.3);
+          doc.text((t.name || '').substring(0, 26), 18, currentY + 1.5);
 
-          // Quota
           doc.setFont('helvetica', 'normal');
           doc.setTextColor(100, 116, 139);
-          doc.text(`${t.quota}h`, 151, currentY + 5.3);
+          doc.text((t.subjectsTaught || '-').substring(0, 30), 70, currentY + 1.5);
 
-          // Statut couleur
+          doc.text(`${t.quota}h`, 128, currentY + 1.5);
           doc.setFont('helvetica', 'bold');
-          doc.setFontSize(9);
+          doc.setTextColor(15, 23, 42);
+          doc.text(`${t.assignedHours}h`, 148, currentY + 1.5);
+
           if (t.status === 'optimal') {
             doc.setTextColor(16, 185, 129);
-            doc.text("✓ Conforme", 168, currentY + 5.3);
+            doc.text("✓ Conforme", 168, currentY + 1.5);
           } else if (t.status === 'under') {
             doc.setTextColor(217, 119, 6);
-            doc.text(`Manque ${Math.abs(t.diff)}h`, 168, currentY + 5.3);
+            doc.text(`-${Math.abs(t.diff)}h`, 168, currentY + 1.5);
           } else {
             doc.setTextColor(225, 29, 72);
-            doc.text(`+${t.diff}h excès`, 168, currentY + 5.3);
+            doc.text(`+${t.diff}h`, 168, currentY + 1.5);
           }
 
-          // Séparateur fin
-          doc.setDrawColor(241, 245, 249);
-          doc.setLineWidth(0.2);
-          doc.line(14, currentY + 8, 196, currentY + 8);
-
-          currentY += 8.5;
+          currentY += 7;
         });
 
       } else if (chartType === 'classes') {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10.5);
         doc.setTextColor(15, 23, 42);
-        doc.text(`Synthèse Générale : ${safeClasses.length} Classes  |  Capacité Hebdo Max : ${safeActiveDays.length * safeTotalSlots}h/classe`, 14, currentY);
+        doc.text(`Synthèse des Divisions : ${safeClasses.length} Classes actives dans l'établissement`, 14, currentY);
         currentY += 8;
 
-        // En-tête de tableau
         doc.setFillColor(30, 41, 59);
         doc.roundedRect(14, currentY, 182, 8, 1, 1, 'F');
         doc.setTextColor(255, 255, 255);
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.text("CLASSE", 20, currentY + 5.5);
-        doc.text("NB COURS", 70, currentY + 5.5);
-        doc.text("TOTAL HEURES", 110, currentY + 5.5);
-        doc.text("DISPONIBLE", 145, currentY + 5.5);
-        doc.text("TAUX", 175, currentY + 5.5);
-        currentY += 9;
+        doc.setFontSize(9);
+        doc.text("CLASSE / DIVISION", 18, currentY + 5.5);
+        doc.text("DISCIPLINES ATTRIBUÉES", 70, currentY + 5.5);
+        doc.text("HEURES PLANIFIÉES", 140, currentY + 5.5);
+        doc.text("TAUX REMPLISSAGE", 170, currentY + 5.5);
+        currentY += 10;
 
         classStats.forEach((c, i) => {
           if (currentY > 275) {
             doc.addPage();
-            currentY = 18;
+            currentY = 20;
           }
 
-          const classColorHex = DISTINCT_TEACHER_COLORS[i % DISTINCT_TEACHER_COLORS.length];
-          const [cr, cg, cb] = hexToRgb(classColorHex);
-
-          doc.setFillColor(i % 2 === 0 ? 250 : 255, i % 2 === 0 ? 250 : 255, i % 2 === 0 ? 252 : 255);
-          doc.rect(14, currentY, 182, 8, 'F');
-
-          // Bande latérale colorée
-          doc.setFillColor(cr, cg, cb);
-          doc.rect(14, currentY, 2.5, 8, 'F');
+          if (i % 2 === 1) {
+            doc.setFillColor(248, 250, 252);
+            doc.rect(14, currentY - 3.5, 182, 7, 'F');
+          }
 
           doc.setFont('helvetica', 'bold');
-          doc.setFontSize(10);
-          doc.setTextColor(15, 23, 42);
-          doc.text(String(c.name || '').substring(0, 24), 19, currentY + 5.3);
+          doc.setFontSize(8.5);
+          doc.setTextColor(30, 41, 59);
+          doc.text((c.name || '').substring(0, 26), 18, currentY + 1.5);
 
           doc.setFont('helvetica', 'normal');
-          doc.setFontSize(9.5);
-          doc.setTextColor(71, 85, 105);
-          doc.text(`${c.subjectCount} cours`, 70, currentY + 5.3);
-          doc.text(`${c.totalAssignedHours}h / ${c.weeklyMaxSlots}h`, 110, currentY + 5.3);
-          doc.text(`${c.freeSlots}h libres`, 145, currentY + 5.3);
+          doc.setTextColor(100, 116, 139);
+          doc.text(`${c.subjectCount} matières affectées`, 70, currentY + 1.5);
 
           doc.setFont('helvetica', 'bold');
-          doc.setTextColor(37, 99, 235);
-          doc.text(`${c.fillRate}%`, 175, currentY + 5.3);
+          doc.setTextColor(15, 23, 42);
+          doc.text(`${c.totalAssignedHours}h / ${c.weeklyMaxSlots}h`, 140, currentY + 1.5);
 
-          doc.setDrawColor(241, 245, 249);
-          doc.setLineWidth(0.2);
-          doc.line(14, currentY + 8, 196, currentY + 8);
+          doc.setTextColor(c.fillRate >= 100 ? 16 : 79, c.fillRate >= 100 ? 185 : 70, c.fillRate >= 100 ? 129 : 229);
+          doc.text(`${c.fillRate}%`, 175, currentY + 1.5);
 
-          currentY += 8.5;
+          currentY += 7;
         });
 
       } else if (chartType === 'subjects') {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10.5);
         doc.setTextColor(15, 23, 42);
-        doc.text(`Synthèse Générale : ${safeSubjects.length} Matières Référencées`, 14, currentY);
+        doc.text(`Répertoire Disciplinaire : ${safeSubjects.length} Matières répertoriées`, 14, currentY);
         currentY += 8;
 
         doc.setFillColor(30, 41, 59);
         doc.roundedRect(14, currentY, 182, 8, 1, 1, 'F');
         doc.setTextColor(255, 255, 255);
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.text("MATIÈRE", 20, currentY + 5.5);
-        doc.text("VOLUME HEBDOMADAIRE", 80, currentY + 5.5);
-        doc.text("CLASSES", 135, currentY + 5.5);
-        doc.text("PART TOTALE", 165, currentY + 5.5);
-        currentY += 9;
+        doc.setFontSize(9);
+        doc.text("MATIÈRE", 18, currentY + 5.5);
+        doc.text("VOLUME HEBDOMADAIRE", 75, currentY + 5.5);
+        doc.text("CLASSES DESSERVIES", 130, currentY + 5.5);
+        doc.text("POIDS %", 175, currentY + 5.5);
+        currentY += 10;
 
         subjectStats.forEach((s, i) => {
           if (currentY > 275) {
             doc.addPage();
-            currentY = 18;
+            currentY = 20;
           }
 
-          const [sr, sg, sb] = hexToRgb(s.color || '#6366f1');
-
-          doc.setFillColor(i % 2 === 0 ? 250 : 255, i % 2 === 0 ? 250 : 255, i % 2 === 0 ? 252 : 255);
-          doc.rect(14, currentY, 182, 8, 'F');
-
-          doc.setFillColor(sr, sg, sb);
-          doc.rect(14, currentY, 2.5, 8, 'F');
+          if (i % 2 === 1) {
+            doc.setFillColor(248, 250, 252);
+            doc.rect(14, currentY - 3.5, 182, 7, 'F');
+          }
 
           doc.setFont('helvetica', 'bold');
-          doc.setFontSize(10);
-          doc.setTextColor(15, 23, 42);
-          doc.text(String(s.name || '').substring(0, 28), 19, currentY + 5.3);
+          doc.setFontSize(8.5);
+          doc.setTextColor(30, 41, 59);
+          doc.text((s.name || '').substring(0, 28), 18, currentY + 1.5);
 
           doc.setFont('helvetica', 'normal');
-          doc.setFontSize(9.5);
-          doc.setTextColor(71, 85, 105);
-          doc.text(`${s.totalHours} heures / semaine`, 80, currentY + 5.3);
-          doc.text(`${s.classesCount} classe(s)`, 135, currentY + 5.3);
+          doc.setTextColor(100, 116, 139);
+          doc.text(`${s.totalHours}h / semaine`, 75, currentY + 1.5);
+          doc.text(`${s.classesCount} division(s)`, 130, currentY + 1.5);
 
           doc.setFont('helvetica', 'bold');
-          doc.setTextColor(124, 58, 237);
-          doc.text(`${s.percentage}%`, 165, currentY + 5.3);
+          doc.setTextColor(147, 51, 234);
+          doc.text(`${s.percentage}%`, 175, currentY + 1.5);
 
-          doc.setDrawColor(241, 245, 249);
-          doc.setLineWidth(0.2);
-          doc.line(14, currentY + 8, 196, currentY + 8);
-
-          currentY += 8.5;
+          currentY += 7;
         });
 
       } else {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10.5);
         doc.setTextColor(15, 23, 42);
-        doc.text(`Synthèse Générale : ${safeActiveDays.length} Jours Ouvrés`, 14, currentY);
+        doc.text(`Charge Hebdomadaire : ${safeActiveDays.length} Jours d'ouverture`, 14, currentY);
         currentY += 8;
 
-        dailyStats.forEach((d, i) => {
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(10);
-          doc.text(`• ${d.day} : ${d.slotsCount} cours programmés (Capacité globale : ${d.capacity} créneaux)`, 16, currentY);
+        dailyStats.forEach((d) => {
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9);
+          doc.setTextColor(30, 41, 59);
+          doc.text(`${d.day} : ${d.slotsCount} créneaux occupés`, 18, currentY);
           currentY += 7;
         });
       }
 
-      // 3. PIED DE PAGE DISCRET ACADÉMIQUE
-      doc.setFontSize(8);
-      doc.setTextColor(148, 163, 184);
-      doc.text("Document officiel direction généré via Planora SaaS • Tous droits réservés", 14, 287);
+      // 3. PIED DE PAGE DISCRET
+      const totalPages = doc.getNumberOfPages();
+      for (let p = 1; p <= totalPages; p++) {
+        doc.setPage(p);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184);
+        doc.text(`Document administratif officiel • Direction ${schoolName} • Page ${p}/${totalPages}`, 14, 288);
+      }
 
-      const fileName = `Rapport_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}_${chartType}.pdf`;
+      const fileName = `Rapport_Analytique_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}_${chartType}.pdf`;
       doc.save(fileName);
-
       setExportSuccessMsg("Rapport PDF généré et téléchargé avec succès !");
       setTimeout(() => setExportSuccessMsg(null), 4000);
     } catch (e) {
@@ -540,51 +488,54 @@ export default function ChefAnalyticsDetailModal({
     }
 
     try {
-      const wb = XLSX.utils.book_new();
+      let dataToExport: any[] = [];
+      let sheetName = 'Statistiques';
 
       if (chartType === 'teachers') {
-        const data = teacherStats.map((t) => ({
-          "Nom & Prénom": t.name,
-          "Disciplines Enseignées": t.subjectsTaught,
-          "Heures Affectées (h/sem)": t.assignedHours,
-          "Quota Contractuel (h/sem)": t.quota,
-          "Écart Horaire (h)": t.diff,
-          "Taux d'Atteinte (%)": `${t.percent}%`,
-          "Statut": t.status === 'optimal' ? 'Conforme' : t.status === 'under' ? 'Sous-charge' : 'Surcharge'
+        sheetName = 'Enseignants_Quotas';
+        dataToExport = teacherStats.map((t) => ({
+          'ID': t.id,
+          'Nom Enseignant': t.name,
+          'Disciplines Enseignées': t.subjectsTaught,
+          'Quota Hebdo Contractuel (h)': t.quota,
+          'Heures Affectées Réelles (h)': t.assignedHours,
+          'Écart (Différence)': t.diff,
+          'Taux Réalisation (%)': `${t.percent}%`,
+          'Statut Quota': t.status === 'optimal' ? 'Conforme' : t.status === 'under' ? 'Sous-chargé' : 'Surcharge'
         }));
-        const ws = XLSX.utils.json_to_sheet(data);
-        XLSX.utils.book_append_sheet(wb, ws, "Quotas Enseignants");
       } else if (chartType === 'classes') {
-        const data = classStats.map((c) => ({
-          "Classe": c.name,
-          "Nb Cours Liés": c.subjectCount,
-          "Total Heures Affectées (h)": c.totalAssignedHours,
-          "Capacité Maximale (h)": c.weeklyMaxSlots,
-          "Heures Libres Restantes (h)": c.freeSlots,
-          "Taux de Remplissage (%)": `${c.fillRate}%`,
-          "Détail des Matières": c.subjectsList.map((s: any) => `${s.name} (${s.hours}h - ${s.teacher})`).join('; ')
+        sheetName = 'Classes_Remplissage';
+        dataToExport = classStats.map((c) => ({
+          'ID': c.id,
+          'Nom Classe / Division': c.name,
+          'Nombre de Matières': c.subjectCount,
+          'Heures Planifiées (h)': c.totalAssignedHours,
+          'Capacité Hebdomadaire (h)': c.weeklyMaxSlots,
+          'Heures Libres': c.freeSlots,
+          'Taux Remplissage (%)': `${c.fillRate}%`
         }));
-        const ws = XLSX.utils.json_to_sheet(data);
-        XLSX.utils.book_append_sheet(wb, ws, "Volumes Classes");
       } else if (chartType === 'subjects') {
-        const data = subjectStats.map((s) => ({
-          "Discipline / Matière": s.name,
-          "Volume Global Dispensé (h/sem)": s.totalHours,
-          "Part du Volume Établissement (%)": `${s.percentage}%`,
-          "Nombre de Classes": s.classesCount,
-          "Nombre de Professeurs": s.teachersCount
+        sheetName = 'Disciplines_Poids';
+        dataToExport = subjectStats.map((s) => ({
+          'ID': s.id,
+          'Matière / Discipline': s.name,
+          'Volume Global (h/sem)': s.totalHours,
+          'Nombre de Classes Desservies': s.classesCount,
+          'Nombre Enseignants': s.teachersCount,
+          'Poids Pédagogique (%)': `${s.percentage}%`
         }));
-        const ws = XLSX.utils.json_to_sheet(data);
-        XLSX.utils.book_append_sheet(wb, ws, "Disciplines");
       } else {
-        const data = dailyStats.map((d) => ({
-          "Jour": d.day,
-          "Cours Programmés": d.slotsCount,
-          "Capacité Totale Établissement": d.capacity
+        sheetName = 'Charge_Par_Jour';
+        dataToExport = dailyStats.map((d) => ({
+          'Jour': d.day,
+          'Créneaux Occupés': d.slotsCount,
+          'Capacité Théorique': d.capacity
         }));
-        const ws = XLSX.utils.json_to_sheet(data);
-        XLSX.utils.book_append_sheet(wb, ws, "Charge Journalière");
       }
+
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
       const fileName = `Export_Analytique_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}_${chartType}.xlsx`;
       XLSX.writeFile(wb, fileName);
@@ -598,43 +549,42 @@ export default function ChefAnalyticsDetailModal({
 
   if (!isOpen) return null;
 
-  // En-tête dynamique
   const getHeaderInfo = () => {
     switch (chartType) {
       case 'teachers':
         return {
-          title: "Graphique Global & Audit Détaillé des Quotas Enseignants",
-          subtitle: `${safeTeachers.length} enseignants répertoriés • Analyse précise des heures contractuelles vs affectées`,
-          icon: GraduationCap,
-          color: "text-amber-400"
+          title: "Graphique Global & Quotas des Enseignants",
+          subtitle: `${safeTeachers.length} enseignants répertoriés • Suivi des heures contractuelles vs affectées`,
+          icon: Users,
+          color: "text-amber-500"
         };
       case 'classes':
         return {
-          title: "Graphique Global & Répartition Horaire par Classe",
-          subtitle: `${safeClasses.length} classes configurées • Volume hebdomadaire, matières et créneaux disponibles`,
-          icon: Users,
-          color: "text-blue-400"
+          title: "Graphique Global & Volumes Horaires par Classe",
+          subtitle: `${safeClasses.length} divisions • Taux de remplissage et distribution des cours`,
+          icon: Building2,
+          color: "text-blue-500"
         };
       case 'subjects':
         return {
           title: "Graphique Global & Poids Pédagogique par Matière",
           subtitle: `${safeSubjects.length} disciplines enseignées • Répartition globale des volumes horaires`,
           icon: BookOpen,
-          color: "text-purple-400"
+          color: "text-purple-500"
         };
       case 'weekly_load':
         return {
           title: "Graphique Global & Charge Quotidienne de l'Établissement",
           subtitle: `${safeActiveDays.length} jours d'ouverture • Volume de cours par journée`,
           icon: Calendar,
-          color: "text-emerald-400"
+          color: "text-emerald-500"
         };
       default:
         return {
           title: "Graphique Global & Détails Analytiques",
           subtitle: "Vue d'ensemble détaillée pour le chef d'établissement",
           icon: Sparkles,
-          color: "text-indigo-400"
+          color: "text-indigo-500"
         };
     }
   };
@@ -649,31 +599,31 @@ export default function ChefAnalyticsDetailModal({
   const overTeachersCount = teacherStats.filter((t) => t?.status === 'over').length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-xl overflow-hidden animate-in fade-in duration-200">
+    <div className={`fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 overflow-hidden animate-in fade-in duration-200 ${isLight ? "bg-slate-900/40 backdrop-blur-md" : "bg-slate-950/85 backdrop-blur-xl"}`}>
       
       {/* Conteneur Plein Écran Spacieux */}
-      <div className="relative w-full max-w-6xl h-[94vh] max-h-[920px] bg-slate-900 border border-white/15 rounded-3xl shadow-2xl flex flex-col overflow-hidden text-slate-100 font-sans">
+      <div className={`relative w-full max-w-6xl h-[94vh] max-h-[920px] rounded-3xl shadow-2xl flex flex-col overflow-hidden font-sans transition-all ${isLight ? "bg-white border border-gray-200/90 text-gray-900 shadow-indigo-950/10" : "bg-slate-900 border border-white/15 text-slate-100"}`}>
         
         {/* Lueur d'ambiance */}
-        <div className="absolute top-0 right-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className={`absolute top-0 right-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none ${isLight ? "opacity-30" : "opacity-100"}`} />
+        <div className={`absolute bottom-0 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none ${isLight ? "opacity-30" : "opacity-100"}`} />
 
         {/* --- HEADER DE LA MODALE --- */}
-        <header className="px-6 py-4 border-b border-white/10 flex items-center justify-between gap-4 bg-slate-950/60 shrink-0 z-10 flex-wrap">
+        <header className={`px-6 py-4 border-b flex items-center justify-between gap-4 shrink-0 z-10 flex-wrap transition-colors ${isLight ? "bg-gray-50/90 border-gray-200/80" : "bg-slate-950/60 border-white/10"}`}>
           <div className="flex items-center gap-3.5">
-            <span className="p-2.5 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
+            <span className={`p-2.5 rounded-2xl flex items-center justify-center border ${isLight ? "bg-indigo-50 text-indigo-600 border-indigo-200" : "bg-indigo-500/20 text-indigo-400 border-indigo-500/30"}`}>
               <IconComponent className={`w-6 h-6 ${headerInfo.color}`} />
             </span>
             <div>
               <div className="flex items-center gap-2.5">
-                <h2 className="text-lg sm:text-xl font-black tracking-tight text-white">
+                <h2 className={`text-lg sm:text-xl font-black tracking-tight ${isLight ? "text-gray-900" : "text-white"}`}>
                   {headerInfo.title}
                 </h2>
-                <span className="text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2.5 py-0.5 rounded-full">
+                <span className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"}`}>
                   Vue Chef d'Établissement
                 </span>
               </div>
-              <p className="text-xs text-gray-400 mt-0.5">
+              <p className={`text-xs mt-0.5 ${isLight ? "text-gray-500" : "text-gray-400"}`}>
                 {headerInfo.subtitle} • {schoolName}
               </p>
             </div>
@@ -686,17 +636,23 @@ export default function ChefAnalyticsDetailModal({
             <button
               type="button"
               onClick={handleExportPDF}
-              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-md active:scale-95 border ${
-                isPremiumOrSchool
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95 border ${
+                isLight
+                  ? isPremiumOrSchool
+                    ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-700 shadow-rose-600/20'
+                    : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
+                  : isPremiumOrSchool
                   ? 'bg-rose-600 hover:bg-rose-500 text-white border-rose-500/30 shadow-rose-600/20'
                   : 'bg-rose-950/40 hover:bg-rose-950/60 text-rose-300 border-rose-500/20'
               }`}
               title={isPremiumOrSchool ? "Télécharger le rapport d'analyse détaillé en PDF" : "Réservé aux abonnés Premium et School"}
             >
-              <FileText className="w-4 h-4 text-rose-400" />
+              <FileText className={`w-4 h-4 ${isLight ? (isPremiumOrSchool ? 'text-white' : 'text-rose-600') : 'text-rose-400'}`} />
               <span>Export PDF</span>
               {!isPremiumOrSchool && (
-                <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[9px] font-mono flex items-center gap-0.5 border border-amber-500/30">
+                <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono flex items-center gap-0.5 border ${
+                  isLight ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                }`}>
                   <Lock className="w-2.5 h-2.5" /> VIP
                 </span>
               )}
@@ -706,17 +662,23 @@ export default function ChefAnalyticsDetailModal({
             <button
               type="button"
               onClick={handleExportExcel}
-              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-md active:scale-95 border ${
-                isPremiumOrSchool
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95 border ${
+                isLight
+                  ? isPremiumOrSchool
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 shadow-emerald-600/20'
+                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                  : isPremiumOrSchool
                   ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500/30 shadow-emerald-600/20'
                   : 'bg-emerald-950/40 hover:bg-emerald-950/60 text-emerald-300 border-emerald-500/20'
               }`}
               title={isPremiumOrSchool ? "Télécharger les données d'analyse en format Excel .xlsx" : "Réservé aux abonnés Premium et School"}
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+              <FileSpreadsheet className={`w-4 h-4 ${isLight ? (isPremiumOrSchool ? 'text-white' : 'text-emerald-600') : 'text-emerald-400'}`} />
               <span>Export Excel</span>
               {!isPremiumOrSchool && (
-                <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[9px] font-mono flex items-center gap-0.5 border border-amber-500/30">
+                <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono flex items-center gap-0.5 border ${
+                  isLight ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                }`}>
                   <Lock className="w-2.5 h-2.5" /> VIP
                 </span>
               )}
@@ -725,7 +687,7 @@ export default function ChefAnalyticsDetailModal({
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/10 transition-colors cursor-pointer ml-1"
+              className={`p-2 rounded-xl border transition-colors cursor-pointer ml-1 ${isLight ? "bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 border-gray-200" : "bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border-white/10"}`}
               title="Fermer la vue détaillée"
             >
               <X className="w-5 h-5" />
@@ -735,32 +697,34 @@ export default function ChefAnalyticsDetailModal({
 
         {/* NOTIFICATION SUCCÈS D'EXPORTATION */}
         {exportSuccessMsg && (
-          <div className="px-6 py-2 bg-emerald-500/15 border-b border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-2 animate-in fade-in">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <div className="px-6 py-2 bg-emerald-500/15 border-b border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
             <span>{exportSuccessMsg}</span>
           </div>
         )}
 
         {/* --- BARRE D'OUTILS ET RECHERCHE --- */}
-        <div className="px-6 py-3 border-b border-white/10 bg-slate-950/30 flex flex-wrap items-center justify-between gap-3 shrink-0 z-10">
+        <div className={`px-6 py-3 border-b flex flex-wrap items-center justify-between gap-3 shrink-0 z-10 ${isLight ? "bg-gray-50/60 border-gray-200/60" : "bg-slate-950/30 border-white/10"}`}>
           <div className="relative flex-1 min-w-[220px] max-w-md">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               placeholder={chartType === 'teachers' ? "Rechercher un enseignant ou discipline..." : "Rechercher une classe..."}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-950/80 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors"
+              className={`w-full rounded-xl pl-9 pr-4 py-2 text-xs transition-colors focus:outline-none ${isLight ? "bg-white border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-indigo-500 shadow-sm" : "bg-slate-950/80 border border-white/10 text-white placeholder-gray-500 focus:border-indigo-500"}`}
             />
           </div>
 
           {chartType === 'teachers' && (
-            <div className="flex items-center gap-1.5 p-1 bg-slate-950/60 rounded-xl border border-white/5 text-xs flex-wrap">
+            <div className={`flex items-center gap-1.5 p-1 rounded-xl border text-xs flex-wrap ${isLight ? "bg-gray-100 border-gray-200" : "bg-slate-950/60 border-white/5"}`}>
               <button
                 type="button"
                 onClick={() => setFilterStatus('all')}
                 className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                  filterStatus === 'all' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
+                  filterStatus === 'all'
+                    ? 'bg-indigo-600 text-white'
+                    : isLight ? 'text-gray-600 hover:text-gray-900 hover:bg-white/60' : 'text-gray-400 hover:text-white'
                 }`}
               >
                 Tous ({safeTeachers.length})
@@ -769,7 +733,9 @@ export default function ChefAnalyticsDetailModal({
                 type="button"
                 onClick={() => setFilterStatus('optimal')}
                 className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                  filterStatus === 'optimal' ? 'bg-emerald-600 text-white' : 'text-gray-400 hover:text-white'
+                  filterStatus === 'optimal'
+                    ? 'bg-emerald-600 text-white'
+                    : isLight ? 'text-gray-600 hover:text-gray-900 hover:bg-white/60' : 'text-gray-400 hover:text-white'
                 }`}
               >
                 Quota Exact ({optimalTeachersCount})
@@ -778,7 +744,9 @@ export default function ChefAnalyticsDetailModal({
                 type="button"
                 onClick={() => setFilterStatus('under')}
                 className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                  filterStatus === 'under' ? 'bg-amber-600 text-white' : 'text-gray-400 hover:text-white'
+                  filterStatus === 'under'
+                    ? 'bg-amber-600 text-white'
+                    : isLight ? 'text-gray-600 hover:text-gray-900 hover:bg-white/60' : 'text-gray-400 hover:text-white'
                 }`}
               >
                 Sous-chargés ({underTeachersCount})
@@ -787,7 +755,9 @@ export default function ChefAnalyticsDetailModal({
                 type="button"
                 onClick={() => setFilterStatus('over')}
                 className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                  filterStatus === 'over' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'
+                  filterStatus === 'over'
+                    ? 'bg-red-600 text-white'
+                    : isLight ? 'text-gray-600 hover:text-gray-900 hover:bg-white/60' : 'text-gray-400 hover:text-white'
                 }`}
               >
                 Surcharge ({overTeachersCount})
@@ -806,58 +776,57 @@ export default function ChefAnalyticsDetailModal({
             <div className="space-y-8">
               
               {/* SYNTHÈSE DIAGNOSTIC EN TEXTE SIMPLE & COMPRÉHENSIBLE */}
-              <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-950/30 via-slate-900/60 to-indigo-950/30 border border-amber-500/20 shadow-xl space-y-3">
-                <div className="flex items-center gap-2 text-amber-300 font-bold text-sm">
+              <div className={`p-5 rounded-2xl border shadow-sm space-y-3 ${isLight ? "bg-gradient-to-br from-amber-50/90 via-orange-50/30 to-indigo-50/40 border-amber-200 text-gray-800" : "bg-gradient-to-br from-amber-950/30 via-slate-900/60 to-indigo-950/30 border-amber-500/20 shadow-xl text-gray-300"}`}>
+                <div className={`flex items-center gap-2 font-bold text-sm ${isLight ? "text-amber-900" : "text-amber-300"}`}>
                   <Info className="w-5 h-5 shrink-0" />
                   <span>Diagnostic Global &amp; Explication Pédagogique</span>
                 </div>
-                <p className="text-xs text-gray-300 leading-relaxed">
+                <p className={`text-xs leading-relaxed ${isLight ? "text-gray-700 font-medium" : "text-gray-300"}`}>
                   Votre établissement compte <strong>{safeTeachers.length} enseignants</strong> pour un quota global contractuel de <strong>{totalContractHours} heures</strong> par semaine.
                   Actuellement, <strong>{totalAssignedHoursAll} heures</strong> sont affectées dans les classes.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
-                  <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 flex items-center gap-2.5">
+                  <div className={`p-3 rounded-xl border flex items-center gap-2.5 ${isLight ? "bg-emerald-50/90 border-emerald-200 text-emerald-950" : "bg-emerald-950/30 border-emerald-500/30"}`}>
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                     <div>
-                      <div className="font-bold text-white">{optimalTeachersCount} Enseignants</div>
-                      <div className="text-[11px] text-emerald-300">Quota respecté à 100%</div>
+                      <div className={`font-black text-sm ${isLight ? "text-emerald-950" : "text-white"}`}>{optimalTeachersCount} Enseignants</div>
+                      <div className="text-[11px] text-emerald-600 font-semibold">Quota respecté à 100%</div>
                     </div>
                   </div>
-                  <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-500/30 flex items-center gap-2.5">
+                  <div className={`p-3 rounded-xl border flex items-center gap-2.5 ${isLight ? "bg-amber-50/90 border-amber-200 text-amber-950" : "bg-amber-950/30 border-amber-500/30"}`}>
                     <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
                     <div>
-                      <div className="font-bold text-white">{underTeachersCount} Enseignants</div>
-                      <div className="text-[11px] text-amber-300">Sous-chargés (heures à allouer)</div>
+                      <div className={`font-black text-sm ${isLight ? "text-amber-950" : "text-white"}`}>{underTeachersCount} Enseignants</div>
+                      <div className="text-[11px] text-amber-700 font-semibold">Sous-chargés (heures à allouer)</div>
                     </div>
                   </div>
-                  <div className="p-3 rounded-xl bg-red-950/30 border border-red-500/30 flex items-center gap-2.5">
+                  <div className={`p-3 rounded-xl border flex items-center gap-2.5 ${isLight ? "bg-red-50/90 border-red-200 text-red-950" : "bg-red-950/30 border-red-500/30"}`}>
                     <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
                     <div>
-                      <div className="font-bold text-white">{overTeachersCount} Enseignants</div>
-                      <div className="text-[11px] text-red-300">En surcharge horaire</div>
+                      <div className={`font-black text-sm ${isLight ? "text-red-950" : "text-white"}`}>{overTeachersCount} Enseignants</div>
+                      <div className="text-[11px] text-red-700 font-semibold">En surcharge horaire</div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* GRAPHIQUE GLOBAL SPACIEUX (BARRES COMPARATIVES AVEC DÉFILEMENT POUR 50+ PROFS) */}
-              <div className="p-6 rounded-2xl bg-slate-950/70 border border-white/10 shadow-xl space-y-4">
+              {/* GRAPHIQUE GLOBAL SPACIEUX */}
+              <div className={`p-6 rounded-2xl border space-y-4 ${isLight ? "bg-white border-gray-200 shadow-sm text-gray-900" : "bg-slate-950/70 border-white/10 shadow-xl"}`}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                      <BarChart2 className="w-4 h-4 text-indigo-400" />
+                    <h3 className={`text-sm font-black flex items-center gap-2 ${isLight ? "text-gray-900" : "text-white"}`}>
+                      <BarChart2 className="w-4 h-4 text-indigo-500" />
                       <span>Graphique Global : Charge Réelle vs Quota Contractuel par Enseignant</span>
                     </h3>
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className={`text-xs mt-0.5 ${isLight ? "text-gray-500" : "text-gray-400"}`}>
                       Visualisation élargie permettant d'afficher confortablement tous les professeurs de l'établissement sans chevauchement.
                     </p>
                   </div>
-                  <span className="text-xs font-mono text-gray-400 bg-white/5 px-2.5 py-1 rounded-lg border border-white/5">
+                  <span className={`text-xs font-mono px-2.5 py-1 rounded-lg border ${isLight ? "bg-gray-100 text-gray-700 border-gray-200" : "bg-white/5 text-gray-400 border-white/5"}`}>
                     {filteredTeachers.length} affiché(s)
                   </span>
                 </div>
 
-                {/* Graphique de barres interactif avec jauge */}
                 <div className="space-y-3 pt-2 max-h-[380px] overflow-y-auto pr-2">
                   {filteredTeachers.length === 0 ? (
                     <div className="p-8 text-center text-xs text-gray-500">
@@ -870,30 +839,29 @@ export default function ChefAnalyticsDetailModal({
                       const isOver = t.status === 'over';
 
                       return (
-                        <div key={t.id} className="p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/20 transition-all space-y-1.5">
+                        <div key={t.id} className={`p-3 rounded-xl border transition-all space-y-1.5 ${isLight ? "bg-gray-50/80 border-gray-200/80 hover:border-indigo-300 hover:bg-indigo-50/20" : "bg-white/[0.02] border-white/5 hover:border-white/20"}`}>
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-1">
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-white">{t.name}</span>
-                              <span className="text-[11px] text-gray-400 font-mono">({t.subjectsTaught})</span>
+                              <span className={`font-bold ${isLight ? "text-gray-900" : "text-white"}`}>{t.name}</span>
+                              <span className={`text-[11px] font-mono ${isLight ? "text-gray-500" : "text-gray-400"}`}>({t.subjectsTaught})</span>
                             </div>
                             <div className="flex items-center gap-3 font-mono">
-                              <span className="text-gray-400">
-                                Affecté : <strong className="text-white">{t.assignedHours}h</strong> / Quota : {t.quota}h
+                              <span className={isLight ? "text-gray-600" : "text-gray-400"}>
+                                Affecté : <strong className={isLight ? "text-gray-900" : "text-white"}>{t.assignedHours}h</strong> / Quota : {t.quota}h
                               </span>
                               <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
                                 isExact
-                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                  ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/30'
                                   : isUnder
-                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                  : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                                  ? 'bg-amber-500/20 text-amber-700 border border-amber-500/30'
+                                  : 'bg-red-500/20 text-red-700 border border-red-500/30'
                               }`}>
                                 {t.percent}% {isUnder ? `(Manque ${Math.abs(t.diff)}h)` : isOver ? `(+${t.diff}h excès)` : '✓ Conforme'}
                               </span>
                             </div>
                           </div>
 
-                          {/* Barre de progression visuelle */}
-                          <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden flex border border-white/5">
+                          <div className={`h-2 w-full rounded-full overflow-hidden flex border ${isLight ? "bg-gray-200 border-gray-200" : "bg-slate-900 border-white/5"}`}>
                             <div
                               className={`h-full transition-all duration-500 rounded-full ${
                                 isExact ? 'bg-emerald-500' : isUnder ? 'bg-amber-500' : 'bg-red-500'
@@ -909,18 +877,18 @@ export default function ChefAnalyticsDetailModal({
               </div>
 
               {/* CONSEILS & RECOMMANDATIONS SIMPLES POUR LE CHEF */}
-              <div className="p-5 rounded-2xl bg-indigo-950/30 border border-indigo-500/20 space-y-3">
-                <h4 className="text-xs font-mono font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-indigo-400" />
+              <div className={`p-5 rounded-2xl border space-y-3 ${isLight ? "bg-indigo-50/80 border-indigo-200 text-gray-800 shadow-sm" : "bg-indigo-950/30 border-indigo-500/20 text-gray-300"}`}>
+                <h4 className={`text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-2 ${isLight ? "text-indigo-900" : "text-indigo-300"}`}>
+                  <Sparkles className="w-4 h-4 text-indigo-500" />
                   <span>Recommandations Pratiques d'Optimisation</span>
                 </h4>
-                <ul className="text-xs text-gray-300 space-y-2">
+                <ul className={`text-xs space-y-2 ${isLight ? "text-gray-700" : "text-gray-300"}`}>
                   <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">•</span>
+                    <span className="text-emerald-500 font-bold">•</span>
                     <span><strong>Pour les professeurs sous-chargés :</strong> Rendez-vous à l'Étape 4 (Classes) pour leur attribuer les matières restantes de manière à saturer leur quota légal.</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">•</span>
+                    <span className="text-emerald-500 font-bold">•</span>
                     <span><strong>Pour les professeurs en surcharge :</strong> Répartissez certaines classes avec un collègue de la même discipline pour éviter la fatigue et respecter le quantum horaire.</span>
                   </li>
                 </ul>
@@ -936,29 +904,29 @@ export default function ChefAnalyticsDetailModal({
             <div className="space-y-8">
               
               {/* SYNTHÈSE DIAGNOSTIC DES CLASSES */}
-              <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-950/30 via-slate-900/60 to-indigo-950/30 border border-blue-500/20 shadow-xl space-y-3">
-                <div className="flex items-center gap-2 text-blue-300 font-bold text-sm">
+              <div className={`p-5 rounded-2xl border space-y-3 ${isLight ? "bg-gradient-to-br from-blue-50/90 via-sky-50/30 to-indigo-50/40 border-blue-200 text-gray-800 shadow-sm" : "bg-gradient-to-br from-blue-950/30 via-slate-900/60 to-indigo-950/30 border-blue-500/20 shadow-xl text-gray-300"}`}>
+                <div className={`flex items-center gap-2 font-bold text-sm ${isLight ? "text-blue-900" : "text-blue-300"}`}>
                   <Info className="w-5 h-5 shrink-0" />
                   <span>Diagnostic Global des Classes &amp; Remplissage</span>
                 </div>
-                <p className="text-xs text-gray-300 leading-relaxed">
+                <p className={`text-xs leading-relaxed ${isLight ? "text-gray-700 font-medium" : "text-gray-300"}`}>
                   L'établissement compte <strong>{safeClasses.length} classes</strong>. Chaque classe dispose d'une capacité théorique maximale de <strong>{safeActiveDays.length * safeTotalSlots} créneaux</strong> par semaine ({safeActiveDays.length} jours × {safeTotalSlots}h).
                 </p>
               </div>
 
               {/* GRAPHIQUE GLOBAL SPACIEUX DES CLASSES */}
-              <div className="p-6 rounded-2xl bg-slate-950/70 border border-white/10 shadow-xl space-y-4">
+              <div className={`p-6 rounded-2xl border space-y-4 ${isLight ? "bg-white border-gray-200 shadow-sm text-gray-900" : "bg-slate-950/70 border-white/10 shadow-xl"}`}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                      <BarChart2 className="w-4 h-4 text-blue-400" />
+                    <h3 className={`text-sm font-black flex items-center gap-2 ${isLight ? "text-gray-900" : "text-white"}`}>
+                      <BarChart2 className="w-4 h-4 text-blue-500" />
                       <span>Graphique Global : Volume Horaire &amp; Matières par Classe</span>
                     </h3>
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className={`text-xs mt-0.5 ${isLight ? "text-gray-500" : "text-gray-400"}`}>
                       Visualisez en un coup d'œil la charge hebdomadaire de chaque niveau d'élèves.
                     </p>
                   </div>
-                  <span className="text-xs font-mono text-gray-400 bg-white/5 px-2.5 py-1 rounded-lg border border-white/5">
+                  <span className={`text-xs font-mono px-2.5 py-1 rounded-lg border ${isLight ? "bg-gray-100 text-gray-700 border-gray-200" : "bg-white/5 text-gray-400 border-white/5"}`}>
                     {filteredClasses.length} classe(s)
                   </span>
                 </div>
@@ -970,23 +938,23 @@ export default function ChefAnalyticsDetailModal({
                     </div>
                   ) : (
                     filteredClasses.map((c) => (
-                      <div key={c.id} className="p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/20 transition-all space-y-2.5">
+                      <div key={c.id} className={`p-4 rounded-xl border transition-all space-y-2.5 ${isLight ? "bg-gray-50/80 border-gray-200/80 hover:border-indigo-300 hover:bg-indigo-50/20" : "bg-white/[0.02] border-white/5 hover:border-white/20"}`}>
                         <div className="flex items-center justify-between text-xs">
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-white text-sm">{c.name}</span>
-                            <span className="text-[11px] font-mono text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
+                            <span className={`font-bold text-sm ${isLight ? "text-gray-900" : "text-white"}`}>{c.name}</span>
+                            <span className="text-[11px] font-mono text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
                               {c.subjectCount} cours liés
                             </span>
                           </div>
                           <div className="font-mono text-xs">
-                            <span className="text-gray-400">Total : </span>
-                            <strong className="text-blue-400">{c.totalAssignedHours}h / {c.weeklyMaxSlots}h</strong>
+                            <span className={isLight ? "text-gray-500" : "text-gray-400"}>Total : </span>
+                            <strong className="text-blue-500">{c.totalAssignedHours}h / {c.weeklyMaxSlots}h</strong>
                             <span className="text-gray-500 ml-2">({c.freeSlots}h libres)</span>
                           </div>
                         </div>
 
                         {/* Barre de distribution multicolore par matière */}
-                        <div className="h-2.5 w-full bg-slate-900 rounded-full overflow-hidden flex border border-white/5">
+                        <div className={`h-2.5 w-full rounded-full overflow-hidden flex border ${isLight ? "bg-gray-200 border-gray-200" : "bg-slate-900 border-white/5"}`}>
                           {c.subjectsList.map((sb: any, sIdx: number) => {
                             const segWidth = c.weeklyMaxSlots > 0 ? (sb.hours / c.weeklyMaxSlots) * 100 : 0;
                             return (
@@ -1003,9 +971,9 @@ export default function ChefAnalyticsDetailModal({
                         {/* Légende détaillée des cours */}
                         <div className="flex flex-wrap gap-1.5 pt-1">
                           {c.subjectsList.map((sb: any, sIdx: number) => (
-                            <span key={sIdx} className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-gray-300 flex items-center gap-1.5">
+                            <span key={sIdx} className={`text-[10px] px-2 py-0.5 rounded-md border flex items-center gap-1.5 ${isLight ? "bg-white border-gray-200 text-gray-700 shadow-sm" : "bg-white/5 border-white/10 text-gray-300"}`}>
                               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: sb.color }} />
-                              <span>{sb.name} ({sb.hours}h) • <span className="text-gray-400">{sb.teacher}</span></span>
+                              <span>{sb.name} ({sb.hours}h) • <span className={isLight ? "text-gray-500" : "text-gray-400"}>{sb.teacher}</span></span>
                             </span>
                           ))}
                         </div>
@@ -1024,37 +992,37 @@ export default function ChefAnalyticsDetailModal({
           {chartType === 'subjects' && (
             <div className="space-y-8">
               
-              <div className="p-5 rounded-2xl bg-gradient-to-br from-purple-950/30 via-slate-900/60 to-indigo-950/30 border border-purple-500/20 shadow-xl space-y-3">
-                <div className="flex items-center gap-2 text-purple-300 font-bold text-sm">
+              <div className={`p-5 rounded-2xl border space-y-3 ${isLight ? "bg-gradient-to-br from-purple-50/90 via-indigo-50/30 to-pink-50/40 border-purple-200 text-gray-800 shadow-sm" : "bg-gradient-to-br from-purple-950/30 via-slate-900/60 to-indigo-950/30 border-purple-500/20 shadow-xl text-gray-300"}`}>
+                <div className={`flex items-center gap-2 font-bold text-sm ${isLight ? "text-purple-900" : "text-purple-300"}`}>
                   <Info className="w-5 h-5 shrink-0" />
                   <span>Diagnostic du Référentiel des Matières</span>
                 </div>
-                <p className="text-xs text-gray-300 leading-relaxed">
+                <p className={`text-xs leading-relaxed ${isLight ? "text-gray-700 font-medium" : "text-gray-300"}`}>
                   Ce graphique mesure le volume d'heures total dispensé pour chaque discipline dans l'établissement scolaire.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {subjectStats.map((sub: any) => (
-                  <div key={sub.id} className="p-4 rounded-xl bg-slate-950/60 border border-white/10 space-y-2">
+                  <div key={sub.id} className={`p-4 rounded-xl border space-y-2 ${isLight ? "bg-white border-gray-200 shadow-sm text-gray-900" : "bg-slate-950/60 border-white/10"}`}>
                     <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2 font-bold text-white">
+                      <div className={`flex items-center gap-2 font-bold ${isLight ? "text-gray-900" : "text-white"}`}>
                         <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: sub.color }} />
                         <span>{sub.name}</span>
                       </div>
-                      <span className="font-mono text-purple-300 font-bold bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
+                      <span className={`font-mono font-bold px-2 py-0.5 rounded border ${isLight ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-purple-500/10 text-purple-300 border-purple-500/20"}`}>
                         {sub.percentage}% du total
                       </span>
                     </div>
 
-                    <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden">
+                    <div className={`h-2 w-full rounded-full overflow-hidden ${isLight ? "bg-gray-200" : "bg-slate-900"}`}>
                       <div className="h-full rounded-full" style={{ width: `${sub.percentage}%`, backgroundColor: sub.color }} />
                     </div>
 
                     <div className="flex justify-between text-[11px] text-gray-400 font-mono pt-1">
-                      <span>Volume : <strong className="text-white">{sub.totalHours}h / sem</strong></span>
-                      <span>Enseignée dans : <strong className="text-white">{sub.classesCount} classe(s)</strong></span>
-                      <span>Professeurs : <strong className="text-white">{sub.teachersCount}</strong></span>
+                      <span>Volume : <strong className={isLight ? "text-gray-900" : "text-white"}>{sub.totalHours}h / sem</strong></span>
+                      <span>Enseignée dans : <strong className={isLight ? "text-gray-900" : "text-white"}>{sub.classesCount} classe(s)</strong></span>
+                      <span>Professeurs : <strong className={isLight ? "text-gray-900" : "text-white"}>{sub.teachersCount}</strong></span>
                     </div>
                   </div>
                 ))}
@@ -1069,24 +1037,24 @@ export default function ChefAnalyticsDetailModal({
           {chartType === 'weekly_load' && (
             <div className="space-y-8">
               
-              <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-950/30 via-slate-900/60 to-indigo-950/30 border border-emerald-500/20 shadow-xl space-y-3">
-                <div className="flex items-center gap-2 text-emerald-300 font-bold text-sm">
+              <div className={`p-5 rounded-2xl border space-y-3 ${isLight ? "bg-gradient-to-br from-emerald-50/90 via-teal-50/30 to-indigo-50/40 border-emerald-200 text-gray-800 shadow-sm" : "bg-gradient-to-br from-emerald-950/30 via-slate-900/60 to-indigo-950/30 border-emerald-500/20 shadow-xl text-gray-300"}`}>
+                <div className={`flex items-center gap-2 font-bold text-sm ${isLight ? "text-emerald-900" : "text-emerald-300"}`}>
                   <Info className="w-5 h-5 shrink-0" />
                   <span>Répartition de l'Occupation par Journée</span>
                 </div>
-                <p className="text-xs text-gray-300 leading-relaxed">
+                <p className={`text-xs leading-relaxed ${isLight ? "text-gray-700 font-medium" : "text-gray-300"}`}>
                   Visualisez l'équilibre de programmation des cours entre le début et la fin de semaine.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {dailyStats.map((d: any) => (
-                  <div key={d.day} className="p-4 rounded-xl bg-slate-950/60 border border-white/10 space-y-2">
+                  <div key={d.day} className={`p-4 rounded-xl border space-y-2 ${isLight ? "bg-white border-gray-200 shadow-sm text-gray-900" : "bg-slate-950/60 border-white/10"}`}>
                     <div className="flex justify-between items-center text-xs font-bold">
-                      <span className="text-white">{d.day}</span>
-                      <span className="text-emerald-400 font-mono">{d.slotsCount} cours programmés</span>
+                      <span className={`font-bold ${isLight ? "text-gray-900" : "text-white"}`}>{d.day}</span>
+                      <span className="text-emerald-500 font-mono">{d.slotsCount} cours programmés</span>
                     </div>
-                    <div className="text-[11px] text-gray-400">
+                    <div className={`text-[11px] ${isLight ? "text-gray-500" : "text-gray-400"}`}>
                       Capacité totale établissement : {d.capacity} créneaux
                     </div>
                   </div>
@@ -1099,9 +1067,9 @@ export default function ChefAnalyticsDetailModal({
         </div>
 
         {/* --- PIED DE PAGE AVEC ACTIONS RAPIDES --- */}
-        <footer className="px-6 py-3.5 border-t border-white/10 bg-slate-950/60 flex items-center justify-between gap-4 shrink-0 z-10 flex-wrap">
-          <div className="text-xs text-gray-400 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-indigo-400" />
+        <footer className={`px-6 py-3.5 border-t flex items-center justify-between gap-4 shrink-0 z-10 flex-wrap ${isLight ? "bg-gray-50/90 border-gray-200/80 text-gray-600" : "bg-slate-950/60 border-white/10 text-gray-400"}`}>
+          <div className="text-xs flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-indigo-500" />
             <span>Données synchronisées en temps réel • Exports PDF &amp; Excel certifiés direction</span>
           </div>
           <div className="flex items-center gap-3">
@@ -1109,30 +1077,38 @@ export default function ChefAnalyticsDetailModal({
               type="button"
               onClick={handleExportPDF}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer border ${
-                isPremiumOrSchool
+                isLight
+                  ? isPremiumOrSchool
+                    ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200 shadow-sm'
+                    : 'bg-gray-100 text-gray-400 border-gray-200'
+                  : isPremiumOrSchool
                   ? 'bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border-rose-500/30'
                   : 'bg-white/5 hover:bg-white/10 text-gray-400 border-white/10'
               }`}
             >
-              <FileText className="w-3.5 h-3.5 text-rose-400" />
+              <FileText className="w-3.5 h-3.5 text-rose-500" />
               <span>PDF</span>
             </button>
             <button
               type="button"
               onClick={handleExportExcel}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer border ${
-                isPremiumOrSchool
+                isLight
+                  ? isPremiumOrSchool
+                    ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200 shadow-sm'
+                    : 'bg-gray-100 text-gray-400 border-gray-200'
+                  : isPremiumOrSchool
                   ? 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border-emerald-500/30'
                   : 'bg-white/5 hover:bg-white/10 text-gray-400 border-white/10'
               }`}
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500" />
               <span>Excel</span>
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all cursor-pointer ml-2"
+              className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all cursor-pointer ml-2"
             >
               Fermer la vue détaillée
             </button>
@@ -1144,24 +1120,24 @@ export default function ChefAnalyticsDetailModal({
       {/* --- MODAL PROMPT D'UPGRADE SI FORMULE GRATUITE OU STANDARD --- */}
       {isUpgradePromptOpen && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in">
-          <div className="bg-slate-900 border border-amber-500/30 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 text-white relative">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
-                <Crown className="w-5 h-5 text-amber-400" />
+          <div className={`border rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 relative ${isLight ? "bg-white border-amber-300 text-gray-900" : "bg-slate-900 border-amber-500/30 text-white"}`}>
+            <div className={`flex items-center justify-between border-b pb-3 ${isLight ? "border-gray-200" : "border-white/10"}`}>
+              <div className="flex items-center gap-2 text-amber-500 font-bold text-sm">
+                <Crown className="w-5 h-5 text-amber-500" />
                 <span>Fonctionnalité Premium &amp; School</span>
               </div>
               <button
                 type="button"
                 onClick={() => setIsUpgradePromptOpen(false)}
-                className="p-1 rounded-lg bg-white/5 text-gray-400 hover:text-white"
+                className={`p-1 rounded-lg ${isLight ? "bg-gray-100 text-gray-500 hover:text-gray-900" : "bg-white/5 text-gray-400 hover:text-white"}`}
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs text-gray-300 leading-relaxed">
-              <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/20 space-y-2">
-                <p className="font-bold text-amber-300 text-sm">
+            <div className={`space-y-3 text-xs leading-relaxed ${isLight ? "text-gray-700" : "text-gray-300"}`}>
+              <div className={`p-4 rounded-2xl border space-y-2 ${isLight ? "bg-amber-50 border-amber-200 text-amber-950" : "bg-amber-950/30 border-amber-500/20"}`}>
+                <p className="font-bold text-amber-600 text-sm">
                   Exportations Analytiques Réservées aux Abonnés VIP
                 </p>
                 <p>
@@ -1170,16 +1146,16 @@ export default function ChefAnalyticsDetailModal({
               </div>
 
               <div className="space-y-2 pt-1">
-                <div className="flex items-center gap-2 text-emerald-300">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <div className="flex items-center gap-2 text-emerald-600 font-medium">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" />
                   <span>Rapports d'audits PDF prêts pour le Rectorat / Direction</span>
                 </div>
-                <div className="flex items-center gap-2 text-emerald-300">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <div className="flex items-center gap-2 text-emerald-600 font-medium">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" />
                   <span>Tableaux Excel (.xlsx) avec calculs automatiques des quotas</span>
                 </div>
-                <div className="flex items-center gap-2 text-emerald-300">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <div className="flex items-center gap-2 text-emerald-600 font-medium">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" />
                   <span>Générateur IA &amp; Multi-formats illimités</span>
                 </div>
               </div>
@@ -1189,7 +1165,7 @@ export default function ChefAnalyticsDetailModal({
               <button
                 type="button"
                 onClick={() => setIsUpgradePromptOpen(false)}
-                className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-bold"
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold ${isLight ? "bg-gray-100 hover:bg-gray-200 text-gray-700" : "bg-white/5 hover:bg-white/10 text-gray-300"}`}
               >
                 Plus tard
               </button>

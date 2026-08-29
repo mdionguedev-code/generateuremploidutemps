@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 @theme {
   --color-primary: #5A45FF;
@@ -104,7 +104,10 @@ body {
   background: radial-gradient(circle at 50% 0%, #0a0a0f 0%, #020204 100%) !important;
   color: #f3f4f6;
   min-height: 100vh;
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   transition: background-color 0.3s ease, background 0.3s ease, border-color 0.3s ease, color 0.2s ease, box-shadow 0.3s ease;
 }
 
@@ -113,55 +116,160 @@ body {
    ========================================================================== */
 body.light {
   background: radial-gradient(circle at 50% 0%, #ffffff 0%, #f1f5f9 100%) !important;
-  color: #0f172a !important;
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  color: #334155 !important;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-weight: 380 !important;
+  font-size: 0.935rem !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-/* 1. Global Typography Contrast Refinements */
+/* 1. Global Typography Contrast, Weight & Size Refinements */
+/* Headings: Retain clear, elegant semi-bold emphasis */
 body.light h1:not(.text-white):not([class*="text-white"]),
 body.light h2:not(.text-white):not([class*="text-white"]),
 body.light h3:not(.text-white):not([class*="text-white"]),
 body.light h4:not(.text-white):not([class*="text-white"]),
 body.light h5:not(.text-white):not([class*="text-white"]),
 body.light h6:not(.text-white):not([class*="text-white"]) {
-  color: #0f172a !important;
+  color: #1e293b !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em;
 }
 
-/* Remap generic utility gray levels to high contrast equivalents */
+/* Navigation Tabs & Buttons: Retain clear, crisp font-weight */
+body.light button,
+body.light button *,
+body.light nav,
+body.light nav *,
+body.light [role="tab"],
+body.light [role="tab"] *,
+body.light [role="button"],
+body.light [role="button"] * {
+  font-weight: 600 !important;
+}
+
+/* Explanatory texts, helper paragraphs, guides, and descriptions: 100% text-xs leading-relaxed text-slate-600 font-normal */
+body.light p,
+body.light p *,
+body.light p strong,
+body.light p b,
+body.light .text-slate-500,
+body.light .text-slate-600,
+body.light .text-gray-400,
+body.light .text-gray-500,
+body.light [class*="leading-relaxed"],
+body.light [class*="leading-relaxed"] *,
+body.light [class*="leading-normal"],
+body.light small,
+body.light label:not([class*="font-bold"]) {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-size: 0.75rem !important;
+  font-weight: 400 !important;
+  color: #475569 !important; /* text-slate-600 */
+  line-height: 1.625 !important; /* leading-relaxed */
+  letter-spacing: -0.005em !important;
+}
+
+body.light .text-2xl { font-size: 1.35rem !important; }
+body.light .text-xl { font-size: 1.15rem !important; }
+body.light .text-lg { font-size: 1.025rem !important; }
+body.light .text-base { font-size: 0.925rem !important; }
+body.light .text-sm { font-size: 0.8125rem !important; line-height: 1.5 !important; }
+/* Hover indications, popovers, and tooltips: 100% fine, small & regular (NO BOLD) */
+body.light [class*="group-hover"]:not(button):not(a),
+body.light [class*="group-hover"]:not(button):not(a) *,
+body.light [class*="tooltip"],
+body.light [class*="tooltip"] *,
+body.light .recharts-tooltip-wrapper *,
+body.light [role="tooltip"],
+body.light [data-tooltip] {
+  font-weight: 400 !important;
+  font-size: 0.6875rem !important; /* 10-11px */
+  line-height: 1.35 !important;
+  letter-spacing: normal !important;
+}
+
+body.light .font-black {
+  font-weight: 600 !important;
+}
+
+body.light .font-extrabold {
+  font-weight: 550 !important;
+}
+
+body.light .font-bold:not(p):not(p *):not([class*="group-hover"]) {
+  font-weight: 500 !important;
+}
+
+body.light .font-semibold:not(p):not(p *):not([class*="group-hover"]) {
+  font-weight: 450 !important;
+}
+
+body.light .font-medium:not(p):not(p *):not([class*="group-hover"]) {
+  font-weight: 400 !important;
+}
+
+/* Remap generic utility gray levels to soft, balanced slate equivalents */
 body.light .text-white:not(
   button.bg-gradient-to-r,
   button[class*="bg-indigo-"],
+  button[class*="bg-blue-"],
   button[class*="bg-emerald-"],
   button[class*="bg-purple-"],
   button[class*="bg-rose-"],
   button[class*="bg-red-"],
   .btn-primary,
   [class*="from-indigo-"],
+  [class*="from-blue-"],
   [class*="from-purple-"],
   [class*="from-emerald-"],
   [class*="from-teal-"],
-  [class*="bg-indigo-500"],
-  [class*="bg-indigo-600"],
+  [class*="bg-blue-"],
+  [class*="bg-indigo-"],
   [class*="bg-emerald-500"],
   [class*="bg-emerald-600"],
   [class*="bg-purple-600"],
   [class*="bg-red-600"],
   [class*="bg-slate-800"]
 ) {
-  color: #0f172a !important;
+  color: #334155 !important;
 }
 
-body.light .text-gray-100 { color: #0f172a !important; }
-body.light .text-gray-200 { color: #1e293b !important; }
-body.light .text-gray-300 { color: #334155 !important; } /* slate-700 */
-body.light .text-gray-400 { color: #475569 !important; } /* slate-600 */
-body.light .text-gray-500 { color: #64748b !important; } /* slate-500 */
+/* Restore text-white for children of colored buttons */
+body.light button.bg-gradient-to-r .text-white,
+body.light button[class*="bg-indigo-"] .text-white,
+body.light button[class*="bg-blue-"] .text-white,
+body.light button[class*="bg-emerald-"] .text-white,
+body.light button[class*="bg-purple-"] .text-white,
+body.light button[class*="bg-rose-"] .text-white,
+body.light button[class*="bg-red-"] .text-white,
+body.light .btn-primary .text-white,
+body.light [class*="from-indigo-"] .text-white,
+body.light [class*="from-blue-"] .text-white,
+body.light [class*="from-purple-"] .text-white,
+body.light [class*="from-emerald-"] .text-white,
+body.light [class*="from-teal-"] .text-white {
+  color: #ffffff !important;
+}
 
-body.light .text-slate-100 { color: #0f172a !important; }
-body.light .text-slate-200 { color: #1e293b !important; }
-body.light .text-slate-300 { color: #334155 !important; }
-body.light .text-slate-400 { color: #475569 !important; }
-body.light .text-slate-500 { color: #64748b !important; }
+body.light .text-slate-900,
+body.light .text-slate-800,
+body.light .text-gray-900,
+body.light .text-gray-800 { color: #334155 !important; }
+
+body.light .text-gray-100 { color: #334155 !important; }
+body.light .text-gray-200 { color: #334155 !important; }
+body.light .text-gray-300 { color: #475569 !important; } /* slate-600 */
+body.light .text-gray-400 { color: #64748b !important; } /* slate-500 */
+body.light .text-gray-500 { color: #94a3b8 !important; } /* slate-400 */
+
+body.light .text-slate-100 { color: #334155 !important; }
+body.light .text-slate-200 { color: #334155 !important; }
+body.light .text-slate-300 { color: #475569 !important; }
+body.light .text-slate-400 { color: #64748b !important; }
+body.light .text-slate-500 { color: #94a3b8 !important; }
 
 /* Keep light texts beautifully colored on custom dark/neon colored accents */
 body.light .text-indigo-400 { color: #4f46e5 !important; }
@@ -223,7 +331,7 @@ body.light [class*="bg-slate-800"]:not(.fixed.inset-0):not([class*="fixed"]) {
 }
 
 /* Fixed Overlay Backdrops (modals) */
-body.light div.fixed.inset-0 {
+body.light div.fixed.inset-0:not(.modal-solid-bg):not([class*="!bg-white"]):not([class*="bg-white"]):not([class*="bg-slate-50"]) {
   background-color: rgba(15, 23, 42, 0.6) !important;
   backdrop-filter: blur(8px) !important;
 }
@@ -364,20 +472,7 @@ body.light [id^="card-"] .bg-black\/40 {
 }
 
 /* 7. Tabs & Navigation Pills */
-body.light nav {
-  background-color: #f1f5f9 !important;
-  border-color: #cbd5e1 !important;
-}
-
-body.light nav button:not([class*="from-indigo-500"]):not([class*="bg-indigo-"]) {
-  color: #475569 !important;
-  background-color: transparent !important;
-}
-
-body.light nav button:not([class*="from-indigo-500"]):not([class*="bg-indigo-"]):hover {
-  color: #0f172a !important;
-  background-color: #e2e8f0 !important;
-}
+/* Clean navigation handled directly in dashboard component */
 
 /* 8. Active forms fields & exclusions blocks */
 body.light input,
@@ -539,7 +634,7 @@ body.light ::-webkit-scrollbar-thumb:hover {
    HIGH-AESTHETIC LIGHT THEME ADAPTATIVE OVERRIDES
    ========================================================================== */
 body.light {
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
 }
 
 /* Force deep black (#05070f) for maximum readability on headings & bold */
