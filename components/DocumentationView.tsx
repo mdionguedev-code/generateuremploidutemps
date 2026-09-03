@@ -99,11 +99,9 @@ export default function DocumentationView({
           <button
             type="button"
             onClick={onClose}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-colors cursor-pointer text-xs font-bold ${
-              isLight ? "bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900 border-gray-200" : "bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border-white/10"
-            }`}
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border transition-all cursor-pointer text-xs font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border-rose-500/30 hover:border-rose-500/50 hover:scale-105 active:scale-95 shadow-md shadow-rose-500/5"
           >
-            <X className="w-4 h-4 text-rose-500" />
+            <X className="w-4 h-4" />
             <span>Fermer</span>
           </button>
         </div>
@@ -255,9 +253,9 @@ export default function DocumentationView({
             
             <div className="space-y-3.5 pt-2">
               <div className={`p-3.5 rounded-xl border space-y-1 ${isLight ? "bg-white border-gray-200 shadow-sm" : "bg-white/[0.02] border-white/10"}`}>
-                <h4 className={`font-bold text-xs ${isLight ? "text-gray-950" : "text-white"}`}>Étape 1 : Configuration horaire</h4>
+                <h4 className={`font-bold text-xs ${isLight ? "text-gray-950" : "text-white"}`}>Étape 1 : Configuration horaire &amp; Pauses</h4>
                 <p className={`text-[11px] leading-relaxed ${isLight ? "text-gray-600 font-medium" : "text-gray-400"}`}>
-                  Déterminez les jours d'ouverture de l'école (5 ou 6 jours) et définissez l'amplitude quotidienne (ex: 8h00 à 18h00). Cliquez sur le bouton "Passer à l'Étape 2" pour continuer.
+                  Déterminez les jours d'ouverture de l'école (5 ou 6 jours), définissez l'amplitude quotidienne (ex: 8h00 à 18h00), et configurez les pauses communes (récréations, repas). Les pauses décaleront dynamiquement les heures de cours et s'afficheront sur les emplois du temps des classes.
                 </p>
               </div>
               
@@ -275,17 +273,32 @@ export default function DocumentationView({
                 </p>
               </div>
               
-              <div className={`p-3.5 rounded-xl border space-y-1 ${isLight ? "bg-white border-gray-200 shadow-sm" : "bg-white/[0.02] border-white/10"}`}>
-                <h4 className={`font-bold text-xs ${isLight ? "text-gray-950" : "text-white"}`}>Étape 4 : Fiches Classes &amp; Affectations</h4>
+              <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? "bg-white border-gray-200 shadow-sm" : "bg-white/[0.02] border-white/10"}`}>
+                <h4 className={`font-bold text-xs flex items-center justify-between gap-2 ${isLight ? "text-gray-950" : "text-white"}`}>
+                  <span>Étape 4 : Fiches Classes, Affectations &amp; Classes Scindées</span>
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold border ${isLight ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-purple-500/20 text-purple-300 border-purple-500/30"}`}>
+                    Nouveau : Cours Simultanés
+                  </span>
+                </h4>
                 <p className={`text-[11px] leading-relaxed ${isLight ? "text-gray-600 font-medium" : "text-gray-400"}`}>
-                  Enregistrez vos divisions de classes (ex: 6ème A, 3ème B) et associez à chacune d'elles les volumes horaires des matières requises en assignant le bon enseignant.
+                  Enregistrez vos classes (ex: 6ème A, Terminale S) et choisissez le mode d'affectation :
                 </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-[11px]">
+                  <div className={`p-2.5 rounded-lg border ${isLight ? "bg-blue-50/50 border-blue-100 text-slate-800" : "bg-slate-950/60 border-white/5 text-slate-300"}`}>
+                    <strong className="text-indigo-500 font-bold block mb-0.5">📘 Cours Standard :</strong>
+                    Matière suivie par l'ensemble de la classe avec son professeur dédié (ex: Mathématiques 4h).
+                  </div>
+                  <div className={`p-2.5 rounded-lg border ${isLight ? "bg-purple-50/60 border-purple-100 text-purple-950" : "bg-purple-950/30 border-purple-500/20 text-purple-200"}`}>
+                    <strong className="text-purple-400 font-bold block mb-0.5">🔗 Classe Scindée :</strong>
+                    Scission en 2 sous-groupes (ex: <em>Groupe A</em> Espagnol et <em>Groupe B</em> Arabe, ou TP Sciences) dispensés <strong>exactement au même moment et même jour</strong> par 2 professeurs distincts, avec gestion des quantums horaires hebdomadaires flexibles.
+                  </div>
+                </div>
               </div>
               
               <div className={`p-3.5 rounded-xl border space-y-1 ${isLight ? "bg-white border-gray-200 shadow-sm" : "bg-white/[0.02] border-white/10"}`}>
                 <h4 className={`font-bold text-xs ${isLight ? "text-gray-950" : "text-white"}`}>Étape 5 : Résolution automatique &amp; Grille interactive</h4>
                 <p className={`text-[11px] leading-relaxed ${isLight ? "text-gray-600 font-medium" : "text-gray-400"}`}>
-                  Générez l'emploi du temps optimal d'un clic. Le moteur résout instantanément la répartition. Ajustez ensuite manuellement par glisser-déposer si vous le souhaitez.
+                  Générez l'emploi du temps optimal d'un clic. Le moteur résout instantanément la répartition, affiche les <strong>Split Cards</strong> pour les classes scindées, et synchronise automatiquement le déplacement des créneaux liés lors du glisser-déposer.
                 </p>
               </div>
             </div>
@@ -300,7 +313,7 @@ export default function DocumentationView({
               <span>3. Le Moteur Anti-Collision &amp; Ajustements Manuels</span>
             </div>
             <h3 className={`text-xl font-black ${isLight ? "text-gray-950" : "text-white"}`}>
-              Règles de détection des conflits
+              Règles de détection des conflits &amp; Classes Scindées
             </h3>
             <p className={`text-xs sm:text-sm leading-relaxed ${
               isLight ? "text-gray-700 font-medium" : "text-gray-300"
@@ -309,9 +322,10 @@ export default function DocumentationView({
             </p>
             <ul className={`text-xs space-y-2 list-disc pl-5 ${isLight ? "text-gray-700 font-medium" : "text-gray-400"}`}>
               <li><strong>Conflit d'enseignant :</strong> Un professeur ne peut jamais dispenser de cours dans deux classes distinctes au même instant.</li>
-              <li><strong>Conflit de classe :</strong> Une classe ne peut pas se voir attribuer deux cours différents sur le même créneau horaire.</li>
+              <li><strong>Conflit de classe :</strong> Une classe entière ne peut pas avoir deux cours différents non scindés sur le même créneau horaire.</li>
+              <li><strong>Support des Classes Scindées :</strong> Le solveur autorise et force deux matières jumelées avec leurs enseignants respectifs à occuper le même créneau pour une même classe sans fausse alerte de conflit.</li>
               <li><strong>Respect des indisponibilités :</strong> Aucun cours n'est programmé sur les heures marquées indisponibles par les enseignants ou verrouillées par les fermetures de l'établissement.</li>
-              <li><strong>Glisser-déposer assisté :</strong> Si vous réorganisez un cours manuellement à la souris, la grille cible passe au vert si le déplacement respecte l'intégrité des plannings, ou bloque en rouge en indiquant le motif du conflit.</li>
+              <li><strong>Glisser-déposer synchronisé :</strong> Le déplacement manuel d'un créneau de classe scindée déplace conjointement les deux sous-groupes vers le nouveau créneau validé.</li>
             </ul>
           </section>
 

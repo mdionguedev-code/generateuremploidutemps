@@ -18,9 +18,17 @@ export interface Teacher {
 }
 
 export interface ClassAssignment {
+  id?: string;
   teacherId: string;
   subjectId: string;
   hoursPerWeek: number; // quantum horaire
+  fixedDay?: string; // Jour fixé par l'utilisateur (ex: "Mardi" pour EPS)
+  fixedStartSlot?: number; // Créneau de départ fixé par l'utilisateur (ex: 0 pour 8h, 6 pour 14h)
+  // Classes Scindées (Sous-groupes et cours simultanés)
+  group?: 'all' | 'G1' | 'G2' | string; // 'all' (classe entière), 'G1' (Groupe A), 'G2' (Groupe B)
+  groupLabel?: string; // Ex: "Groupe A", "Groupe B", "Espagnol", "Arabe"
+  pairedGroupId?: string; // ID partagé reliant les cours synchronisés
+  syncHours?: number; // Nombre d'heures synchronisées simultanément
 }
 
 export interface ClassGroup {
@@ -37,6 +45,10 @@ export interface TimetableEntry {
   subjectId: string;
   day: string;
   slotIndex: number;
+  // Classes Scindées (Sous-groupes et cours simultanés)
+  group?: 'all' | 'G1' | 'G2' | string;
+  groupLabel?: string;
+  pairedEntryId?: string;
 }
 
 export interface TimetableState {
@@ -45,3 +57,11 @@ export interface TimetableState {
   classes: ClassGroup[];
   timetable: TimetableEntry[];
 }
+
+export interface SchoolBreak {
+  id: string;
+  name: string; // ex: "Récréation", "Pause Midi"
+  afterSlotIndex: number; // 0-based index of slot after which the break occurs
+  duration: number; // Duration in minutes (5, 10, 15, ..., 60)
+}
+

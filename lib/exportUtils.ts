@@ -44,29 +44,45 @@ interface TimetableSpanBlock {
   startSlot: number;
   span: number;
   entry?: TimetableEntry;
+  entries?: TimetableEntry[];
   isUnavailable?: boolean;
 }
 
-// Helper pour grouper les créneaux consécutifs pour une classe (cours de 2h unifiés)
+// Helper pour grouper les créneaux consécutifs pour une classe (cours de 2h unifiés et gestion Classes Scindées)
 function getDayBlocksForClass(
   classId: string,
   day: string,
   slotLabels: string[],
   timetable: TimetableEntry[],
-  cls: ClassGroup
+  cls: ClassGroup,
+  schoolBreaks: any[] = []
 ): TimetableSpanBlock[] {
   const blocks: TimetableSpanBlock[] = [];
   let s = 0;
 
   while (s < slotLabels.length) {
-    const entry = timetable.find(e => e.classId === classId && e.day === day && e.slotIndex === s);
+    const matchingEntries = timetable.filter(e => e.classId === classId && e.day === day && e.slotIndex === s);
     const isUn = (cls.unavailability || []).some(u => u.day === day && u.slotIndex === s);
 
-    if (entry) {
+    if (matchingEntries.length > 1) {
+      // Classes Scindées: multi-groupes simultanés sur ce créneau
+      blocks.push({ startSlot: s, span: 1, entries: matchingEntries, isUnavailable: false });
+      s += 1;
+    } else if (matchingEntries.length === 1) {
+      const entry = matchingEntries[0];
       let span = 1;
       while (s + span < slotLabels.length) {
-        const nextEntry = timetable.find(e => e.classId === classId && e.day === day && e.slotIndex === s + span);
-        if (nextEntry && nextEntry.subjectId === entry.subjectId && nextEntry.teacherId === entry.teacherId) {
+        const nextMatching = timetable.filter(e => e.classId === classId && e.day === day && e.slotIndex === s + span);
+        if (
+          nextMatching.length === 1 &&
+          nextMatching[0].subjectId === entry.subjectId &&
+          nextMatching[0].teacherId === entry.teacherId &&
+          nextMatching[0].group === entry.group
+        ) {
+          const hasBreak = schoolBreaks.some(b => b.afterSlotIndex === s + span - 1);
+          if (hasBreak) {
+            break;
+          }
           span++;
         } else {
           break;
@@ -78,8 +94,12 @@ function getDayBlocksForClass(
       let span = 1;
       while (s + span < slotLabels.length) {
         const nextUn = (cls.unavailability || []).some(u => u.day === day && u.slotIndex === s + span);
-        const nextEntry = timetable.find(e => e.classId === classId && e.day === day && e.slotIndex === s + span);
-        if (nextUn && !nextEntry) {
+        const nextEntries = timetable.filter(e => e.classId === classId && e.day === day && e.slotIndex === s + span);
+        if (nextUn && nextEntries.length === 0) {
+          const hasBreak = schoolBreaks.some(b => b.afterSlotIndex === s + span - 1);
+          if (hasBreak) {
+            break;
+          }
           span++;
         } else {
           break;
@@ -155,7 +175,8 @@ export function exportTimetableToPdf(
   teachers: Teacher[],
   subjects: Subject[],
   schoolName: string = "Diongue-IziSchool",
-  schoolSlogan: string = "Validé par la direction des études."
+  schoolSlogan: string = "Validé par la direction des études.",
+  schoolBreaks: any[] = []
 ) {
   const DAYS = activeExportDays;
   const SLOT_LABELS = activeExportSlotLabels;
@@ -204,7 +225,16 @@ export function exportTimetableToPdf(
 
   // Calcul hauteur dynamique de ligne pour occuper l'espace harmonieusement
   const availableBodyH = 158; // 190 - 32
-  const rowHeight = Math.min(15.5, availableBodyH / SLOT_LABELS.length);
+  const breakRowHeight = 6;
+  const totalBreaksH = (schoolBreaks || []).length * breakRowHeight;
+  const rowHeight = Math.min(15.5, (availableBodyH - totalBreaksH) / SLOT_LABELS.length);
+
+  const getSlotY = (sIndex: number) => {
+    let y = tableBodyY + sIndex * rowHeight;
+    const breaksBefore = (schoolBreaks || []).filter(b => b.afterSlotIndex < sIndex);
+    y += breaksBefore.length * breakRowHeight;
+    return y;
+  };
 
   // En-tête du tableau (Fond slate élégant, lignes pleines)
   doc.setFillColor(30, 41, 59); // slate-800
@@ -225,7 +255,7 @@ export function exportTimetableToPdf(
 
   // --- COLONNE HEURES (LIGNES PLEINES) ---
   for (let s = 0; s < SLOT_LABELS.length; s++) {
-    const y = tableBodyY + s * rowHeight;
+    const y = getSlotY(s);
     doc.setFillColor(s % 2 === 0 ? 248 : 255, s % 2 === 0 ? 250 : 255, s % 2 === 0 ? 252 : 255);
     doc.rect(12, y, hourColWidth, rowHeight, 'F');
 
@@ -243,15 +273,62 @@ export function exportTimetableToPdf(
   for (let d = 0; d < DAYS.length; d++) {
     const day = DAYS[d];
     const colX = 12 + hourColWidth + d * dayColWidth;
-    const blocks = getDayBlocksForClass(cls.id, day, SLOT_LABELS, timetable, cls);
+    const blocks = getDayBlocksForClass(cls.id, day, SLOT_LABELS, timetable, cls, schoolBreaks);
 
     blocks.forEach((block) => {
-      const blockY = tableBodyY + block.startSlot * rowHeight;
+      const blockY = getSlotY(block.startSlot);
       const blockH = block.span * rowHeight;
 
-      if (block.entry) {
+      if (block.entries && block.entries.length > 1) {
+        // COURS SCINDÉ MULTI-GROUPES (Classe scindée)
+        doc.setFillColor(255, 255, 255);
+        doc.rect(colX, blockY, dayColWidth, blockH, 'F');
+        doc.setDrawColor(168, 85, 247); // purple-500 accent for split courses
+        doc.setLineWidth(0.4);
+        doc.rect(colX, blockY, dayColWidth, blockH, 'S');
+
+        // Bande latérale violette
+        doc.setFillColor(147, 51, 234);
+        doc.rect(colX, blockY, 2.8, blockH, 'F');
+
+        // Ligne médiane de séparation
+        const halfH = blockH / 2;
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineWidth(0.25);
+        doc.line(colX + 3, blockY + halfH, colX + dayColWidth, blockY + halfH);
+
+        // Groupe 1
+        const e1 = block.entries[0];
+        const subj1 = getSubjectName(e1.subjectId, subjects);
+        const teach1 = getTeacherName(e1.teacherId, teachers);
+        const lbl1 = e1.groupLabel || (e1.group === 'G1' ? 'Gr. A' : 'Gr. 1');
+        doc.setTextColor(109, 40, 217); // purple-700
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.text(`${lbl1} : ${subj1.substring(0, 14)}`, colX + 4, blockY + 3.8);
+        doc.setTextColor(100, 116, 139);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6.5);
+        doc.text(`(${teach1.substring(0, 15)})`, colX + 4, blockY + 6.8);
+
+        // Groupe 2
+        const e2 = block.entries[1];
+        const subj2 = getSubjectName(e2.subjectId, subjects);
+        const teach2 = getTeacherName(e2.teacherId, teachers);
+        const lbl2 = e2.groupLabel || (e2.group === 'G2' ? 'Gr. B' : 'Gr. 2');
+        doc.setTextColor(109, 40, 217);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.text(`${lbl2} : ${subj2.substring(0, 14)}`, colX + 4, blockY + halfH + 3.8);
+        doc.setTextColor(100, 116, 139);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6.5);
+        doc.text(`(${teach2.substring(0, 15)})`, colX + 4, blockY + halfH + 6.8);
+
+      } else if (block.entry) {
         // COURS PROGRAMMÉ (1h, 2h ou plus)
-        const subj = getSubjectName(block.entry.subjectId, subjects);
+        const grpPrefix = block.entry.group && block.entry.group !== 'all' ? `[${block.entry.groupLabel || (block.entry.group === 'G1' ? 'Gr. A' : 'Gr. B')}] ` : '';
+        const subj = `${grpPrefix}${getSubjectName(block.entry.subjectId, subjects)}`;
         const teach = getTeacherName(block.entry.teacherId, teachers);
         const teachObj = teachers.find(t => t.id === block.entry?.teacherId);
         const teachColor = teachObj?.color || '#4f46e5';
@@ -335,8 +412,46 @@ export function exportTimetableToPdf(
     });
   }
 
+  // --- DESSIN DES PAUSES (COMMUNES) ---
+  (schoolBreaks || []).forEach((b) => {
+    const sIdx = b.afterSlotIndex;
+    if (sIdx >= SLOT_LABELS.length) return;
+    const breakY = getSlotY(sIdx + 1) - breakRowHeight;
+
+    // Draw break background
+    doc.setFillColor(238, 242, 255); // Indigo-50
+    doc.rect(12, breakY, totalTableWidth, breakRowHeight, 'F');
+
+    // Draw break border
+    doc.setDrawColor(224, 231, 255); // Indigo-100 border
+    doc.setLineWidth(0.35);
+    doc.rect(12, breakY, totalTableWidth, breakRowHeight, 'S');
+
+    // Break time label
+    const slotLabel = SLOT_LABELS[sIdx];
+    const breakStartStr = slotLabel.split(' - ')[1];
+    const [hStr, mStr] = breakStartStr.split('h');
+    const bStartMin = parseInt(hStr) * 60 + parseInt(mStr);
+    const bEndMin = bStartMin + b.duration;
+    const bEndH = Math.floor(bEndMin / 60);
+    const bEndM = bEndMin % 60;
+    const breakEndStr = `${String(bEndH).padStart(2, '0')}h${String(bEndM).padStart(2, '0')}`;
+    const breakTimeStr = `${breakStartStr} - ${breakEndStr}`;
+
+    doc.setTextColor(71, 85, 105);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.text(breakTimeStr, 12 + hourColWidth / 2, breakY + breakRowHeight / 2 + 1, { align: 'center' });
+
+    // Break name & duration
+    doc.setTextColor(79, 70, 229); // indigo-600
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text(`PAUSE : ${b.name || 'Pause'} (${b.duration} min)`, 12 + hourColWidth + (totalTableWidth - hourColWidth) / 2, breakY + breakRowHeight / 2 + 1, { align: 'center' });
+  });
+
   // --- PIED DE PAGE DISCRET ACADÉMIQUE ---
-  const footerY = tableBodyY + SLOT_LABELS.length * rowHeight + 6;
+  const footerY = tableBodyY + SLOT_LABELS.length * rowHeight + totalBreaksH + 6;
   doc.setTextColor(100, 116, 139);
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
@@ -452,7 +567,9 @@ export function exportTeacherTimetableToPdf(
 
       if (block.entry) {
         const subj = getSubjectName(block.entry.subjectId, subjects);
-        const clsName = getClassName(block.entry.classId, classes);
+        const rawCls = getClassName(block.entry.classId, classes);
+        const grpSuffix = block.entry.group && block.entry.group !== 'all' ? ` (${block.entry.groupLabel || (block.entry.group === 'G1' ? 'Groupe A' : 'Groupe B')})` : '';
+        const clsName = `${rawCls}${grpSuffix}`;
 
         doc.setFillColor(255, 255, 255);
         doc.rect(colX, blockY, dayColWidth, blockH, 'F');
@@ -466,7 +583,7 @@ export function exportTeacherTimetableToPdf(
         doc.rect(colX, blockY, 2.8, blockH, 'F');
 
         const cleanSubj = subj.length > 22 ? subj.substring(0, 20) + ".." : subj;
-        const cleanCls = clsName.length > 22 ? clsName.substring(0, 20) + ".." : clsName;
+        const cleanCls = clsName.length > 26 ? clsName.substring(0, 24) + ".." : clsName;
 
         if (block.span === 1) {
           doc.setTextColor(15, 23, 42);
@@ -736,7 +853,8 @@ export function exportTimetableToExcel(
   timetable: TimetableEntry[],
   classes: ClassGroup[],
   teachers: Teacher[],
-  subjects: Subject[]
+  subjects: Subject[],
+  schoolBreaks: any[] = []
 ) {
   const DAYS = activeExportDays;
   const SLOT_LABELS = activeExportSlotLabels;
@@ -751,19 +869,40 @@ export function exportTimetableToExcel(
     for (let s = 0; s < SLOT_LABELS.length; s++) {
       const row = [SLOT_LABELS[s]];
       for (const day of DAYS) {
-        const entry = timetable.find(e => e.classId === cls.id && e.day === day && e.slotIndex === s);
-        if (entry) {
-          row.push(`${getSubjectName(entry.subjectId, subjects)} (${getTeacherName(entry.teacherId, teachers)})`);
+        const matchingEntries = timetable.filter(e => e.classId === cls.id && e.day === day && e.slotIndex === s);
+        if (matchingEntries.length > 1) {
+          const formatted = matchingEntries.map(e => `[${e.groupLabel || (e.group === 'G1' ? 'Gr. A' : 'Gr. B')}] ${getSubjectName(e.subjectId, subjects)} (${getTeacherName(e.teacherId, teachers)})`).join(' // ');
+          row.push(formatted);
+        } else if (matchingEntries.length === 1) {
+          const entry = matchingEntries[0];
+          const grpPrefix = entry.group && entry.group !== 'all' ? `[${entry.groupLabel || (entry.group === 'G1' ? 'Gr. A' : 'Gr. B')}] ` : '';
+          row.push(`${grpPrefix}${getSubjectName(entry.subjectId, subjects)} (${getTeacherName(entry.teacherId, teachers)})`);
         } else {
           const isUn = (cls.unavailability || []).some(u => u.day === day && u.slotIndex === s);
           row.push(isUn ? "[Indisponible]" : "Classe libérée");
         }
       }
       classData.push(row);
+
+      // Check if there is a break after slot s
+      const breakAfter = (schoolBreaks || []).find(b => b.afterSlotIndex === s);
+      if (breakAfter) {
+        const breakStartStr = SLOT_LABELS[s].split(' - ')[1];
+        const [hStr, mStr] = breakStartStr.split('h');
+        const bStartMin = parseInt(hStr) * 60 + parseInt(mStr);
+        const bEndMin = bStartMin + breakAfter.duration;
+        const bEndH = Math.floor(bEndMin / 60);
+        const bEndM = bEndMin % 60;
+        const breakEndStr = `${String(bEndH).padStart(2, '0')}h${String(bEndM).padStart(2, '0')}`;
+        const breakTimeStr = `${breakStartStr} - ${breakEndStr}`;
+
+        const breakRow = [`${breakTimeStr} (Pause)`, ...DAYS.map(() => `PAUSE: ${breakAfter.name || 'Pause'} (${breakAfter.duration} min)`)];
+        classData.push(breakRow);
+      }
     }
 
     const ws = XLSX.utils.aoa_to_sheet(classData);
-    ws['!cols'] = [{ wch: 18 }, ...DAYS.map(() => ({ wch: 24 }))];
+    ws['!cols'] = [{ wch: 22 }, ...DAYS.map(() => ({ wch: 26 }))];
     XLSX.utils.book_append_sheet(wb, ws, cls.name.replace(/[:\/\\*\?\[\]]/g, ''));
   }
 
@@ -818,7 +957,8 @@ export function exportTeacherTimetableToExcel(
       for (const day of DAYS) {
         const entry = timetable.find(e => e.teacherId === teacher.id && e.day === day && e.slotIndex === s);
         if (entry) {
-          row.push(`${getSubjectName(entry.subjectId, subjects)} (${getClassName(entry.classId, classes)})`);
+          const grpSuffix = entry.group && entry.group !== 'all' ? ` (${entry.groupLabel || (entry.group === 'G1' ? 'Groupe A' : 'Groupe B')})` : '';
+          row.push(`${getSubjectName(entry.subjectId, subjects)} (${getClassName(entry.classId, classes)}${grpSuffix})`);
         } else {
           const isUn = (teacher.unavailability || []).some(u => u.day === day && u.slotIndex === s);
           row.push(isUn ? "[Indisponible]" : "Prof libre");
@@ -852,7 +992,8 @@ export function exportTimetableToWord(
   schoolName: string = "Diongue-IziSchool",
   schoolSlogan: string = "Validé par la direction des études.",
   schoolLogo: string = "",
-  schoolLogoIcon: string = "GraduationCap"
+  schoolLogoIcon: string = "GraduationCap",
+  schoolBreaks: any[] = []
 ) {
   const DAYS = activeExportDays;
   const SLOT_LABELS = activeExportSlotLabels;
@@ -903,6 +1044,30 @@ export function exportTimetableToWord(
       }
     }
     rowsHtml += `<tr style="height: 48px;">${cellsHtml}</tr>`;
+
+    // Check if there is a break after slot s
+    const breakAfter = (schoolBreaks || []).find(b => b.afterSlotIndex === s);
+    if (breakAfter) {
+      const breakStartStr = SLOT_LABELS[s].split(' - ')[1];
+      const [hStr, mStr] = breakStartStr.split('h');
+      const bStartMin = parseInt(hStr) * 60 + parseInt(mStr);
+      const bEndMin = bStartMin + breakAfter.duration;
+      const bEndH = Math.floor(bEndMin / 60);
+      const bEndM = bEndMin % 60;
+      const breakEndStr = `${String(bEndH).padStart(2, '0')}h${String(bEndM).padStart(2, '0')}`;
+      const breakTimeStr = `${breakStartStr} - ${breakEndStr}`;
+
+      rowsHtml += `
+        <tr style="height: 28px; background-color: #e0e7ff; color: #4338ca; text-align: center; font-weight: bold;">
+          <td style="border: 1px solid #cbd5e1; padding: 6px; font-size: 8.5pt; font-family: monospace;">
+            ${escapeHtml(breakTimeStr)}
+          </td>
+          <td colspan="${DAYS.length}" style="border: 1px solid #cbd5e1; padding: 6px; font-size: 9pt; text-align: center; vertical-align: middle;">
+            ⏸️ PAUSE : ${escapeHtml(breakAfter.name || 'Pause')} (${breakAfter.duration} min)
+          </td>
+        </tr>
+      `;
+    }
   }
 
   const fileContent = `

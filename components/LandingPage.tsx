@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import DocumentationView from './DocumentationView';
 import LicensePurchaseModal from './LicensePurchaseModal';
+import LegalModal from './LegalModal';
 import { SaaSPlan, PaymentMethod } from '@/lib/saasTypes';
 
 interface LandingPageProps {
@@ -33,6 +34,56 @@ export default function LandingPage({
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const [selectedPlanForPurchase, setSelectedPlanForPurchase] = useState<SaaSPlan | null>(null);
 
+  const testimonials = React.useMemo(() => [
+    {
+      id: 1,
+      name: "M. Malick Ndiaye",
+      role: "Proviseur",
+      initials: "MN",
+      text: "La qualité des emplois du temps générés par Planora est exceptionnelle. Les heures de cours de 1h s'enchaînent de manière fluide, et le découpage des volumes horaires impairs respecte parfaitement notre cahier des charges, sans aucun conflit de professeur.",
+      stars: 5,
+      glowColor: "from-[#571bc1]/10"
+    },
+    {
+      id: 2,
+      name: "Mme Astou Fall",
+      role: "Responsable des Études",
+      initials: "AF",
+      text: "Ce générateur a révolutionné la préparation de notre rentrée. Les contraintes complexes, comme les pauses de l'établissement ou le positionnement prioritaire de l'EPS, sont intégrées avec une rigueur absolue. L'emploi du temps final est d'une grande fluidité.",
+      stars: 5,
+      glowColor: "from-[#4be277]/10"
+    },
+    {
+      id: 3,
+      name: "M. Amadou Diop",
+      role: "Directeur des Enseignements",
+      initials: "AD",
+      text: "La précision du solveur quant à l'optimisation des grilles horaires de cours est irréprochable. Nos enseignants ne subissent plus de trous dans leurs plannings et les journées des élèves sont harmonieuses et sans heures perdues.",
+      stars: 5,
+      glowColor: "from-[#ffba61]/10"
+    },
+    {
+      id: 4,
+      name: "Mme Mariama Sow",
+      role: "Censeur",
+      initials: "MS",
+      text: "L'intelligence artificielle de Planora assure une répartition optimale et équilibrée. De plus, la détection de conflit en temps réel sur les ajustements manuels nous apporte une sérénité totale lors des derniers réglages d'effectifs.",
+      stars: 5,
+      glowColor: "from-[#d0bcff]/10"
+    },
+    {
+      id: 5,
+      name: "M. Ousmane Diallo",
+      role: "Secrétaire Général",
+      initials: "OD",
+      text: "La clarté des plannings générés et la diversité des formats d'exports (PDF, Word, Excel) facilitent grandement la communication avec les équipes pédagogiques. Chaque professeur dispose instantanément d'une fiche claire et propre.",
+      stars: 5,
+      glowColor: "from-[#4be277]/10"
+    }
+  ], []);
+
+
+
   const handleChoosePlan = (planId: string) => {
     const foundPlan = plans.find(p => p.id === planId);
     if (foundPlan) {
@@ -43,6 +94,8 @@ export default function LandingPage({
   const [activeStep, setActiveStep] = useState<number>(0);
   const [visibleSteps, setVisibleSteps] = useState<boolean[]>([false, false, false, false, false]);
   const [isDocOpen, setIsDocOpen] = useState<boolean>(false);
+  const [isLegalOpen, setIsLegalOpen] = useState<boolean>(false);
+  const [legalTab, setLegalTab] = useState<'cgu' | 'cgv' | 'privacy' | 'cookies'>('cgu');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -209,7 +262,10 @@ export default function LandingPage({
             <a className="text-xs font-medium text-[#bccbb9] hover:text-[#dae2fd] transition-colors hover:bg-white/5 rounded-lg px-3 py-2" href="#pricing">Tarifs</a>
           </div>
           <div className="flex items-center gap-4">
-            <button onClick={onOpenLogin} className="hidden lg:block text-xs font-medium text-[#bccbb9] hover:text-white transition-colors cursor-pointer font-sans bg-transparent border-0">
+            <button 
+              onClick={onOpenLogin} 
+              className="hidden lg:block text-xs font-bold text-[#4be277] hover:text-white hover:bg-[#4be277]/10 border border-[#4be277]/30 hover:border-[#4be277]/60 px-4 py-2 rounded-xl transition-all cursor-pointer bg-transparent"
+            >
               Connexion
             </button>
             <button onClick={onOpenLogin} className="btn-primary hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
@@ -232,7 +288,7 @@ export default function LandingPage({
                 Automatisez vos emplois du temps en <span className="text-gradient-primary">quelques secondes</span>.
               </h1>
               <p className="text-base sm:text-lg text-[#bccbb9] max-w-xl leading-relaxed">
-                L&apos;intelligence artificielle au service des écoles et des équipes. Dites adieu aux conflits d&apos;horaires et aux heures perdues. Générez des plannings optimisés sans effort.
+                Simplifiez la planification de votre rentrée scolaire. Notre moteur d&apos;intelligence artificielle résout instantanément les contraintes les plus complexes pour générer des emplois du temps optimisés, harmonieux et sans aucun conflit.
               </p>
               
               <div className="flex flex-wrap items-center gap-4 mt-2">
@@ -240,7 +296,11 @@ export default function LandingPage({
                   Essayer Planora gratuitement
                   <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                 </button>
-                <button onClick={onDirectDemoClient} className="btn-secondary hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2 cursor-pointer">
+                <button 
+                  type="button" 
+                  className="btn-secondary hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2 cursor-pointer"
+                  title="Vidéo de démonstration bientôt disponible"
+                >
                   <span className="material-symbols-outlined text-[18px]">play_circle</span>
                   Voir la démo (1 min)
                 </button>
@@ -254,33 +314,6 @@ export default function LandingPage({
                   <div className="w-8 h-8 rounded-full bg-[#2d3449] border-2 border-[#0b1326] flex items-center justify-center text-xs text-white font-bold">SF</div>
                 </div>
                 <span className="text-xs font-semibold text-[#bccbb9]">+ de 10 000 plannings générés</span>
-              </div>
-
-              {/* --- QUICK ACCESS BANNER FOR DEMO --- */}
-              <div className="mt-6 p-4 rounded-xl bg-[#571bc1]/10 border border-[#4be277]/20 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-4 max-w-xl">
-                <div className="text-left w-full sm:w-auto">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[#4be277] animate-ping" />
-                    <span className="text-[10px] font-bold text-[#4be277] uppercase tracking-wider font-mono">Accès Démo Instantané</span>
-                  </div>
-                  <p className="text-xs text-[#bccbb9] mt-1">
-                    Connectez-vous directement en un clic pour tester :
-                  </p>
-                </div>
-                <div className="flex gap-2 w-full sm:w-auto shrink-0">
-                  <button
-                    onClick={onDirectDemoClient}
-                    className="flex-1 sm:flex-initial bg-[#571bc1]/20 hover:bg-[#571bc1]/30 text-[#d0bcff] border border-[#571bc1]/40 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer"
-                  >
-                    Espace Client
-                  </button>
-                  <button
-                    onClick={onDirectDemoAdmin}
-                    className="flex-1 sm:flex-initial bg-[#4be277]/20 hover:bg-[#4be277]/30 text-[#4be277] border border-[#4be277]/40 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer"
-                  >
-                    Console Admin
-                  </button>
-                </div>
               </div>
 
             </div>
@@ -374,7 +407,7 @@ export default function LandingPage({
               <div className="hidden md:block absolute left-1/2 top-0 bottom-0 w-[3px] bg-white/10 transform -translate-x-1/2 rounded-full overflow-hidden">
                 {/* Foreground Timeline Progress Line */}
                 <div 
-                  className="w-full bg-gradient-to-b from-[#4be277] via-[#d0bcff] via-[#ffba61] via-[#60a5fa] to-[#4be277] transition-all duration-700 ease-out origin-top"
+                  className="w-full bg-gradient-to-b from-[#4be277] to-[#571bc1] transition-all duration-700 ease-out origin-top"
                   style={{ height: getTimelineProgress() }}
                 />
               </div>
@@ -414,13 +447,13 @@ export default function LandingPage({
                   </div>
                 </div>
               </div>
-
+ 
               {/* Step 2: Matières */}
               <div className="step-item flex flex-col md:flex-row-reverse items-center justify-between mb-20 relative" data-index="1">
                 <div className={`md:w-5/12 text-left pl-0 md:pl-12 mb-6 md:mb-0 transition-all duration-1000 ease-out transform ${
                   visibleSteps[1] ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-12'
                 }`}>
-                  <div className="inline-block px-2.5 py-0.5 rounded-full bg-[#d0bcff]/10 border border-[#d0bcff]/20 text-[#d0bcff] font-mono text-xs font-bold mb-2">
+                  <div className="inline-block px-2.5 py-0.5 rounded-full bg-[#0dd59a]/10 border border-[#0dd59a]/20 text-[#0dd59a] font-mono text-xs font-bold mb-2">
                     Étape 2
                   </div>
                   <h3 className="text-xl font-bold text-[#dae2fd] mb-2">2. Référentiel des Matières</h3>
@@ -430,35 +463,35 @@ export default function LandingPage({
                 </div>
                 <div className={`absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-[#0b1326] rounded-full flex items-center justify-center z-10 hidden md:flex font-bold transition-all duration-500 border-2 ${
                   activeStep >= 2 
-                    ? 'border-[#d0bcff] text-[#d0bcff] scale-110 shadow-[0_0_15px_rgba(208,188,255,0.5)]' 
+                    ? 'border-[#0dd59a] text-[#0dd59a] scale-110 shadow-[0_0_15px_rgba(13,213,154,0.5)]' 
                     : 'border-white/20 text-white/40 scale-100'
                 }`}>2</div>
                 <div className={`md:w-5/12 pr-0 md:pr-12 transition-all duration-1000 ease-out delay-150 transform ${
                   visibleSteps[1] ? 'opacity-100 translate-x-0 scale-100' : 'opacity-0 -translate-x-12 scale-95'
                 }`}>
-                  <div className="glass-panel p-6 flex flex-col gap-2.5 bg-[#131b2e]/50 border-[#571bc1]/20 text-left">
+                  <div className="glass-panel p-6 flex flex-col gap-2.5 bg-[#131b2e]/50 border-[#0dd59a]/25 text-left">
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-white flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-400"></span>Mathématiques</span>
-                      <span className="text-[#d0bcff] font-mono text-[10px]">#3b82f6</span>
+                      <span className="text-[#0dd59a] font-mono text-[10px]">#3b82f6</span>
                     </div>
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-white flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400"></span>Sciences Physiques</span>
-                      <span className="text-[#d0bcff] font-mono text-[10px]">#10b981</span>
+                      <span className="text-[#0dd59a] font-mono text-[10px]">#10b981</span>
                     </div>
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-white flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400"></span>Histoire-Géographie</span>
-                      <span className="text-[#d0bcff] font-mono text-[10px]">#f59e0b</span>
+                      <span className="text-[#0dd59a] font-mono text-[10px]">#f59e0b</span>
                     </div>
                   </div>
                 </div>
               </div>
-
+ 
               {/* Step 3: Professeurs */}
               <div className="step-item flex flex-col md:flex-row items-center justify-between mb-20 relative" data-index="2">
                 <div className={`md:w-5/12 text-right pr-0 md:pr-12 mb-6 md:mb-0 transition-all duration-1000 ease-out transform ${
                   visibleSteps[2] ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-12'
                 }`}>
-                  <div className="inline-block px-2.5 py-0.5 rounded-full bg-[#ffba61]/10 border border-[#ffba61]/20 text-[#ffba61] font-mono text-xs font-bold mb-2">
+                  <div className="inline-block px-2.5 py-0.5 rounded-full bg-[#4f46e5]/10 border border-[#4f46e5]/20 text-[#818cf8] font-mono text-xs font-bold mb-2">
                     Étape 3
                   </div>
                   <h3 className="text-xl font-bold text-[#dae2fd] mb-2">3. Fiches Enseignants &amp; Quotas</h3>
@@ -468,13 +501,13 @@ export default function LandingPage({
                 </div>
                 <div className={`absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-[#0b1326] rounded-full flex items-center justify-center z-10 hidden md:flex font-bold transition-all duration-500 border-2 ${
                   activeStep >= 3 
-                    ? 'border-[#ffba61] text-[#ffba61] scale-110 shadow-[0_0_15px_rgba(255,186,97,0.5)]' 
+                    ? 'border-[#4f46e5] text-[#818cf8] scale-110 shadow-[0_0_15px_rgba(79,70,229,0.5)]' 
                     : 'border-white/20 text-white/40 scale-100'
                 }`}>3</div>
                 <div className={`md:w-5/12 pl-0 md:pl-12 transition-all duration-1000 ease-out delay-150 transform ${
                   visibleSteps[2] ? 'opacity-100 translate-x-0 scale-100' : 'opacity-0 translate-x-12 scale-95'
                 }`}>
-                  <div className="glass-panel p-6 flex items-center gap-4 bg-[#131b2e]/50 border-[#ffba61]/20 text-left">
+                  <div className="glass-panel p-6 flex items-center gap-4 bg-[#131b2e]/50 border-[#4f46e5]/25 text-left">
                     <div className="flex -space-x-2 shrink-0">
                       <div className="w-10 h-10 rounded-full bg-indigo-600/60 border-2 border-[#131b2e] flex items-center justify-center text-xs text-white font-bold">MD</div>
                       <div className="w-10 h-10 rounded-full bg-purple-600/60 border-2 border-[#131b2e] flex items-center justify-center text-xs text-white font-bold">MS</div>
@@ -482,23 +515,23 @@ export default function LandingPage({
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-center text-xs mb-1">
                         <span className="text-white font-bold truncate">M. Diongue (Maths)</span>
-                        <span className="text-[#ffba61] font-mono text-[10px] font-bold shrink-0">18h/sem</span>
+                        <span className="text-[#818cf8] font-mono text-[10px] font-bold shrink-0">18h/sem</span>
                       </div>
                       <div className="text-[10px] text-gray-400 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#4f46e5]"></span>
                         <span>Mercredi &amp; Samedi libérés (X)</span>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-
+ 
               {/* Step 4: Classes & Affectations */}
               <div className="step-item flex flex-col md:flex-row-reverse items-center justify-between mb-20 relative" data-index="3">
                 <div className={`md:w-5/12 text-left pl-0 md:pl-12 mb-6 md:mb-0 transition-all duration-1000 ease-out transform ${
                   visibleSteps[3] ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-12'
                 }`}>
-                  <div className="inline-block px-2.5 py-0.5 rounded-full bg-[#60a5fa]/10 border border-[#60a5fa]/20 text-[#60a5fa] font-mono text-xs font-bold mb-2">
+                  <div className="inline-block px-2.5 py-0.5 rounded-full bg-[#9333ea]/10 border border-[#9333ea]/20 text-[#c084fc] font-mono text-xs font-bold mb-2">
                     Étape 4
                   </div>
                   <h3 className="text-xl font-bold text-[#dae2fd] mb-2">4. Classes &amp; Affectations</h3>
@@ -508,16 +541,16 @@ export default function LandingPage({
                 </div>
                 <div className={`absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-[#0b1326] rounded-full flex items-center justify-center z-10 hidden md:flex font-bold transition-all duration-500 border-2 ${
                   activeStep >= 4 
-                    ? 'border-[#60a5fa] text-[#60a5fa] scale-110 shadow-[0_0_15px_rgba(96,165,250,0.5)]' 
+                    ? 'border-[#9333ea] text-[#c084fc] scale-110 shadow-[0_0_15px_rgba(147,51,234,0.5)]' 
                     : 'border-white/20 text-white/40 scale-100'
                 }`}>4</div>
                 <div className={`md:w-5/12 pr-0 md:pr-12 transition-all duration-1000 ease-out delay-150 transform ${
                   visibleSteps[3] ? 'opacity-100 translate-x-0 scale-100' : 'opacity-0 -translate-x-12 scale-95'
                 }`}>
-                  <div className="glass-panel p-6 flex flex-col gap-2 bg-[#131b2e]/50 border-[#60a5fa]/20 text-left">
+                  <div className="glass-panel p-6 flex flex-col gap-2 bg-[#131b2e]/50 border-[#9333ea]/25 text-left">
                     <div className="text-xs font-bold text-white flex justify-between items-center mb-1">
                       <span>Terminale S1</span>
-                      <span className="text-[#60a5fa] font-mono text-[10px] bg-blue-500/10 px-2 py-0.5 rounded">28h/sem</span>
+                      <span className="text-[#c084fc] font-mono text-[10px] bg-purple-500/10 px-2 py-0.5 rounded">28h/sem</span>
                     </div>
                     <div className="text-[11px] text-gray-300 flex justify-between">
                       <span>Mathématiques • M. Diongue</span>
@@ -530,13 +563,13 @@ export default function LandingPage({
                   </div>
                 </div>
               </div>
-
+ 
               {/* Step 5: Emploi du Temps & Résolution IA */}
               <div className="step-item flex flex-col md:flex-row items-center justify-between relative" data-index="4">
                 <div className={`md:w-5/12 text-right pr-0 md:pr-12 mb-6 md:mb-0 transition-all duration-1000 ease-out transform ${
                   visibleSteps[4] ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-12'
                 }`}>
-                  <div className="inline-block px-2.5 py-0.5 rounded-full bg-[#4be277]/10 border border-[#4be277]/20 text-[#4be277] font-mono text-xs font-bold mb-2">
+                  <div className="inline-block px-2.5 py-0.5 rounded-full bg-[#571bc1]/10 border border-[#571bc1]/20 text-[#d0bcff] font-mono text-xs font-bold mb-2">
                     Étape 5
                   </div>
                   <h3 className="text-xl font-bold text-[#dae2fd] mb-2">5. Résolution IA &amp; Multi-Exports</h3>
@@ -546,16 +579,16 @@ export default function LandingPage({
                 </div>
                 <div className={`absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-[#0b1326] rounded-full flex items-center justify-center z-10 hidden md:flex font-bold transition-all duration-500 border-2 ${
                   activeStep >= 5 
-                    ? 'border-[#4be277] text-[#4be277] scale-110 shadow-[0_0_15px_rgba(75,226,119,0.5)]' 
+                    ? 'border-[#571bc1] text-[#d0bcff] scale-110 shadow-[0_0_15px_rgba(87,27,193,0.5)]' 
                     : 'border-white/20 text-white/40 scale-100'
                 }`}>5</div>
                 <div className={`md:w-5/12 pl-0 md:pl-12 transition-all duration-1000 ease-out delay-150 transform ${
                   visibleSteps[4] ? 'opacity-100 translate-x-0 scale-100' : 'opacity-0 translate-x-12 scale-95'
                 }`}>
-                  <div className="glass-panel p-6 flex flex-col items-center justify-center bg-[#131b2e]/50 border-[#4be277]/20 relative overflow-hidden text-center">
-                    <div className="absolute inset-0 bg-[#4be277]/5 animate-pulse"></div>
-                    <span className="material-symbols-outlined text-[#4be277] text-4xl mb-1.5 animate-spin-slow">auto_awesome</span>
-                    <span className="text-xs font-mono text-[#4be277] relative z-10 font-bold mb-3">Zéro Conflit Garanti • 100%</span>
+                  <div className="glass-panel p-6 flex flex-col items-center justify-center bg-[#131b2e]/50 border-[#571bc1]/20 relative overflow-hidden text-center">
+                    <div className="absolute inset-0 bg-[#571bc1]/5 animate-pulse"></div>
+                    <span className="material-symbols-outlined text-[#d0bcff] text-4xl mb-1.5 animate-spin-slow">auto_awesome</span>
+                    <span className="text-xs font-mono text-[#d0bcff] relative z-10 font-bold mb-3">Zéro Conflit Garanti • 100%</span>
                     <div className="flex items-center gap-1.5 relative z-10">
                       <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30">PDF</span>
                       <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">WORD</span>
@@ -569,85 +602,74 @@ export default function LandingPage({
           </section>
 
           {/* --- TESTIMONIALS SECTION --- */}
-          <section className="py-24 px-6 md:px-12 max-w-7xl mx-auto relative z-10 border-t border-white/5" id="testimonials">
-            <h2 className="text-3xl md:text-4xl font-bold text-[#dae2fd] text-center mb-20">
+          <section className="py-24 px-0 relative z-10 border-t border-white/5 overflow-hidden" id="testimonials">
+            {/* Inject infinite marquee keyframes inline */}
+            <style dangerouslySetInnerHTML={{__html: `
+              @keyframes marqueeContinuous {
+                0% {
+                  transform: translateX(0);
+                }
+                100% {
+                  transform: translateX(-50%);
+                }
+              }
+              .marquee-track {
+                display: flex;
+                width: max-content;
+                animation: marqueeContinuous 40s linear infinite;
+              }
+              .marquee-track:hover {
+                animation-play-state: paused;
+              }
+            `}} />
+
+            <h2 className="text-3xl md:text-4xl font-bold text-[#dae2fd] text-center mb-12 px-6">
               Ils nous font <span className="text-gradient-primary">confiance</span>
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              
-              {/* Testimonial 1 */}
-              <div className="glass-panel p-8 relative overflow-hidden flex flex-col justify-between text-left">
-                <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-[#d0bcff]/10 rounded-full blur-[50px]"></div>
-                <div>
-                  <div className="flex gap-1.5 mb-4 text-[#ffba61]">
-                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                  </div>
-                  <p className="text-sm text-[#bccbb9] leading-relaxed italic mb-6">
-                    &quot;Un gain de temps incroyable. Ce qui nous prenait des semaines est maintenant réglé en quelques heures.&quot;
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 relative z-10 mt-4">
-                  <div className="w-10 h-10 rounded-full bg-[#2d3449] border border-white/10 flex items-center justify-center text-xs font-bold text-white">JP</div>
-                  <div>
-                    <div className="text-xs font-bold text-white">Jean Dupont</div>
-                    <div className="text-[10px] text-[#bccbb9]">Directeur d&apos;établissement</div>
-                  </div>
-                </div>
-              </div>
+            <div className="relative w-full overflow-hidden py-4">
+              {/* Left and Right Fade overlays for premium glass-morphism feel */}
+              <div className="absolute top-0 left-0 bottom-0 w-12 md:w-32 bg-gradient-to-r from-[#0b1326] via-[#0b1326]/80 to-transparent z-20 pointer-events-none" />
+              <div className="absolute top-0 right-0 bottom-0 w-12 md:w-32 bg-gradient-to-l from-[#0b1326] via-[#0b1326]/80 to-transparent z-20 pointer-events-none" />
 
-              {/* Testimonial 2 */}
-              <div className="glass-panel p-8 relative overflow-hidden flex flex-col justify-between text-left">
-                <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-[#4be277]/10 rounded-full blur-[50px]"></div>
-                <div>
-                  <div className="flex gap-1.5 mb-4 text-[#ffba61]">
-                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+              {/* Infinite scrolling track */}
+              <div className="marquee-track">
+                {/* Render the list twice to guarantee seamless wrapping */}
+                {[...testimonials, ...testimonials].map((t, idx) => (
+                  <div
+                    key={`${t.id}-${idx}`}
+                    className="w-[290px] md:w-[360px] shrink-0 px-3.5"
+                  >
+                    <div className="glass-panel p-8 h-full relative overflow-hidden flex flex-col justify-between text-left border-[#4be277]/25 hover:border-[#4be277]/40 shadow-[0_4px_30px_rgba(0,0,0,0.4)] min-h-[300px] transition-all duration-300">
+                      <div className={`absolute -bottom-10 -right-10 w-40 h-40 bg-gradient-to-tr ${t.glowColor} to-transparent rounded-full blur-[50px] pointer-events-none`}></div>
+                      <div>
+                        <div className="flex gap-1.5 mb-4 text-[#ffba61]">
+                          {Array.from({ length: t.stars }).map((_, i) => (
+                            <span key={i} className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                          ))}
+                        </div>
+                        <p className="text-xs md:text-sm text-[#dae2fd] leading-relaxed italic mb-6">
+                          &quot;{t.text}&quot;
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between mt-auto pt-4 relative z-10 border-t border-white/5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#571bc1]/40 to-[#4be277]/40 border border-white/10 flex items-center justify-center text-xs font-bold text-white shadow-inner font-mono">
+                            {t.initials}
+                          </div>
+                          <div>
+                            <div className="text-xs font-bold text-white">{t.name}</div>
+                            <div className="text-[10px] text-[#bccbb9]">{t.role}</div>
+                          </div>
+                        </div>
+                        <div className="text-[8px] font-mono text-[#4be277] bg-[#4be277]/10 border border-[#4be277]/20 px-2 py-0.5 rounded-full uppercase font-bold tracking-wider">
+                          Vérifié
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-sm text-[#bccbb9] leading-relaxed italic mb-6">
-                    &quot;L&apos;interface est super intuitive et l&apos;IA gère les contraintes complexes avec une facilité déconcertante.&quot;
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 relative z-10 mt-4">
-                  <div className="w-10 h-10 rounded-full bg-[#2d3449] border border-white/10 flex items-center justify-center text-xs font-bold text-white">ML</div>
-                  <div>
-                    <div className="text-xs font-bold text-white">Marie Laurent</div>
-                    <div className="text-[10px] text-[#bccbb9]">Responsable Pédagogique</div>
-                  </div>
-                </div>
+                ))}
               </div>
-
-              {/* Testimonial 3 */}
-              <div className="glass-panel p-8 relative overflow-hidden flex flex-col justify-between text-left">
-                <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-[#ffba61]/10 rounded-full blur-[50px]"></div>
-                <div>
-                  <div className="flex gap-1.5 mb-4 text-[#ffba61]">
-                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                    <span className="material-symbols-outlined text-sm">star_half</span>
-                  </div>
-                  <p className="text-sm text-[#bccbb9] leading-relaxed italic mb-6">
-                    &quot;Le support est réactif et les mises à jour régulières. Planora a transformé notre rentrée scolaire.&quot;
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 relative z-10 mt-4">
-                  <div className="w-10 h-10 rounded-full bg-[#2d3449] border border-white/10 flex items-center justify-center text-xs font-bold text-white">SF</div>
-                  <div>
-                    <div className="text-xs font-bold text-white">Sophie Fall</div>
-                    <div className="text-[10px] text-[#bccbb9]">Proviseure</div>
-                  </div>
-                </div>
-              </div>
-
             </div>
           </section>
 
@@ -663,29 +685,29 @@ export default function LandingPage({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto items-stretch mt-12">
               
               {/* Plan 1: Gratuit */}
-              <div className="glass-panel p-6 flex flex-col justify-between text-left relative hover:border-[#4be277]/30 transition-all duration-300">
+              <div className="glass-panel p-6 flex flex-col justify-between text-left relative hover:-translate-y-2 hover:border-[#4be277]/50 hover:shadow-[0_10px_30px_rgba(75,226,119,0.15)] transition-all duration-300">
                 <div>
                   <div className="inline-block bg-white/10 text-gray-300 text-[10px] font-mono uppercase px-2 py-0.5 rounded-full mb-2 font-bold">Gratuit</div>
                   <h3 className="text-lg font-bold text-[#dae2fd] mb-1">Gratuit</h3>
                   <p className="text-[#bccbb9] text-[11px] mb-4 font-sans">Pour tester le générateur</p>
                   <div className="text-2xl font-black text-white mb-6">0 FCFA</div>
-                  <ul className="flex flex-col gap-2.5 mb-6 text-[11px] text-[#bccbb9]">
+                  <ul className="flex flex-col gap-2.5 mb-6 text-[11px]">
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> 4 générations max</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> 2 classes max</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> 2 profs max</li>
-                    <li className="flex items-center gap-2"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Export PDF (4 exports max)</li>
-                    <li className="flex items-center gap-2 text-gray-500 line-through"><span className="material-symbols-outlined text-gray-600 text-xs">close</span> Export Excel &amp; Word</li>
-                    <li className="flex items-center gap-2 text-gray-500 line-through"><span className="material-symbols-outlined text-gray-600 text-xs">close</span> Assistant IA Gemini</li>
-                    <li className="flex items-center gap-2 text-gray-500 line-through"><span className="material-symbols-outlined text-gray-600 text-xs">close</span> Custom Branding (Logo)</li>
+                    <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Export PDF (4 exports max)</li>
                   </ul>
                 </div>
-                <button onClick={onOpenLogin} className="btn-secondary text-center w-full mt-auto cursor-pointer py-2 text-xs">
+                <button 
+                  onClick={onOpenLogin} 
+                  className="w-full mt-auto cursor-pointer py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-indigo-600/10 hover:shadow-indigo-600/30 transition-all duration-200 border-0"
+                >
                   Commencer
                 </button>
               </div>
 
               {/* Plan 2: Standard */}
-              <div className="glass-panel p-6 flex flex-col justify-between text-left relative hover:border-[#4be277]/30 transition-all duration-300">
+              <div className="glass-panel p-6 flex flex-col justify-between text-left relative hover:-translate-y-2 hover:border-[#4be277]/50 hover:shadow-[0_10px_30px_rgba(75,226,119,0.15)] transition-all duration-300">
                 <div>
                   <div className="inline-block bg-blue-500/20 text-blue-300 text-[10px] font-mono uppercase px-2 py-0.5 rounded-full mb-2 font-bold">Standard</div>
                   <h3 className="text-lg font-bold text-[#dae2fd] mb-1">Standard</h3>
@@ -693,23 +715,23 @@ export default function LandingPage({
                   <div className="text-2xl font-black text-white mb-6">
                     10 000 FCFA<span className="text-[10px] text-[#bccbb9] font-normal">/mois</span>
                   </div>
-                  <ul className="flex flex-col gap-2.5 mb-6 text-[11px] text-[#bccbb9]">
+                  <ul className="flex flex-col gap-2.5 mb-6 text-[11px]">
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> 30 générations max</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> 8 classes max</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> 15 profs max</li>
-                    <li className="flex items-center gap-2"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Export PDF (25 exports max)</li>
-                    <li className="flex items-center gap-2 text-gray-500 line-through"><span className="material-symbols-outlined text-gray-600 text-xs">close</span> Export Excel &amp; Word</li>
-                    <li className="flex items-center gap-2 text-gray-500 line-through"><span className="material-symbols-outlined text-gray-600 text-xs">close</span> Assistant IA Gemini</li>
-                    <li className="flex items-center gap-2 text-gray-500 line-through"><span className="material-symbols-outlined text-gray-600 text-xs">close</span> Custom Branding (Logo)</li>
+                    <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Export PDF (25 exports max)</li>
                   </ul>
                 </div>
-                <button onClick={() => handleChoosePlan('plan_standard')} className="btn-secondary text-center w-full mt-auto cursor-pointer py-2 text-xs">
+                <button 
+                  onClick={() => handleChoosePlan('plan_standard')} 
+                  className="w-full mt-auto cursor-pointer py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-indigo-600/10 hover:shadow-indigo-600/30 transition-all duration-200 border-0"
+                >
                   Choisir Standard
                 </button>
               </div>
 
               {/* Plan 3: Premium */}
-              <div className="glass-panel p-6 flex flex-col justify-between text-left relative border-[#4be277]/50 shadow-[0_0_20px_rgba(75,226,119,0.1)] hover:scale-[1.01] transition-all duration-300">
+              <div className="glass-panel p-6 flex flex-col justify-between text-left relative border-[#4be277]/50 shadow-[0_0_20px_rgba(75,226,119,0.1)] hover:-translate-y-2 hover:border-[#4be277] hover:shadow-[0_15px_40px_rgba(75,226,119,0.25)] transition-all duration-300 animate-pulse-subtle">
                 <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-[#4be277] text-[#0b1326] font-bold text-[9px] uppercase tracking-wider px-3 py-0.5 rounded-full">Recommandé</div>
                 <div className="absolute inset-0 bg-gradient-to-b from-[#4be277]/5 to-transparent rounded-xl pointer-events-none"></div>
                 <div>
@@ -719,23 +741,25 @@ export default function LandingPage({
                   <div className="text-2xl font-black text-white mb-6">
                     15 000 FCFA<span className="text-[10px] text-[#bccbb9] font-normal">/mois</span>
                   </div>
-                  <ul className="flex flex-col gap-2.5 mb-6 text-[11px] text-[#bccbb9]">
+                  <ul className="flex flex-col gap-2.5 mb-6 text-[11px]">
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> 50 générations max</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> 20 classes max</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> 25 profs max</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> 50 exportations max (PDF, Word, Excel)</li>
-                    <li className="flex items-center gap-2 text-indigo-300 font-bold"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Assistant IA Gemini</li>
-                    <li className="flex items-center gap-2 text-emerald-300"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Support Prioritaire</li>
-                    <li className="flex items-center gap-2 text-gray-500 line-through"><span className="material-symbols-outlined text-gray-600 text-xs">close</span> Custom Branding (Logo)</li>
+                    <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Assistant IA Gemini</li>
+                    <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Support Prioritaire</li>
                   </ul>
                 </div>
-                <button onClick={() => handleChoosePlan('plan_premium')} className="btn-primary text-center w-full mt-auto cursor-pointer py-2 text-xs">
+                <button 
+                  onClick={() => handleChoosePlan('plan_premium')} 
+                  className="w-full mt-auto cursor-pointer py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#571bc1] to-[#4be277] hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-[#4be277]/10 hover:shadow-[#4be277]/25 transition-all duration-200 border-0"
+                >
                   Choisir Premium
                 </button>
               </div>
 
               {/* Plan 4: School */}
-              <div className="glass-panel p-6 flex flex-col justify-between text-left relative hover:border-[#4be277]/30 transition-all duration-300">
+              <div className="glass-panel p-6 flex flex-col justify-between text-left relative hover:-translate-y-2 hover:border-[#4be277]/50 hover:shadow-[0_10px_30px_rgba(75,226,119,0.15)] transition-all duration-300">
                 <div>
                   <div className="inline-block bg-purple-500/20 text-purple-300 text-[10px] font-mono uppercase px-2 py-0.5 rounded-full mb-2 font-bold">Illimité &amp; VIP</div>
                   <h3 className="text-lg font-bold text-[#dae2fd] mb-1">School</h3>
@@ -743,18 +767,21 @@ export default function LandingPage({
                   <div className="text-2xl font-black text-white mb-6">
                     30 000 FCFA<span className="text-[10px] text-[#bccbb9] font-normal">/mois</span>
                   </div>
-                  <ul className="flex flex-col gap-2.5 mb-6 text-[11px] text-[#bccbb9]">
-                    <li className="flex items-center gap-2 font-bold text-emerald-400"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Classes illimitées</li>
-                    <li className="flex items-center gap-2 font-bold text-emerald-400"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Enseignants illimités</li>
-                    <li className="flex items-center gap-2 font-bold text-emerald-400"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Générations illimitées</li>
-                    <li className="flex items-center gap-2 font-bold text-emerald-400"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Exportations illimitées (Tout format)</li>
-                    <li className="flex items-center gap-2 text-indigo-300 font-bold"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Assistant IA prioritaire</li>
-                    <li className="flex items-center gap-2 text-amber-300 font-bold"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Custom Branding (Logo &amp; URL)</li>
-                    <li className="flex items-center gap-2"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Multi-comptes &amp; Réseaux</li>
-                    <li className="flex items-center gap-2 text-amber-300 font-bold"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Support dédié 24/7 VIP</li>
+                  <ul className="flex flex-col gap-2.5 mb-6 text-[11px]">
+                    <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Classes illimitées</li>
+                    <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Enseignants illimités</li>
+                    <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Générations illimitées</li>
+                    <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Exportations illimitées (Tout format)</li>
+                    <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Assistant IA prioritaire</li>
+                    <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Custom Branding (Logo &amp; URL)</li>
+                    <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Multi-comptes &amp; Réseaux</li>
+                    <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Support dédié 24/7 VIP</li>
                   </ul>
                 </div>
-                <button onClick={() => handleChoosePlan('plan_school')} className="btn-secondary text-center w-full mt-auto cursor-pointer py-2 text-xs">
+                <button 
+                  onClick={() => handleChoosePlan('plan_school')} 
+                  className="w-full mt-auto cursor-pointer py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-indigo-600/10 hover:shadow-indigo-600/30 transition-all duration-200 border-0"
+                >
                   Choisir School
                 </button>
               </div>
@@ -793,9 +820,30 @@ export default function LandingPage({
             </div>
             <div className="flex flex-col gap-3">
               <span className="text-xs text-white font-bold mb-2 uppercase tracking-wider font-mono">Légal</span>
-              <a className="text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors" href="#">Politique de confidentialité</a>
-              <a className="text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors" href="#">Conditions d&apos;utilisation</a>
-              <a className="text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors" href="#">Contact</a>
+              <button 
+                onClick={() => { setLegalTab('cgu'); setIsLegalOpen(true); }}
+                className="text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors text-left bg-transparent border-0 cursor-pointer p-0"
+              >
+                Conditions d&apos;utilisation (CGU)
+              </button>
+              <button 
+                onClick={() => { setLegalTab('cgv'); setIsLegalOpen(true); }}
+                className="text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors text-left bg-transparent border-0 cursor-pointer p-0"
+              >
+                Conditions de Vente (CGV)
+              </button>
+              <button 
+                onClick={() => { setLegalTab('privacy'); setIsLegalOpen(true); }}
+                className="text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors text-left bg-transparent border-0 cursor-pointer p-0"
+              >
+                Politique de confidentialité
+              </button>
+              <button 
+                onClick={() => { setLegalTab('cookies'); setIsLegalOpen(true); }}
+                className="text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors text-left bg-transparent border-0 cursor-pointer p-0"
+              >
+                Politique des cookies
+              </button>
             </div>
           </div>
         </footer>
@@ -815,6 +863,13 @@ export default function LandingPage({
           }}
           plan={selectedPlanForPurchase}
           onPurchaseRequest={onPurchaseLicenseRequest}
+        />
+
+        <LegalModal
+          isOpen={isLegalOpen}
+          onClose={() => setIsLegalOpen(false)}
+          initialTab={legalTab}
+          theme={theme === 'light' ? 'light' : 'dark'}
         />
 
       </div>

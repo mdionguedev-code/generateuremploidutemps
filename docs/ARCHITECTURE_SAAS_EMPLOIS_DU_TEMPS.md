@@ -48,8 +48,9 @@ graph LR
 ### 🔹 Étape 1 : Configuration des Jours & Plages Horaires
 - **Choix des jours ouvrés** : Sélection interactive du Lundi au Samedi avec présélections rapides (*Lundi-Vendredi 5j* ou *Lundi-Samedi 6j*).
 - **Amplitude quotidienne personnalisée** : Définition de l'heure de début (ex: `08h00`) et de l'heure de fin (ex: `18h00` ou `22h00`).
+- **Gestion des pauses communes** : Configuration des pauses de l'établissement (durée de 5 min à 1h par pas de 5 min) insérées entre les créneaux, qui décalent dynamiquement les créneaux suivants.
 - **Calcul automatique de capacité** : Synthèse du volume de créneaux disponibles par classe et par semaine.
-- **Répercussion dynamique** sur toutes les grilles, formulaires d'indisponibilités et exports.
+- **Répercussion dynamique** sur toutes les grilles (affichage des pauses sur l'emploi du temps des classes uniquement, non visible sur celui des profs), formulaires d'indisponibilités et exports.
 
 ### 🔹 Étape 2 : Référentiel des Matières
 - Création, édition et suppression des matières scolaires.
@@ -60,17 +61,21 @@ graph LR
 - Définition du **Quota Hebdomadaire Visé** (en heures).
 - **Grille interactive d'indisponibilité** : Marquage en un clic des temps libres ou créneaux réservés.
 
-### 🔹 Étape 4 : Classes & Affectations Pédagogiques
+### 🔹 Étape 4 : Classes, Affectations & Classes Scindées
 - Déclaration des classes / niveaux (6ème A, Terminale S1, etc.).
-- **Affectation des cours via menu déroulant** : Liaison `(Matière, Professeur, Volume Horaire Hebdomadaire)`.
+- **Mode Standard (Classe Entière)** : Liaison `(Matière, Professeur, Volume Horaire Hebdomadaire)`.
+- **Mode Classe Scindée (Sous-groupes Simultanés)** :
+  - Scission d'une classe en 2 sous-groupes (ex: *Groupe A* / *Groupe B*, LV2 Espagnol / Arabe, TP de Sciences).
+  - Deux enseignants distincts dispensent cours **exactement au même moment et le même jour** pour chaque groupe.
+  - Gestion de **volumes horaires flexibles** (ex: 3h d'Espagnol pour Gr. A et 2h d'Arabe pour Gr. B, dont 2h synchronisées au même créneau, et 1h autonome).
 - **Grille de fermeture de classe** : Marquage des heures où la classe n'est pas disponible (ateliers, fermetures).
 
 ### 🔹 Étape 5 : Emploi du Temps (Visualisation & Optimisation)
 - **Résolution automatique** sous contraintes en un clic.
 - **Vues Multiples** :
-  - *Vue par Classe* : Planning hebdomadaire avec affichage des matières, professeurs, salles et durées fusionnées (`rowSpan`).
-  - *Vue par Enseignant* : Planning global de l'équipe pédagogique ou focus individuel par professeur.
-- **Drag & Drop interactif** : Déplacement de cours à la souris avec validation anti-conflit en direct.
+  - *Vue par Classe* : Planning hebdomadaire avec affichage des matières, professeurs, durées fusionnées (`rowSpan`) et **Split Cards bicolores** pour les cours en classe scindée.
+  - *Vue par Enseignant* : Planning global de l'équipe pédagogique ou focus individuel par professeur (avec badge du sous-groupe assigné ex: `6ème A (Groupe A)`).
+- **Drag & Drop interactif & synchrone** : Déplacement de cours à la souris avec validation anti-conflit en direct et déplacement jumelé des 2 sous-groupes d'une classe scindée.
 - **Panier de cours non planifiés** : Permet de glisser manuellement les reliquats d'heures.
 - **Indicateur de score** : Pourcentage de conformité mathématique (0 à 100%).
 
@@ -84,21 +89,25 @@ Le moteur de résolution ([`lib/solver.ts`](file:///c:/Users/HP/Desktop/SAAS%20E
 - **Règle** : Les séances sont découpées en blocs de **2 heures maximum**, le résidu en bloc de **1 heure** (ex: 5h/semaine = `2h + 2h + 1h`, 4h = `2h + 2h`, 3h = `2h + 1h`).
 - **Objectif** : Respect du rythme d'apprentissage des élèves sans saturation.
 
-### 2. Unicité Journalière par Matière
+### 2. Classes Scindées & Synchronisation Parallèle
+- Les séances scindées jumelées sont planifiées **simultanément** sur le même créneau `(jour, heure)` pour la classe, en mobilisant les 2 professeurs respectifs.
+- Les heures excédentaires non synchronisées d'un groupe sont placées de manière autonome sans blocage.
+
+### 3. Unicité Journalière par Matière
 - Une matière ne peut **jamais** apparaître plus d'une fois par jour dans une même classe (interdiction d'avoir 2h le matin et 2h l'après-midi pour la même matière, ou 2h + 2h collées pour faire 4h).
 
-### 3. Espacement Optimal des Jours (Heuristique)
+### 4. Espacement Optimal des Jours (Heuristique)
 - L'algorithme privilégie un espacement maximal entre les séances d'une même matière (ex: `Lundi → Mercredi → Vendredi`).
 
-### 4. Variation des Heures de Début
+### 5. Variation des Heures de Début
 - L'algorithme évite que les cours d'une même matière débutent systématiquement à la même heure chaque jour. Il diversifie les créneaux (ex: Lundi 8h, Mercredi 10h, Vendredi 14h).
 
-### 5. Enchaînement Compact des Matières
+### 6. Enchaînement Compact des Matières
 - Pour les créneaux d'1 heure de matières différentes, l'algorithme privilégie les blocs contigus afin d'éviter les heures de trou intempestives pour les élèves.
 
-### 6. Détection et Blocage des Conflits
+### 7. Détection et Blocage des Conflits
 - **Zéro superposition enseignant** : Un prof ne peut être dans 2 classes en même temps.
-- **Zéro superposition classe** : Une classe ne peut recevoir 2 cours simultanément.
+- **Zéro superposition classe standard** : Une classe ne peut recevoir 2 cours distincts simultanément (sauf en mode classe scindée explicitement autorisé).
 - **Validation du Drag & Drop en temps réel** : Blocage immédiat avec explication claire en cas de tentative de collision.
 
 ---

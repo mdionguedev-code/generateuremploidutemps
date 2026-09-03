@@ -1,5 +1,5 @@
 import { createClient } from '@/utils/supabase/client';
-import { Subject, Teacher, ClassGroup, TimetableEntry } from '@/lib/types';
+import { Subject, Teacher, ClassGroup, TimetableEntry, SchoolBreak } from '@/lib/types';
 import {
   SaaSPlan,
   SaaSClient,
@@ -20,6 +20,7 @@ export interface EstablishmentSettingsData {
   endHour: number;
   planId: string;
   status: string;
+  schoolBreaks?: SchoolBreak[];
 }
 
 // -------------------------------------------------------------
@@ -49,7 +50,8 @@ export async function getEstablishmentData(userId: string) {
         start_hour: 8,
         end_hour: 18,
         plan_id: 'plan_trial',
-        status: 'active'
+        status: 'active',
+        school_breaks: []
       })
       .select()
       .single();
@@ -102,7 +104,18 @@ export async function getEstablishmentData(userId: string) {
   const classes: ClassGroup[] = (dbClasses || []).map(c => ({
     id: c.id,
     name: c.name,
-    assignments: Array.isArray(c.assignments) ? c.assignments : [],
+    assignments: (Array.isArray(c.assignments) ? c.assignments : []).map((a: any) => ({
+      id: a.id || undefined,
+      teacherId: a.teacherId,
+      subjectId: a.subjectId,
+      hoursPerWeek: Number(a.hoursPerWeek || 0),
+      fixedDay: a.fixedDay ? String(a.fixedDay).trim() : undefined,
+      fixedStartSlot: a.fixedStartSlot !== undefined && a.fixedStartSlot !== null && String(a.fixedStartSlot).trim() !== '' ? Number(a.fixedStartSlot) : undefined,
+      group: a.group || 'all',
+      groupLabel: a.groupLabel || undefined,
+      pairedGroupId: a.pairedGroupId || undefined,
+      syncHours: a.syncHours !== undefined && a.syncHours !== null ? Number(a.syncHours) : undefined,
+    })),
     unavailability: Array.isArray(c.unavailability) ? c.unavailability : []
   }));
 
@@ -131,7 +144,8 @@ export async function getEstablishmentData(userId: string) {
     startHour: settings?.start_hour || 8,
     endHour: settings?.end_hour || 18,
     planId: settings?.plan_id || 'plan_trial',
-    status: settings?.status || 'active'
+    status: settings?.status || 'active',
+    schoolBreaks: Array.isArray(settings?.school_breaks) ? settings.school_breaks : []
   };
 
   return {
@@ -159,6 +173,7 @@ export async function saveEstablishmentSettings(userId: string, data: Partial<Es
   if (data.endHour !== undefined) updatePayload.end_hour = data.endHour;
   if (data.planId !== undefined) updatePayload.plan_id = data.planId;
   if (data.status !== undefined) updatePayload.status = data.status;
+  if (data.schoolBreaks !== undefined) updatePayload.school_breaks = data.schoolBreaks;
 
   const { error } = await supabase
     .from('establishment_settings')

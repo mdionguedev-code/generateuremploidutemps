@@ -14,7 +14,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = generateTimetable(subjects, teachers, classes, activeDays, totalSlots);
+    const sanitizedClasses = (classes || []).map((c: any) => ({
+      ...c,
+      assignments: (c.assignments || []).map((a: any) => ({
+        ...a,
+        hoursPerWeek: Number(a.hoursPerWeek || 0),
+        fixedDay: a.fixedDay ? String(a.fixedDay).trim() : undefined,
+        fixedStartSlot: a.fixedStartSlot !== undefined && a.fixedStartSlot !== null && String(a.fixedStartSlot).trim() !== '' ? Number(a.fixedStartSlot) : undefined,
+      }))
+    }));
+
+    const result = generateTimetable(subjects, teachers, sanitizedClasses, activeDays, totalSlots);
 
     // Save to Supabase if authenticated
     const supabase = await createClient();

@@ -64,19 +64,19 @@ function runTests() {
   }
   console.log("  => Succès: 5h découpées sur 3 jours distincts.\n");
 
-  // 1bis. Vérification: Variation des heures de début des cours de Maths sur les 3 jours
-  console.log("Test 1bis - Vérification de la variation des heures de début pour les Maths :");
+  // 1bis. Vérification: Règle Maths deux fois à 8h dans la semaine
+  console.log("Test 1bis - Vérification de la règle des 2 séances de Maths à 8h :");
   const mathStartSlotsPerDay = mathDays.map(day => {
     const dayEntries = mathEntries.filter(e => e.day === day).sort((a, b) => a.slotIndex - b.slotIndex);
     return { day, startSlot: dayEntries[0].slotIndex, startHour: `${dayEntries[0].slotIndex + 8}h` };
   });
   console.log("  Heures de début de Maths :", mathStartSlotsPerDay);
 
-  const startSlotsSet = new Set(mathStartSlotsPerDay.map(m => m.startSlot));
-  if (startSlotsSet.size !== mathStartSlotsPerDay.length) {
-    throw new Error(`Erreur: Des séances de Maths débutent à la même heure sur des jours différents ! (${Array.from(startSlotsSet).join(', ')})`);
+  const math8hCount = mathStartSlotsPerDay.filter(m => m.startSlot === 0).length;
+  if (math8hCount !== 2) {
+    throw new Error(`Erreur: Attendu 2 séances de Maths débutant à 8h, obtenu ${math8hCount}`);
   }
-  console.log("  => Succès: Toutes les séances de Maths débutent à des heures différentes !\n");
+  console.log("  => Succès: Exactement 2 séances de Maths débutent à 8h sur des jours distincts !\n");
 
   // 2. Vérification: Pas plus d'une séance par jour pour chaque matière dans une classe
   console.log("Test 2 - Vérification de l'unicité journalière et absence de blocs > 2h:");

@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Plus,
   Trash,
+  Edit,
   Play,
   Check,
   AlertCircle,
@@ -107,7 +108,7 @@ import {
   Area
 } from 'recharts';
 
-import { Subject, Teacher, ClassGroup, TimetableEntry, DayTimeSlot } from '@/lib/types';
+import { Subject, Teacher, ClassGroup, TimetableEntry, DayTimeSlot, SchoolBreak, ClassAssignment } from '@/lib/types';
 import {
   exportTimetableToExcel,
   exportTimetableToPdf,
@@ -148,14 +149,37 @@ export default function TimetableDashboard({
   const [activeDays, setActiveDays] = useState<string[]>(["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"]);
   const [startHour, setStartHour] = useState<number>(8);
   const [endHour, setEndHour] = useState<number>(18);
+  const [schoolBreaks, setSchoolBreaks] = useState<SchoolBreak[]>([]);
 
   const totalSlots = useMemo(() => Math.max(1, endHour - startHour), [startHour, endHour]);
   const slotLabels = useMemo(() => {
-    return Array.from({ length: totalSlots }, (_, i) => {
-      const h = startHour + i;
-      return `${String(h).padStart(2, '0')}h - ${String(h + 1).padStart(2, '0')}h`;
-    });
-  }, [startHour, totalSlots]);
+    const labels: string[] = [];
+    let currentMinutes = startHour * 60;
+
+    for (let i = 0; i < totalSlots; i++) {
+      const startMin = currentMinutes;
+      const endMin = currentMinutes + 60;
+      
+      const startH = Math.floor(startMin / 60);
+      const startM = startMin % 60;
+      const endH = Math.floor(endMin / 60);
+      const endM = endMin % 60;
+
+      const startStr = `${String(startH).padStart(2, '0')}h${String(startM).padStart(2, '0')}`;
+      const endStr = `${String(endH).padStart(2, '0')}h${String(endM).padStart(2, '0')}`;
+      
+      labels.push(`${startStr} - ${endStr}`);
+
+      currentMinutes = endMin;
+
+      // Check if there is a break after this slot
+      const breakAfter = (schoolBreaks || []).find(b => b.afterSlotIndex === i);
+      if (breakAfter) {
+        currentMinutes += breakAfter.duration;
+      }
+    }
+    return labels;
+  }, [startHour, totalSlots, schoolBreaks]);
 
   useEffect(() => {
     if (isMounted && typeof window !== 'undefined') {
@@ -216,9 +240,24 @@ export default function TimetableDashboard({
       localStorage.setItem('school_active_days', JSON.stringify(activeDays));
       localStorage.setItem('school_start_hour', startHour.toString());
       localStorage.setItem('school_end_hour', endHour.toString());
+      localStorage.setItem('school_breaks', JSON.stringify(schoolBreaks));
       setExportScheduleConfig(activeDays, slotLabels);
+
+      if (currentUserId) {
+        saveEstablishmentSettings(currentUserId, {
+          schoolName,
+          schoolSlogan,
+          schoolLogo,
+          schoolLogoType,
+          schoolLogoIcon,
+          activeDays,
+          startHour,
+          endHour,
+          schoolBreaks
+        });
+      }
     }
-  }, [schoolName, schoolSlogan, schoolLogo, schoolLogoType, schoolLogoIcon, activeDays, startHour, endHour, slotLabels, isMounted]);
+  }, [schoolName, schoolSlogan, schoolLogo, schoolLogoType, schoolLogoIcon, activeDays, startHour, endHour, schoolBreaks, slotLabels, isMounted, currentUserId]);
 
   // --- UI Control States ---
   const [activeTab, setActiveTab] = useState<'scheduleConfig' | 'subjects' | 'teachers' | 'classes' | 'timetable' | 'stats' | 'ai' | 'settings'>('scheduleConfig');
@@ -384,6 +423,7 @@ export default function TimetableDashboard({
           setActiveDays(estData.settings.activeDays);
           setStartHour(estData.settings.startHour);
           setEndHour(estData.settings.endHour);
+          setSchoolBreaks(estData.settings.schoolBreaks || []);
           setUserPlanId(estData.settings.planId || 'plan_trial');
 
           if (estData.classes.length > 0) {
@@ -918,6 +958,11 @@ export default function TimetableDashboard({
   // Subject Form
   const [newSubName, setNewSubName] = useState('');
   
+  // Breaks Form
+  const [newBreakName, setNewBreakName] = useState('');
+  const [newBreakAfterSlot, setNewBreakAfterSlot] = useState<number>(0);
+  const [newBreakDuration, setNewBreakDuration] = useState<number>(15);
+  
   // Teacher Form
   const [newTeacherName, setNewTeacherName] = useState('');
   const [newTeacherQuota, setNewTeacherQuota] = useState<number>(18);
@@ -928,11 +973,29 @@ export default function TimetableDashboard({
   // Class Form
   const [newClassName, setNewClassName] = useState('');
   const [newClassUnavail, setNewClassUnavail] = useState<DayTimeSlot[]>([]);
-  const [classAssignments, setClassAssignments] = useState<{ teacherId: string; subjectId: string; hoursPerWeek: number }[]>([]);
+  const [classAssignments, setClassAssignments] = useState<ClassAssignment[]>([]);
   // Temp state to add an assignment block inside class form
   const [tempTeacherId, setTempTeacherId] = useState('');
   const [tempSubjectId, setTempSubjectId] = useState('');
   const [tempHours, setTempHours] = useState<number>(2);
+  const [tempFixedDay, setTempFixedDay] = useState<string>(''); // For EPS or custom fixed schedule
+  const [tempFixedStartSlot, setTempFixedStartSlot] = useState<string>(''); // Start slot index for fixed schedule
+
+  // Classes Scindées (Sous-groupes et cours simultanés)
+  const [assignmentMode, setAssignmentMode] = useState<'standard' | 'divisionV1'>('standard');
+  const [divG1TeacherId, setDivG1TeacherId] = useState('');
+  const [divG1SubjectId, setDivG1SubjectId] = useState('');
+  const [divG1Hours, setDivG1Hours] = useState<number>(2);
+  const [divG1Label, setDivG1Label] = useState('Groupe A');
+
+  const [divG2TeacherId, setDivG2TeacherId] = useState('');
+  const [divG2SubjectId, setDivG2SubjectId] = useState('');
+  const [divG2Hours, setDivG2Hours] = useState<number>(2);
+  const [divG2Label, setDivG2Label] = useState('Groupe B');
+
+  const [divSyncHours, setDivSyncHours] = useState<number>(2);
+  const [divFixedDay, setDivFixedDay] = useState<string>('');
+  const [divFixedStartSlot, setDivFixedStartSlot] = useState<string>('');
 
   // Editing items trackers
   const [editingTeacherId, setEditingTeacherId] = useState<string | null>(null);
@@ -1106,11 +1169,21 @@ export default function TimetableDashboard({
     triggerNotification("Lancement du moteur de résolution sous contraintes...", "info");
     
     setTimeout(async () => {
+      const sanitizedClasses = classes.map(c => ({
+        ...c,
+        assignments: (c.assignments || []).map(a => ({
+          ...a,
+          hoursPerWeek: Number(a.hoursPerWeek || 0),
+          fixedDay: a.fixedDay ? String(a.fixedDay).trim() : undefined,
+          fixedStartSlot: a.fixedStartSlot !== undefined && a.fixedStartSlot !== null && String(a.fixedStartSlot).trim() !== '' ? Number(a.fixedStartSlot) : undefined,
+        }))
+      }));
+
       try {
         const response = await fetch('/api/timetable/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ subjects, teachers, classes, activeDays, totalSlots })
+          body: JSON.stringify({ subjects, teachers, classes: sanitizedClasses, activeDays, totalSlots })
         });
 
         if (!response.ok) {
@@ -1130,7 +1203,7 @@ export default function TimetableDashboard({
             data.timetable,
             data.unscheduled,
             data.score,
-            { subjects, teachers, classes, activeDays, totalSlots }
+            { subjects, teachers, classes: sanitizedClasses, activeDays, totalSlots }
           );
         }
         
@@ -1142,7 +1215,7 @@ export default function TimetableDashboard({
       } catch (err: any) {
         console.error(err);
         // Local fallback solve just in case network is slow
-        const localSol = generateTimetable(subjects, teachers, classes, activeDays, totalSlots);
+        const localSol = generateTimetable(subjects, teachers, sanitizedClasses, activeDays, totalSlots);
         setTimetable(localSol.timetable);
         setUnscheduled(localSol.unscheduled);
         setGenerationScore(localSol.score);
@@ -1155,7 +1228,7 @@ export default function TimetableDashboard({
             localSol.timetable,
             localSol.unscheduled,
             localSol.score,
-            { subjects, teachers, classes, activeDays, totalSlots }
+            { subjects, teachers, classes: sanitizedClasses, activeDays, totalSlots }
           );
         }
         triggerNotification("Génération complétée et sauvegardée en base.", "success");
@@ -1351,16 +1424,17 @@ export default function TimetableDashboard({
       if (entryToMove) {
         const val = validateManualMove(timetable, classes, teachers, entryToMove, day, slotIndex, startHour);
         if (val.isValid) {
-          // Perform move!
+          // Perform move! (If paired entry exists, move it synchronously too!)
+          const pairedPartnerId = entryToMove.pairedEntryId;
           const updatedTable = timetable.map(item => {
-            if (item.id === draggedItem.entryId) {
+            if (item.id === draggedItem.entryId || (pairedPartnerId && item.id === pairedPartnerId)) {
               return { ...item, day, slotIndex };
             }
             return item;
           });
           setTimetable(updatedTable);
           syncToLocalStorage(subjects, teachers, classes, updatedTable, unscheduled, generationScore);
-          triggerNotification("Créneau déplacé avec succès !");
+          triggerNotification(pairedPartnerId ? "Créneau scindé (G1 + G2) déplacé avec succès !" : "Créneau déplacé avec succès !");
         } else {
           triggerNotification(val.reason || "Déplacement invalide.", "error");
         }
@@ -1422,7 +1496,8 @@ export default function TimetableDashboard({
     if (!entry) return;
 
     if (window.confirm("Enlever ce cours et le renvoyer dans la corbeille des heures non planifiées ?")) {
-      const updatedTable = timetable.filter(item => item.id !== entryId);
+      const pairedPartnerId = entry.pairedEntryId;
+      const updatedTable = timetable.filter(item => item.id !== entryId && (!pairedPartnerId || item.id !== pairedPartnerId));
       
       // Send back to basket
       const existingUnscheduledIdx = unscheduled.findIndex(
@@ -1443,6 +1518,30 @@ export default function TimetableDashboard({
           hours: 1,
           reason: "Retiré manuellement de l'emploi du temps."
         });
+      }
+
+      // If paired partner, also update its unscheduled basket
+      if (pairedPartnerId) {
+        const partner = timetable.find(e => e.id === pairedPartnerId);
+        if (partner) {
+          const partIdx = updatedUnscheduled.findIndex(
+            u => u.classId === partner.classId && u.teacherId === partner.teacherId && u.subjectId === partner.subjectId
+          );
+          if (partIdx !== -1) {
+            updatedUnscheduled[partIdx] = {
+              ...updatedUnscheduled[partIdx],
+              hours: updatedUnscheduled[partIdx].hours + 1
+            };
+          } else {
+            updatedUnscheduled.push({
+              classId: partner.classId,
+              teacherId: partner.teacherId,
+              subjectId: partner.subjectId,
+              hours: 1,
+              reason: "Retiré manuellement de l'emploi du temps (paire scindée)."
+            });
+          }
+        }
       }
 
       setTimetable(updatedTable);
@@ -1504,17 +1603,25 @@ export default function TimetableDashboard({
   // Helper to compute rowSpan and grouped entries for Class View
   const getClassCellSpanInfo = (classId: string, day: string, slotIndex: number) => {
     const currentCls = classes.find(c => c.id === classId);
-    const entry = timetable.find(e => e.classId === classId && e.day === day && e.slotIndex === slotIndex);
+    const matchingEntries = timetable.filter(e => e.classId === classId && e.day === day && e.slotIndex === slotIndex);
     const isClassUnavailable = currentCls?.unavailability.some(u => u.day === day && u.slotIndex === slotIndex);
 
-    if (entry) {
+    if (matchingEntries.length > 1) {
+      return { isContinuation: false, rowSpan: 1, blockEntries: matchingEntries, isUnavailableSpan: false, isSplit: true };
+    }
+
+    if (matchingEntries.length === 1) {
+      const entry = matchingEntries[0];
       if (slotIndex > 0) {
-        const prevEntry = timetable.find(e => e.classId === classId && e.day === day && e.slotIndex === slotIndex - 1);
+        const prevMatching = timetable.filter(e => e.classId === classId && e.day === day && e.slotIndex === slotIndex - 1);
+        const hasBreakBefore = schoolBreaks.some(b => b.afterSlotIndex === slotIndex - 1);
         if (
-          prevEntry &&
-          prevEntry.classId === entry.classId &&
-          prevEntry.teacherId === entry.teacherId &&
-          prevEntry.subjectId === entry.subjectId
+          !hasBreakBefore &&
+          prevMatching.length === 1 &&
+          prevMatching[0].classId === entry.classId &&
+          prevMatching[0].teacherId === entry.teacherId &&
+          prevMatching[0].subjectId === entry.subjectId &&
+          prevMatching[0].group === entry.group
         ) {
           return { isContinuation: true, rowSpan: 1, blockEntries: [], isUnavailableSpan: false };
         }
@@ -1523,15 +1630,18 @@ export default function TimetableDashboard({
       let span = 1;
       const blockEntries = [entry];
       for (let s = slotIndex + 1; s < slotLabels.length; s++) {
-        const nextEntry = timetable.find(e => e.classId === classId && e.day === day && e.slotIndex === s);
+        const nextMatching = timetable.filter(e => e.classId === classId && e.day === day && e.slotIndex === s);
+        const hasBreak = schoolBreaks.some(b => b.afterSlotIndex === s - 1);
         if (
-          nextEntry &&
-          nextEntry.classId === entry.classId &&
-          nextEntry.teacherId === entry.teacherId &&
-          nextEntry.subjectId === entry.subjectId
+          !hasBreak &&
+          nextMatching.length === 1 &&
+          nextMatching[0].classId === entry.classId &&
+          nextMatching[0].teacherId === entry.teacherId &&
+          nextMatching[0].subjectId === entry.subjectId &&
+          nextMatching[0].group === entry.group
         ) {
           span++;
-          blockEntries.push(nextEntry);
+          blockEntries.push(nextMatching[0]);
         } else {
           break;
         }
@@ -1543,7 +1653,8 @@ export default function TimetableDashboard({
     if (isClassUnavailable) {
       if (slotIndex > 0) {
         const prevUnav = currentCls?.unavailability.some(u => u.day === day && u.slotIndex === slotIndex - 1);
-        if (prevUnav) {
+        const hasBreakBefore = schoolBreaks.some(b => b.afterSlotIndex === slotIndex - 1);
+        if (prevUnav && !hasBreakBefore) {
           return { isContinuation: true, rowSpan: 1, blockEntries: [], isUnavailableSpan: true };
         }
       }
@@ -1551,7 +1662,8 @@ export default function TimetableDashboard({
       let span = 1;
       for (let s = slotIndex + 1; s < slotLabels.length; s++) {
         const nextUnav = currentCls?.unavailability.some(u => u.day === day && u.slotIndex === s);
-        if (nextUnav) {
+        const hasBreak = schoolBreaks.some(b => b.afterSlotIndex === s - 1);
+        if (nextUnav && !hasBreak) {
           span++;
         } else {
           break;
@@ -1572,11 +1684,14 @@ export default function TimetableDashboard({
     if (entry) {
       if (slotIndex > 0) {
         const prevEntry = timetable.find(e => e.teacherId === teacher.id && e.day === day && e.slotIndex === slotIndex - 1);
+        const hasBreakBefore = schoolBreaks.some(b => b.afterSlotIndex === slotIndex - 1);
         if (
+          !hasBreakBefore &&
           prevEntry &&
           prevEntry.teacherId === entry.teacherId &&
           prevEntry.subjectId === entry.subjectId &&
-          prevEntry.classId === entry.classId
+          prevEntry.classId === entry.classId &&
+          prevEntry.group === entry.group
         ) {
           return { isContinuation: true, rowSpan: 1, blockEntries: [], isUnavailableSpan: false };
         }
@@ -1586,11 +1701,14 @@ export default function TimetableDashboard({
       const blockEntries = [entry];
       for (let s = slotIndex + 1; s < slotLabels.length; s++) {
         const nextEntry = timetable.find(e => e.teacherId === teacher.id && e.day === day && e.slotIndex === s);
+        const hasBreak = schoolBreaks.some(b => b.afterSlotIndex === s - 1);
         if (
+          !hasBreak &&
           nextEntry &&
           nextEntry.teacherId === entry.teacherId &&
           nextEntry.subjectId === entry.subjectId &&
-          nextEntry.classId === entry.classId
+          nextEntry.classId === entry.classId &&
+          nextEntry.group === entry.group
         ) {
           span++;
           blockEntries.push(nextEntry);
@@ -1605,7 +1723,8 @@ export default function TimetableDashboard({
     if (isTeacherUnavail) {
       if (slotIndex > 0) {
         const prevUnav = teacher.unavailability?.some(u => u.day === day && u.slotIndex === slotIndex - 1);
-        if (prevUnav) {
+        const hasBreakBefore = schoolBreaks.some(b => b.afterSlotIndex === slotIndex - 1);
+        if (prevUnav && !hasBreakBefore) {
           return { isContinuation: true, rowSpan: 1, blockEntries: [], isUnavailableSpan: true };
         }
       }
@@ -1613,7 +1732,8 @@ export default function TimetableDashboard({
       let span = 1;
       for (let s = slotIndex + 1; s < slotLabels.length; s++) {
         const nextUnav = teacher.unavailability?.some(u => u.day === day && u.slotIndex === s);
-        if (nextUnav) {
+        const hasBreak = schoolBreaks.some(b => b.afterSlotIndex === s - 1);
+        if (nextUnav && !hasBreak) {
           span++;
         } else {
           break;
@@ -1630,10 +1750,11 @@ export default function TimetableDashboard({
   const renderCellContent = (
     day: string,
     slotIndex: number,
-    spanInfo?: { isContinuation: boolean; rowSpan: number; blockEntries: TimetableEntry[]; isUnavailableSpan: boolean }
+    spanInfo?: { isContinuation: boolean; rowSpan: number; blockEntries: TimetableEntry[]; isUnavailableSpan: boolean; isSplit?: boolean }
   ) => {
-    // We are viewing a specific class schedule
-    const entry = timetable.find(e => e.classId === selectedClassId && e.day === day && e.slotIndex === slotIndex);
+    // Check if multiple entries exist on this slot (Classes Scindées: multi-group)
+    const matchingEntries = timetable.filter(e => e.classId === selectedClassId && e.day === day && e.slotIndex === slotIndex);
+    const entry = matchingEntries[0];
     
     // Check if class itself is marked as unavailable during this slot
     const currentCls = classes.find(c => c.id === selectedClassId);
@@ -1642,7 +1763,84 @@ export default function TimetableDashboard({
     const isHovered = dragOverCell?.day === day && dragOverCell?.slotIndex === slotIndex;
 
     const rowSpan = spanInfo?.rowSpan || 1;
-    const blockEntries = spanInfo?.blockEntries || (entry ? [entry] : []);
+    const blockEntries = spanInfo?.blockEntries || matchingEntries;
+
+    // Classes Scindées: SPLIT CELL RENDERING (Groupe A + Groupe B in the same slot)
+    if (matchingEntries.length > 1) {
+      const e1 = matchingEntries[0];
+      const e2 = matchingEntries[1];
+      const teacher1 = teachers.find(t => t.id === e1.teacherId);
+      const subject1 = subjects.find(s => s.id === e1.subjectId);
+      const teacher2 = teachers.find(t => t.id === e2.teacherId);
+      const subject2 = subjects.find(s => s.id === e2.subjectId);
+      const color1 = teacher1?.color || '#6366f1';
+      const color2 = teacher2?.color || '#ec4899';
+      const startHour = (slotLabels[slotIndex] || '').split(' - ')[0];
+
+      return (
+        <div
+          id={`split-card-${e1.id}`}
+          draggable="true"
+          onDragStart={(e) => handleGridDragStart(e, e1.id)}
+          className={`relative h-full w-full p-2 rounded-xl border flex flex-col justify-between cursor-grab active:cursor-grabbing shadow-sm transition-all select-none group ${
+            theme === 'light'
+              ? 'border-purple-200 bg-purple-50/50 hover:border-purple-300 hover:shadow-md'
+              : 'border-purple-500/30 bg-purple-950/20 hover:border-purple-500/50 hover:shadow-md'
+          }`}
+          style={{ borderLeft: '4px solid #a855f7' }}
+        >
+          {/* Header of split cell */}
+          <div className="flex items-center justify-between gap-1 mb-1 pb-1 border-b border-purple-500/20">
+            <span className="text-[9.5px] font-mono font-bold text-purple-400 flex items-center gap-1">
+              <span>🔗 Classe scindée</span>
+              <span className="text-gray-400 font-normal">({startHour})</span>
+            </span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteEntry(e1.id);
+              }}
+              className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 p-0.5 rounded cursor-pointer transition-opacity shrink-0"
+              title="Retirer ce cours scindé (G1 + G2)"
+            >
+              <Trash className="w-3 h-3" />
+            </button>
+          </div>
+
+          {/* Group 1 row */}
+          <div className="p-1.5 rounded-lg bg-black/5 dark:bg-white/5 border border-white/5 flex items-center justify-between mb-1">
+            <div className="flex flex-col min-w-0 pr-1">
+              <div className="flex items-center gap-1">
+                <span className="px-1 py-0.2 rounded text-[8.5px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
+                  {e1.groupLabel || (e1.group === 'G1' ? 'Gr. A' : 'Gr. 1')}
+                </span>
+                <span className={`text-[11px] font-bold truncate ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>
+                  {subject1?.name || e1.subjectId}
+                </span>
+              </div>
+              <span className="text-[10px] text-gray-400 truncate mt-0.5">{teacher1?.name || e1.teacherId}</span>
+            </div>
+            <span className="w-2 h-2 rounded-full shrink-0 shadow-2xs" style={{ backgroundColor: color1 }} />
+          </div>
+
+          {/* Group 2 row */}
+          <div className="p-1.5 rounded-lg bg-black/5 dark:bg-white/5 border border-white/5 flex items-center justify-between">
+            <div className="flex flex-col min-w-0 pr-1">
+              <div className="flex items-center gap-1">
+                <span className="px-1 py-0.2 rounded text-[8.5px] font-mono font-bold bg-pink-500/20 text-pink-300 border border-pink-500/30 shrink-0">
+                  {e2.groupLabel || (e2.group === 'G2' ? 'Gr. B' : 'Gr. 2')}
+                </span>
+                <span className={`text-[11px] font-bold truncate ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>
+                  {subject2?.name || e2.subjectId}
+                </span>
+              </div>
+              <span className="text-[10px] text-gray-400 truncate mt-0.5">{teacher2?.name || e2.teacherId}</span>
+            </div>
+            <span className="w-2 h-2 rounded-full shrink-0 shadow-2xs" style={{ backgroundColor: color2 }} />
+          </div>
+        </div>
+      );
+    }
 
     if (entry) {
       const teacher = teachers.find(t => t.id === entry.teacherId);
@@ -1680,6 +1878,11 @@ export default function TimetableDashboard({
                 }`}>
                   {subject?.name || entry.subjectId}
                 </h4>
+                {entry.group && entry.group !== 'all' && (
+                  <span className="px-1.5 py-0.2 rounded text-[8.5px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0">
+                    {entry.groupLabel || (entry.group === 'G1' ? 'Gr. A' : 'Gr. B')}
+                  </span>
+                )}
                 {rowSpan > 1 && (
                   <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
                     {rowSpan}h
@@ -1835,11 +2038,16 @@ export default function TimetableDashboard({
                 </span>
               )}
             </div>
-            <div className={`text-[11px] font-semibold flex items-center gap-1 ${
+            <div className={`text-[11px] font-semibold flex items-center gap-1 flex-wrap ${
               theme === 'light' ? 'text-indigo-800' : 'text-indigo-300'
             }`}>
               <Users className="w-3 h-3 shrink-0" />
               <span className="truncate">{cls?.name || entry.classId}</span>
+              {entry.group && entry.group !== 'all' && (
+                <span className="px-1.5 py-0.2 rounded text-[8.5px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  {entry.groupLabel || (entry.group === 'G1' ? 'Groupe A' : 'Groupe B')}
+                </span>
+              )}
             </div>
           </div>
 
@@ -2070,33 +2278,206 @@ export default function TimetableDashboard({
     }
   };
 
+  // --- REAL-TIME EPS & FIXED SLOT CONFLICT DETECTION ---
+  const fixedSlotConflict = useMemo(() => {
+    if (!tempFixedDay || tempFixedStartSlot === '' || !tempTeacherId) return null;
+    const targetSlot = Number(tempFixedStartSlot);
+    const targetDay = tempFixedDay;
+    const dur = Math.min(2, Math.max(1, tempHours || 2));
+    
+    // 1. Check teacher unavailability
+    const teach = teachers.find(t => t.id === tempTeacherId);
+    if (teach) {
+      for (let i = 0; i < dur; i++) {
+        if ((teach.unavailability || []).some(u => u.day === targetDay && u.slotIndex === targetSlot + i)) {
+          const hourText = (slotLabels[targetSlot + i] || '').split(' - ')[0];
+          return `Indisponibilité : Le professeur ${teach.name} a marqué le ${targetDay} à ${hourText} comme indisponible.`;
+        }
+      }
+    }
+
+    // 2. Check class unavailability
+    for (let i = 0; i < dur; i++) {
+      if (newClassUnavail.some(u => u.day === targetDay && u.slotIndex === targetSlot + i)) {
+        const hourText = (slotLabels[targetSlot + i] || '').split(' - ')[0];
+        return `Indisponibilité : Cette classe est fermée / indisponible le ${targetDay} à ${hourText}.`;
+      }
+    }
+
+    // 3. Check other assignments within the current form
+    for (const a of classAssignments) {
+      if (a.fixedDay === targetDay && a.fixedStartSlot !== undefined) {
+        const aSlot = Number(a.fixedStartSlot);
+        const aDur = Math.min(2, Math.max(1, a.hoursPerWeek || 2));
+        if (targetSlot < aSlot + aDur && targetSlot + dur > aSlot) {
+          const aSub = subjects.find(s => s.id === a.subjectId)?.name || 'un cours';
+          return `Chevauchement dans la classe : Le cours de ${aSub} est déjà fixé le ${targetDay} à ${(slotLabels[aSlot] || '').split(' - ')[0]}.`;
+        }
+      }
+    }
+
+    // 4. Check other classes (same teacher conflict or EPS facility collision)
+    const currentSubject = subjects.find(s => s.id === tempSubjectId);
+    const currentSubName = (currentSubject?.name || '').toLowerCase();
+    const isEps = currentSubName.includes('eps') || currentSubName.includes('sport') || currentSubName.includes('physique');
+
+    for (const otherCls of classes) {
+      if (editingClassId && otherCls.id === editingClassId) continue;
+      for (const a of otherCls.assignments || []) {
+        if (a.fixedDay === targetDay && a.fixedStartSlot !== undefined) {
+          const aSlot = Number(a.fixedStartSlot);
+          const aDur = Math.min(2, Math.max(1, a.hoursPerWeek || 2));
+          if (targetSlot < aSlot + aDur && targetSlot + dur > aSlot) {
+            const otherSub = subjects.find(s => s.id === a.subjectId)?.name || 'Cours';
+            const otherSubLower = otherSub.toLowerCase();
+            const isOtherEps = otherSubLower.includes('eps') || otherSubLower.includes('sport') || otherSubLower.includes('physique');
+            const hourText = (slotLabels[aSlot] || '').split(' - ')[0];
+
+            if (a.teacherId === tempTeacherId) {
+              return `Conflit Enseignant : ${teach?.name || "L'enseignant"} est déjà assigné(e) à la classe "${otherCls.name}" le ${targetDay} à ${hourText}.`;
+            }
+
+            if (isEps && isOtherEps) {
+              return `Conflit EPS : La classe "${otherCls.name}" utilise déjà le créneau d'EPS le ${targetDay} à ${hourText}. Les créneaux d'EPS doivent être distincts.`;
+            }
+          }
+        }
+      }
+    }
+
+    return null;
+  }, [tempFixedDay, tempFixedStartSlot, tempTeacherId, tempSubjectId, tempHours, teachers, subjects, classes, editingClassId, newClassUnavail, classAssignments, slotLabels]);
+
+  const handleEditAssignmentInForm = (a: ClassAssignment) => {
+    setTempTeacherId(a.teacherId);
+    setTempSubjectId(a.subjectId);
+    setTempHours(a.hoursPerWeek);
+    setTempFixedDay(a.fixedDay || '');
+    setTempFixedStartSlot(a.fixedStartSlot !== undefined && a.fixedStartSlot !== null ? String(a.fixedStartSlot) : '');
+    triggerNotification("Paramètres du cours chargés dans le formulaire. Modifiez l'horaire ou le volume et cliquez sur 'Lier ce cours à la classe'.", "info");
+  };
+
   const handleAddAssignmentToClassForm = () => {
     if (!tempTeacherId || !tempSubjectId) {
       triggerNotification("Sélectionnez l'enseignant et la matière correspondante.", "error");
       return;
     }
+
+    if (fixedSlotConflict) {
+      triggerNotification(fixedSlotConflict, "error");
+      return;
+    }
     
-    // Check if assignments combinations already exists in temporary assignments list
-    const exists = classAssignments.some(as => as.teacherId === tempTeacherId && as.subjectId === tempSubjectId);
-    if (exists) {
-      triggerNotification("Cette association enseignant-matière existe déjà pour cette classe. Modifiez-la si besoin.", "error");
+    // Check if assignments combination already exists in temporary assignments list
+    const existsIndex = classAssignments.findIndex(as => as.teacherId === tempTeacherId && as.subjectId === tempSubjectId && !as.pairedGroupId);
+    if (existsIndex !== -1) {
+      const updatedList = [...classAssignments];
+      updatedList[existsIndex] = {
+        teacherId: tempTeacherId,
+        subjectId: tempSubjectId,
+        hoursPerWeek: Number(tempHours),
+        fixedDay: tempFixedDay ? tempFixedDay.trim() : undefined,
+        fixedStartSlot: tempFixedStartSlot !== '' ? Number(tempFixedStartSlot) : undefined,
+        group: 'all',
+      };
+      setClassAssignments(updatedList);
+      setTempTeacherId('');
+      setTempSubjectId('');
+      setTempHours(2);
+      setTempFixedDay('');
+      setTempFixedStartSlot('');
+      triggerNotification("Cours et horaire imposé mis à jour avec succès !", "success");
       return;
     }
 
     setClassAssignments([...classAssignments, {
+      id: `assoc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       teacherId: tempTeacherId,
       subjectId: tempSubjectId,
-      hoursPerWeek: tempHours
+      hoursPerWeek: Number(tempHours),
+      fixedDay: tempFixedDay ? tempFixedDay.trim() : undefined,
+      fixedStartSlot: tempFixedStartSlot !== '' ? Number(tempFixedStartSlot) : undefined,
+      group: 'all',
     }]);
 
     setTempTeacherId('');
     setTempSubjectId('');
     setTempHours(2);
+    setTempFixedDay('');
+    setTempFixedStartSlot('');
     triggerNotification("Liaison cours ajoutée au formulaire.");
   };
 
-  const handleRemoveAssignmentFromClassForm = (teachId: string, subjId: string) => {
-    setClassAssignments(classAssignments.filter(a => !(a.teacherId === teachId && a.subjectId === subjId)));
+  // Handler for adding a Classes Scindées split course pair
+  const handleAddDivisionV1ToClassForm = () => {
+    if (!divG1TeacherId || !divG1SubjectId) {
+      triggerNotification("Veuillez sélectionner le professeur et la matière du Groupe A.", "error");
+      return;
+    }
+    if (!divG2TeacherId || !divG2SubjectId) {
+      triggerNotification("Veuillez sélectionner le professeur et la matière du Groupe B.", "error");
+      return;
+    }
+    if (divG1TeacherId === divG2TeacherId) {
+      triggerNotification("Les deux groupes doivent avoir deux enseignants différents pour avoir cours au même moment.", "error");
+      return;
+    }
+
+    const h1 = Math.max(1, Number(divG1Hours));
+    const h2 = Math.max(1, Number(divG2Hours));
+    const maxSync = Math.min(h1, h2);
+    const sync = Math.max(1, Math.min(Number(divSyncHours) || maxSync, maxSync));
+    const pairId = `pair-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+
+    const assignment1: ClassAssignment = {
+      id: `assoc-${Date.now()}-1`,
+      teacherId: divG1TeacherId,
+      subjectId: divG1SubjectId,
+      hoursPerWeek: h1,
+      group: 'G1',
+      groupLabel: divG1Label.trim() || 'Groupe A',
+      pairedGroupId: pairId,
+      syncHours: sync,
+      fixedDay: divFixedDay ? divFixedDay.trim() : undefined,
+      fixedStartSlot: divFixedStartSlot !== '' ? Number(divFixedStartSlot) : undefined,
+    };
+
+    const assignment2: ClassAssignment = {
+      id: `assoc-${Date.now()}-2`,
+      teacherId: divG2TeacherId,
+      subjectId: divG2SubjectId,
+      hoursPerWeek: h2,
+      group: 'G2',
+      groupLabel: divG2Label.trim() || 'Groupe B',
+      pairedGroupId: pairId,
+      syncHours: sync,
+      fixedDay: divFixedDay ? divFixedDay.trim() : undefined,
+      fixedStartSlot: divFixedStartSlot !== '' ? Number(divFixedStartSlot) : undefined,
+    };
+
+    setClassAssignments([...classAssignments, assignment1, assignment2]);
+    setDivG1TeacherId('');
+    setDivG1SubjectId('');
+    setDivG1Hours(2);
+    setDivG2TeacherId('');
+    setDivG2SubjectId('');
+    setDivG2Hours(2);
+    setDivSyncHours(2);
+    setDivFixedDay('');
+    setDivFixedStartSlot('');
+    setAssignmentMode('standard');
+    triggerNotification(`Classe scindée configurée (${sync}h simultanées pour ${divG1Label} & ${divG2Label}) !`, "success");
+  };
+
+  const handleRemoveAssignmentFromClassForm = (identifier: string, teachId?: string, subjId?: string) => {
+    let target = classAssignments.find(a => (a.id && a.id === identifier) || (a.teacherId === teachId && a.subjectId === subjId));
+    if (target && target.pairedGroupId) {
+      setClassAssignments(classAssignments.filter(a => a.pairedGroupId !== target!.pairedGroupId));
+      triggerNotification("Paire de cours scindés supprimée.", "info");
+    } else {
+      setClassAssignments(classAssignments.filter(a => !( (a.id && a.id === identifier) || (a.teacherId === teachId && a.subjectId === subjId) )));
+      triggerNotification("Liaison cours supprimée.");
+    }
   };
 
   const handleSaveClass = async (e: React.FormEvent) => {
@@ -2106,11 +2487,24 @@ export default function TimetableDashboard({
       return;
     }
 
+    const sanitizedAssignments: ClassAssignment[] = classAssignments.map(a => ({
+      id: a.id || `assoc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      teacherId: a.teacherId,
+      subjectId: a.subjectId,
+      hoursPerWeek: Number(a.hoursPerWeek || 0),
+      fixedDay: a.fixedDay ? String(a.fixedDay).trim() : undefined,
+      fixedStartSlot: a.fixedStartSlot !== undefined && a.fixedStartSlot !== null && String(a.fixedStartSlot).trim() !== '' ? Number(a.fixedStartSlot) : undefined,
+      group: a.group || 'all',
+      groupLabel: a.groupLabel || undefined,
+      pairedGroupId: a.pairedGroupId || undefined,
+      syncHours: a.syncHours !== undefined && a.syncHours !== null ? Number(a.syncHours) : undefined,
+    }));
+
     if (editingClassId) {
       // Update
       const payload = {
         name: newClassName.trim(),
-        assignments: classAssignments,
+        assignments: sanitizedAssignments,
         unavailability: newClassUnavail
       };
 
@@ -2139,7 +2533,7 @@ export default function TimetableDashboard({
       
       const newClassPayload = {
         name: newClassName.trim(),
-        assignments: classAssignments,
+        assignments: sanitizedAssignments,
         unavailability: newClassUnavail
       };
 
@@ -2163,6 +2557,11 @@ export default function TimetableDashboard({
     setNewClassName('');
     setClassAssignments([]);
     setNewClassUnavail([]);
+    setTempTeacherId('');
+    setTempSubjectId('');
+    setTempHours(2);
+    setTempFixedDay('');
+    setTempFixedStartSlot('');
     setEditingClassId(null);
   };
 
@@ -2171,6 +2570,11 @@ export default function TimetableDashboard({
     setNewClassName(c.name);
     setClassAssignments(c.assignments);
     setNewClassUnavail(c.unavailability || []);
+    setTempTeacherId('');
+    setTempSubjectId('');
+    setTempHours(2);
+    setTempFixedDay('');
+    setTempFixedStartSlot('');
     // Focus jump
     window.scrollTo({ top: 300, behavior: 'smooth' });
   };
@@ -2284,7 +2688,7 @@ export default function TimetableDashboard({
       triggerNotification("Rien à exporter. Générez d'abord un emploi du temps.", "error");
       return;
     }
-    exportTimetableToExcel(timetable, classes, teachers, subjects);
+    exportTimetableToExcel(timetable, classes, teachers, subjects, schoolBreaks);
     setExportCount(prev => prev + 1);
     triggerNotification("Fichier Excel complet d'établissement généré !");
   };
@@ -2310,7 +2714,7 @@ export default function TimetableDashboard({
       triggerNotification("Aucun créneau planifié pour cette classe.", "error");
       return;
     }
-    exportTimetableToPdf(targetId, timetable, classes, teachers, subjects, schoolName, schoolSlogan);
+    exportTimetableToPdf(targetId, timetable, classes, teachers, subjects, schoolName, schoolSlogan, schoolBreaks);
     setExportCount(prev => prev + 1);
     triggerNotification(`Emploi du temps PDF exporté !`);
   };
@@ -2336,7 +2740,7 @@ export default function TimetableDashboard({
       triggerNotification("Aucun créneau planifié pour cette classe.", "error");
       return;
     }
-    exportTimetableToWord(targetId, timetable, classes, teachers, subjects, schoolName, schoolSlogan, schoolLogo, schoolLogoIcon);
+    exportTimetableToWord(targetId, timetable, classes, teachers, subjects, schoolName, schoolSlogan, schoolLogo, schoolLogoIcon, schoolBreaks);
     setExportCount(prev => prev + 1);
     triggerNotification(`Emploi du temps Word (.doc) exporté !`);
   };
@@ -3216,7 +3620,7 @@ export default function TimetableDashboard({
                       <Sparkles className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-indigo-400'}`} />
                       <span className="font-bold">Guide Débutant : Ce que vous devez faire sur cette étape</span>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
                       <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
                         <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
                           <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>1</span>
@@ -3238,6 +3642,15 @@ export default function TimetableDashboard({
                       <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
                         <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
                           <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>3</span>
+                          <span className="font-bold">Pauses Établissement</span>
+                        </div>
+                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                          Configurez les récréations et temps de repas communs à toute l'école.
+                        </p>
+                      </div>
+                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>4</span>
                           <span className="font-bold">Passer à l'étape 2 (Matières)</span>
                         </div>
                         <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
@@ -3397,6 +3810,158 @@ export default function TimetableDashboard({
                               Créneau {idx + 1} : {label}
                             </span>
                           ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 3. CONFIGURATION DES PAUSES */}
+                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-5 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'}`}>
+                      <div className={`flex items-center justify-between pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                        <div className="flex items-center gap-2">
+                          <SlidersHorizontal className={`w-5 h-5 ${isLight ? 'text-indigo-600' : 'text-indigo-400'}`} />
+                          <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                            3. Pauses de l'Établissement (Communes)
+                          </h3>
+                        </div>
+                        <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20'}`}>
+                          {schoolBreaks.length} pause(s)
+                        </span>
+                      </div>
+
+                      <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
+                        Définissez les récréations ou temps de repas. Ces pauses s'afficheront sur les plannings de classes et décaleront les heures des cours suivants.
+                      </p>
+
+                      {/* LIST OF CURRENT BREAKS */}
+                      {schoolBreaks.length === 0 ? (
+                        <p className={`text-xs italic text-center py-4 ${isLight ? 'text-slate-400' : 'text-gray-500'}`}>
+                          Aucune pause configurée pour le moment.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {[...schoolBreaks]
+                            .sort((a, b) => a.afterSlotIndex - b.afterSlotIndex)
+                            .map((b) => {
+                              const slotLabel = slotLabels[b.afterSlotIndex] || `Créneau ${b.afterSlotIndex + 1}`;
+                              return (
+                                <div
+                                  key={b.id}
+                                  className={`flex items-center justify-between p-3 rounded-xl border text-xs ${
+                                    isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/40 border-white/5'
+                                  }`}
+                                >
+                                  <div>
+                                    <div className="font-bold flex items-center gap-1.5">
+                                      <span className={isLight ? 'text-slate-800' : 'text-white'}>{b.name}</span>
+                                      <span className={`px-2 py-0.5 rounded-md font-mono text-[10px] ${isLight ? 'bg-indigo-50 text-indigo-700' : 'bg-indigo-500/20 text-indigo-300'}`}>
+                                        {b.duration} min
+                                      </span>
+                                    </div>
+                                    <p className={`text-[10px] mt-0.5 ${isLight ? 'text-slate-400' : 'text-gray-500'}`}>
+                                      Placée après le : <strong className="font-mono">{slotLabel}</strong>
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSchoolBreaks(schoolBreaks.filter((x) => x.id !== b.id));
+                                      triggerNotification(`Pause "${b.name}" supprimée.`, "info");
+                                    }}
+                                    className="text-gray-400 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+                                    title="Supprimer la pause"
+                                  >
+                                    <Trash className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      )}
+
+                      {/* ADD BREAK FORM */}
+                      <div className={`p-4 rounded-xl border space-y-3.5 ${isLight ? 'bg-slate-50/50 border-slate-200' : 'bg-slate-950/20 border-white/10'}`}>
+                        <h4 className={`text-xs font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-800' : 'text-gray-300'}`}>
+                          Ajouter une Pause
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label className={`block text-[10px] font-medium mb-1 ${isLight ? 'text-slate-600' : 'text-gray-400'}`}>
+                              Nom de la pause
+                            </label>
+                            <input
+                              type="text"
+                              value={newBreakName}
+                              onChange={(e) => setNewBreakName(e.target.value)}
+                              placeholder="Ex: Récréation, Déjeuner"
+                              className={`w-full rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 transition-colors border ${
+                                isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-slate-950 border-white/10 text-white'
+                              }`}
+                            />
+                          </div>
+
+                          <div>
+                            <label className={`block text-[10px] font-medium mb-1 ${isLight ? 'text-slate-600' : 'text-gray-400'}`}>
+                              Placer après le créneau
+                            </label>
+                            <select
+                              value={newBreakAfterSlot}
+                              onChange={(e) => setNewBreakAfterSlot(Number(e.target.value))}
+                              className={`w-full rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 transition-colors font-mono cursor-pointer border ${
+                                isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-slate-950 border-white/10 text-white'
+                              }`}
+                            >
+                              {slotLabels.slice(0, slotLabels.length - 1).map((label, idx) => (
+                                <option key={idx} value={idx}>
+                                  Après Créneau {idx + 1} ({label})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className={`block text-[10px] font-medium mb-1 ${isLight ? 'text-slate-600' : 'text-gray-400'}`}>
+                              Durée de la pause
+                            </label>
+                            <select
+                              value={newBreakDuration}
+                              onChange={(e) => setNewBreakDuration(Number(e.target.value))}
+                              className={`w-full rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 transition-colors font-mono cursor-pointer border ${
+                                isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-slate-950 border-white/10 text-white'
+                              }`}
+                            >
+                              {[5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60].map((m) => (
+                                <option key={m} value={m}>
+                                  {m === 60 ? '1h00 (60 min)' : `${m} min`}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const name = newBreakName.trim() || "Pause";
+                              if (schoolBreaks.some((b) => b.afterSlotIndex === newBreakAfterSlot)) {
+                                triggerNotification("Une pause est déjà configurée après ce créneau.", "error");
+                                return;
+                              }
+                              const newBreak: SchoolBreak = {
+                                id: `break_${Date.now()}`,
+                                name,
+                                afterSlotIndex: newBreakAfterSlot,
+                                duration: newBreakDuration
+                              };
+                              setSchoolBreaks([...schoolBreaks, newBreak]);
+                              setNewBreakName('');
+                              triggerNotification(`Pause "${name}" ajoutée avec succès !`, "success");
+                            }}
+                            className="py-2 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 !text-white text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Ajouter la pause</span>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -3665,32 +4230,61 @@ export default function TimetableDashboard({
                             </tr>
                           </thead>
                           <tbody>
-                            {slotLabels.map((label, sIndex) => (
-                              <tr key={sIndex} className="border-b border-white/10 hover:bg-white/[0.02] transition-colors min-h-16">
-                                {/* Time labels */}
-                                <td className="py-2 px-4 font-mono text-xs text-gray-300 bg-slate-950/40 font-medium border-r border-white/5 whitespace-nowrap">
-                                  {label}
-                                </td>
-                                {/* Days blocks cells */}
-                                {activeDays.map(day => {
-                                  const spanInfo = getClassCellSpanInfo(selectedClassId, day, sIndex);
-                                  if (spanInfo.isContinuation) return null;
+                            {slotLabels.map((label, sIndex) => {
+                              const breakAfter = (schoolBreaks || []).find(b => b.afterSlotIndex === sIndex);
+                              
+                              let breakTimeStr = "";
+                              if (breakAfter) {
+                                const breakStartStr = label.split(' - ')[1];
+                                const [hStr, mStr] = breakStartStr.split('h');
+                                const bStartMin = parseInt(hStr) * 60 + parseInt(mStr);
+                                const bEndMin = bStartMin + breakAfter.duration;
+                                const bEndH = Math.floor(bEndMin / 60);
+                                const bEndM = bEndMin % 60;
+                                const breakEndStr = `${String(bEndH).padStart(2, '0')}h${String(bEndM).padStart(2, '0')}`;
+                                breakTimeStr = `${breakStartStr} - ${breakEndStr}`;
+                              }
 
-                                  return (
-                                    <td 
-                                      key={day} 
-                                      rowSpan={spanInfo.rowSpan}
-                                      className="p-1.5 border-l border-white/10 align-top"
-                                      onDragOver={(e) => handleDragOverCell(e, day, sIndex)}
-                                      onDragLeave={handleDragLeave}
-                                      onDrop={(e) => handleDropOnCell(e, day, sIndex)}
-                                    >
-                                      {renderCellContent(day, sIndex, spanInfo)}
+                              return (
+                                <React.Fragment key={sIndex}>
+                                  <tr className="border-b border-white/10 hover:bg-white/[0.02] transition-colors min-h-16">
+                                    {/* Time labels */}
+                                    <td className="py-2 px-4 font-mono text-xs text-gray-300 bg-slate-950/40 font-medium border-r border-white/5 whitespace-nowrap">
+                                      {label}
                                     </td>
-                                  );
-                                })}
-                              </tr>
-                            ))}
+                                    {/* Days blocks cells */}
+                                    {activeDays.map(day => {
+                                      const spanInfo = getClassCellSpanInfo(selectedClassId, day, sIndex);
+                                      if (spanInfo.isContinuation) return null;
+
+                                      return (
+                                        <td 
+                                          key={day} 
+                                          rowSpan={spanInfo.rowSpan}
+                                          className="p-1.5 border-l border-white/10 align-top"
+                                          onDragOver={(e) => handleDragOverCell(e, day, sIndex)}
+                                          onDragLeave={handleDragLeave}
+                                          onDrop={(e) => handleDropOnCell(e, day, sIndex)}
+                                        >
+                                          {renderCellContent(day, sIndex, spanInfo)}
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                  
+                                  {breakAfter && (
+                                    <tr className={theme === 'light' ? 'bg-indigo-50/40 text-indigo-700' : 'bg-indigo-500/5 text-indigo-300'}>
+                                      <td className="py-2.5 px-4 font-mono text-xs font-semibold border-r border-white/5 whitespace-nowrap bg-slate-950/40 text-gray-400">
+                                        {breakTimeStr}
+                                      </td>
+                                      <td colSpan={activeDays.length} className="py-2.5 px-4 text-center font-bold text-xs uppercase tracking-wider font-mono">
+                                        ⏸️ PAUSE : {breakAfter.name || 'Pause'} ({breakAfter.duration} min)
+                                      </td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -4107,59 +4701,59 @@ export default function TimetableDashboard({
                       </div>
                       <div>
                         <h2 className={`text-lg font-bold flex items-center gap-2 flex-wrap ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span>Étape 4 : Configuration des Classes & Affectations Pédagogiques</span>
+                          <span>Étape 4 : Configuration des Classes, Affectations & Classes Scindées</span>
                           <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'}`}>
                             Groupes & Volumes Horaires
                           </span>
                         </h2>
                         <p className={`text-sm mt-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
-                          Déclarez vos classes et attribuez à chaque groupe les cours à suivre (Matière + Professeur + Heures par semaine).
+                          Déclarez vos classes, attribuez les cours de classe entière ou configurez des classes scindées en deux sous-groupes simultanés.
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  {/* GUIDE DÉBUTANT PAS-À-PAS */}
+                  {/* GUIDE DÉBUTANT PAS-À-PAS POUR CLASSES SCINDÉES */}
                   <div className={`rounded-xl p-4 border ${isLight ? 'bg-blue-50/60 border-blue-200/80' : 'bg-slate-950/50 border-indigo-500/20'}`}>
                     <div className={`flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider mb-2.5 ${isLight ? 'text-blue-600' : 'text-indigo-300'}`}>
                       <Sparkles className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-indigo-400'}`} />
-                      <span className="font-bold">Guide Débutant : Ce que vous devez faire sur cette étape</span>
+                      <span className="font-bold">Guide Débutant : Instructions de configuration & Classes Scindées</span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
                       <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
                         <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
                           <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>1</span>
-                          <span className="font-bold">Créer la classe</span>
+                          <span className="font-bold">Nommer la classe</span>
                         </div>
                         <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Saisissez le libellé de la classe (ex: Terminale S1, 6ème A, 3ème B).
+                          Indiquez le nom de la classe (ex: 6ème A, Terminale S, 3ème B).
                         </p>
                       </div>
                       <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
                         <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
                           <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>2</span>
-                          <span className="font-bold">Affecter les cours</span>
+                          <span className="font-bold">Cours Standard</span>
                         </div>
                         <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Pour chaque matière, choisissez le professeur assigné et le nombre d'heures.
+                          Pour les matières suivies par toute la classe, choisissez le prof et les heures.
                         </p>
                       </div>
-                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
-                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>3</span>
-                          <span className="font-bold">Fermetures</span>
+                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-purple-50/70 border-purple-200 shadow-xs' : 'bg-purple-950/20 border-purple-500/30'}`}>
+                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-purple-900' : 'text-purple-300'}`}>
+                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-purple-200 text-purple-800' : 'bg-purple-500/30 text-purple-200'}`}>3</span>
+                          <span className="font-bold">Classe Scindée (Parallèle)</span>
                         </div>
-                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Marquez les créneaux où cette classe n'a jamais cours (ex: fermeture après-midi).
+                        <p className={`text-xs leading-relaxed ${isLight ? 'text-purple-800 font-normal' : 'text-purple-200/90'}`}>
+                          Scindez en Groupe A et B (ex: Espagnol & Arabe) pour faire cours à la même heure !
                         </p>
                       </div>
                       <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
                         <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
                           <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>4</span>
-                          <span className="font-bold">Passer à l'Étape 5</span>
+                          <span className="font-bold">Enregistrer la classe</span>
                         </div>
                         <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Cliquez sur "Ajouter la classe". Quand tout est prêt, filez à l'Étape 5 !
+                          Enregistrez et passez à l'Étape 5 pour générer votre emploi du temps optimisé.
                         </p>
                       </div>
                     </div>
@@ -4187,114 +4781,449 @@ export default function TimetableDashboard({
                         />
                       </div>
 
-                      {/* Quantum Horaire Section inside Class */}
+                      {/* MODE SWITCHER: STANDARD VS CLASSE SCINDÉE */}
                       <div className="border-t border-white/10 pt-4">
-                        <label className="block text-xs uppercase text-indigo-300 font-mono tracking-wider font-bold mb-1">
-                          {"Affectation Enseignant + Matière (Menus Déroulants)"}
-                        </label>
-                        <p className="text-[10px] text-gray-400 mb-3">
-                          {"Associez un professeur déjà configuré et sa matière dans les menus déroulants ci-dessous."}
-                        </p>
-                        
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                          <div>
-                            <label className="block text-[10px] text-gray-300 font-semibold mb-1">1. Choisir le Professeur</label>
-                            <select
-                              value={tempTeacherId}
-                              onChange={(e) => {
-                                setTempTeacherId(e.target.value);
-                                // Auto set possible subject
-                                const prof = teachers.find(t => t.id === e.target.value);
-                                if (prof && prof.subjectIds.length > 0) {
-                                  setTempSubjectId(prof.subjectIds[0]);
-                                }
-                              }}
-                              className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 font-medium"
-                            >
-                              <option value="">-- Menu déroulant Enseignants --</option>
-                              {teachers.map(t => (
-                                <option key={t.id} value={t.id}>{t.name} (Quota: {t.weeklyQuota}h)</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-[10px] text-gray-300 font-semibold mb-1">2. Choisir la Matière</label>
-                            <select
-                              value={tempSubjectId}
-                              onChange={(e) => setTempSubjectId(e.target.value)}
-                              className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 font-medium"
-                            >
-                              <option value="">-- Menu déroulant Matières --</option>
-                              {/* Filter subjects taught by the selected teacher */}
-                              {tempTeacherId 
-                                ? teachers.find(t => t.id === tempTeacherId)?.subjectIds.map(sid => (
-                                    <option key={sid} value={sid}>{subjects.find(s => s.id === sid)?.name || sid}</option>
-                                  ))
-                                : subjects.map(s => (
-                                    <option key={s.id} value={s.id}>{s.name}</option>
-                                  ))
-                              }
-                            </select>
-                          </div>
+                        <div className="flex items-center gap-2 p-1 bg-slate-950/80 rounded-xl border border-white/10 mb-4">
+                          <button
+                            type="button"
+                            onClick={() => setAssignmentMode('standard')}
+                            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                              assignmentMode === 'standard'
+                                ? 'bg-indigo-600 text-white shadow-md'
+                                : 'text-gray-400 hover:text-white'
+                            }`}
+                          >
+                            <BookOpen className="w-3.5 h-3.5" />
+                            <span>Cours Standard</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAssignmentMode('divisionV1')}
+                            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                              assignmentMode === 'divisionV1'
+                                ? 'bg-purple-600 text-white shadow-md'
+                                : 'text-purple-300 hover:text-white'
+                            }`}
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>Classe Scindée</span>
+                          </button>
                         </div>
 
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="w-1/2">
-                            <label className="block text-[10px] text-gray-400 mb-1">Heures par semaine</label>
-                            <input
-                              type="number"
-                              min={1}
-                              max={15}
-                              value={tempHours}
-                              onChange={(e) => setTempHours(Number(e.target.value))}
-                              className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none"
-                            />
-                          </div>
-                          
-                          <div className="w-1/2 pt-5">
+                        {/* MODE 1: STANDARD ASSIGNMENT */}
+                        {assignmentMode === 'standard' && (
+                          <div className="space-y-3">
+                            <label className="block text-xs uppercase text-indigo-300 font-mono tracking-wider font-bold mb-1">
+                              {"Affectation Standard (Classe Entière)"}
+                            </label>
+                            
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-[10px] text-gray-300 font-semibold mb-1">1. Professeur</label>
+                                <select
+                                  value={tempTeacherId}
+                                  onChange={(e) => {
+                                    setTempTeacherId(e.target.value);
+                                    const prof = teachers.find(t => t.id === e.target.value);
+                                    if (prof && prof.subjectIds.length > 0) {
+                                      setTempSubjectId(prof.subjectIds[0]);
+                                    }
+                                  }}
+                                  className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 font-medium"
+                                >
+                                  <option value="">-- Choisir Enseignant --</option>
+                                  {teachers.map(t => (
+                                    <option key={t.id} value={t.id}>{t.name} (Quota: {t.weeklyQuota}h)</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="block text-[10px] text-gray-300 font-semibold mb-1">2. Matière</label>
+                                <select
+                                  value={tempSubjectId}
+                                  onChange={(e) => setTempSubjectId(e.target.value)}
+                                  className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 font-medium"
+                                >
+                                  <option value="">-- Choisir Matière --</option>
+                                  {tempTeacherId 
+                                    ? teachers.find(t => t.id === tempTeacherId)?.subjectIds.map(sid => (
+                                        <option key={sid} value={sid}>{subjects.find(s => s.id === sid)?.name || sid}</option>
+                                      ))
+                                    : subjects.map(s => (
+                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                      ))
+                                  }
+                                </select>
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] text-gray-400 mb-1">3. Volume horaire (heures / semaine)</label>
+                              <input
+                                type="number"
+                                min={1}
+                                max={15}
+                                value={tempHours}
+                                onChange={(e) => setTempHours(Number(e.target.value))}
+                                className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none"
+                              />
+                            </div>
+
+                            {/* Optional: Fix Time Slot (Specifically for EPS or User Defined) */}
+                            <div className={`p-3 rounded-xl bg-slate-950/60 border space-y-2 transition-all ${
+                              fixedSlotConflict ? 'border-rose-500/50 bg-rose-950/20' : 'border-indigo-500/20'
+                            }`}>
+                              <div className="flex items-center justify-between">
+                                <label className="text-[10px] font-bold text-indigo-300 flex items-center gap-1.5">
+                                  <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                                  Horaire fixé par l'utilisateur (ex: EPS)
+                                </label>
+                                <span className="text-[9px] text-gray-400 font-mono">Optionnel</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="block text-[9px] text-gray-400 mb-1">Jour imposé</label>
+                                  <select
+                                    value={tempFixedDay}
+                                    onChange={(e) => {
+                                      setTempFixedDay(e.target.value);
+                                      if (!e.target.value) setTempFixedStartSlot('');
+                                    }}
+                                    className="w-full bg-slate-950 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500 font-medium"
+                                  >
+                                    <option value="">-- Auto (optimisé) --</option>
+                                    {activeDays.map(d => (
+                                      <option key={d} value={d}>{d}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-[9px] text-gray-400 mb-1">Heure de début</label>
+                                  <select
+                                    value={tempFixedStartSlot}
+                                    onChange={(e) => setTempFixedStartSlot(e.target.value)}
+                                    disabled={!tempFixedDay}
+                                    className="w-full bg-slate-950 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500 font-medium disabled:opacity-40"
+                                  >
+                                    <option value="">-- Choisir l'heure --</option>
+                                    {slotLabels.map((sl, idx) => (
+                                      <option key={idx} value={idx}>{sl.split(' - ')[0]}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                              
+                              {fixedSlotConflict && (
+                                <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-[10px] flex items-start gap-1.5">
+                                  <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                                  <span className="font-medium leading-tight">{fixedSlotConflict}</span>
+                                </div>
+                              )}
+                            </div>
+
                             <button
                               type="button"
                               onClick={handleAddAssignmentToClassForm}
-                              className="w-full py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 text-xs font-semibold rounded-xl border border-indigo-500/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                              disabled={!!fixedSlotConflict}
+                              className={`w-full py-2.5 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm ${
+                                fixedSlotConflict
+                                  ? 'bg-rose-500/10 border-rose-500/20 text-rose-400 cursor-not-allowed opacity-60'
+                                  : 'bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border-indigo-500/30 hover:border-indigo-500/50 shadow-indigo-500/10'
+                              }`}
                             >
-                              <Plus className="w-3.5 h-3.5" />
-                              Lier ce cours
+                              <Plus className="w-4 h-4" />
+                              <span>{fixedSlotConflict ? "Créneau en conflit (Impossible de lier)" : "Lier ce cours à la classe"}</span>
                             </button>
                           </div>
-                        </div>
+                        )}
+
+                        {/* MODE 2: CLASSE SCINDÉE (SOUS-GROUPES ET COURS SIMULTANÉS) */}
+                        {assignmentMode === 'divisionV1' && (
+                          <div className="space-y-4 p-4 rounded-xl bg-purple-950/20 border border-purple-500/30">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold font-mono text-purple-300 flex items-center gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                                Configuration Classe Scindée
+                              </span>
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-200 border border-purple-500/30 font-bold">
+                                Cours Parallèles
+                              </span>
+                            </div>
+
+                            <p className="text-[11px] text-gray-300 leading-relaxed">
+                              Configurez les 2 sous-groupes de la classe. Les heures synchronisées seront programmées <strong>strictement au même moment</strong> avec leurs professeurs respectifs.
+                            </p>
+
+                            {/* GROUPE 1 / A */}
+                            <div className="p-3 rounded-lg bg-slate-950/70 border border-indigo-500/20 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-mono font-bold text-indigo-400 uppercase">Sous-Groupe 1 (ex: Groupe A)</span>
+                                <input
+                                  type="text"
+                                  value={divG1Label}
+                                  onChange={(e) => setDivG1Label(e.target.value)}
+                                  placeholder="Nom du groupe (ex: Groupe A)"
+                                  className="w-28 bg-slate-900 border border-white/10 text-white rounded px-2 py-0.5 text-[10px] focus:outline-none"
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="block text-[9px] text-gray-400 mb-0.5">Professeur 1</label>
+                                  <select
+                                    value={divG1TeacherId}
+                                    onChange={(e) => {
+                                      setDivG1TeacherId(e.target.value);
+                                      const p = teachers.find(t => t.id === e.target.value);
+                                      if (p && p.subjectIds.length > 0) setDivG1SubjectId(p.subjectIds[0]);
+                                    }}
+                                    className="w-full bg-slate-900 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none font-medium"
+                                  >
+                                    <option value="">-- Choisir Prof --</option>
+                                    {teachers.map(t => (
+                                      <option key={t.id} value={t.id}>{t.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-[9px] text-gray-400 mb-0.5">Matière 1</label>
+                                  <select
+                                    value={divG1SubjectId}
+                                    onChange={(e) => setDivG1SubjectId(e.target.value)}
+                                    className="w-full bg-slate-900 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none font-medium"
+                                  >
+                                    <option value="">-- Choisir Matière --</option>
+                                    {divG1TeacherId 
+                                      ? teachers.find(t => t.id === divG1TeacherId)?.subjectIds.map(sid => (
+                                          <option key={sid} value={sid}>{subjects.find(s => s.id === sid)?.name || sid}</option>
+                                        ))
+                                      : subjects.map(s => (
+                                          <option key={s.id} value={s.id}>{s.name}</option>
+                                        ))
+                                    }
+                                  </select>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-[9px] text-gray-400 mb-0.5">Total heures hebdo Groupe 1</label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={12}
+                                  value={divG1Hours}
+                                  onChange={(e) => setDivG1Hours(Number(e.target.value))}
+                                  className="w-full bg-slate-900 border border-white/10 text-white rounded-lg px-2 py-1 text-xs focus:outline-none"
+                                />
+                              </div>
+                            </div>
+
+                            {/* GROUPE 2 / B */}
+                            <div className="p-3 rounded-lg bg-slate-950/70 border border-pink-500/20 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-mono font-bold text-pink-400 uppercase">Sous-Groupe 2 (ex: Groupe B)</span>
+                                <input
+                                  type="text"
+                                  value={divG2Label}
+                                  onChange={(e) => setDivG2Label(e.target.value)}
+                                  placeholder="Nom du groupe (ex: Groupe B)"
+                                  className="w-28 bg-slate-900 border border-white/10 text-white rounded px-2 py-0.5 text-[10px] focus:outline-none"
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="block text-[9px] text-gray-400 mb-0.5">Professeur 2</label>
+                                  <select
+                                    value={divG2TeacherId}
+                                    onChange={(e) => {
+                                      setDivG2TeacherId(e.target.value);
+                                      const p = teachers.find(t => t.id === e.target.value);
+                                      if (p && p.subjectIds.length > 0) setDivG2SubjectId(p.subjectIds[0]);
+                                    }}
+                                    className="w-full bg-slate-900 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none font-medium"
+                                  >
+                                    <option value="">-- Choisir Prof --</option>
+                                    {teachers.filter(t => t.id !== divG1TeacherId).map(t => (
+                                      <option key={t.id} value={t.id}>{t.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-[9px] text-gray-400 mb-0.5">Matière 2</label>
+                                  <select
+                                    value={divG2SubjectId}
+                                    onChange={(e) => setDivG2SubjectId(e.target.value)}
+                                    className="w-full bg-slate-900 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none font-medium"
+                                  >
+                                    <option value="">-- Choisir Matière --</option>
+                                    {divG2TeacherId 
+                                      ? teachers.find(t => t.id === divG2TeacherId)?.subjectIds.map(sid => (
+                                          <option key={sid} value={sid}>{subjects.find(s => s.id === sid)?.name || sid}</option>
+                                        ))
+                                      : subjects.map(s => (
+                                          <option key={s.id} value={s.id}>{s.name}</option>
+                                        ))
+                                    }
+                                  </select>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-[9px] text-gray-400 mb-0.5">Total heures hebdo Groupe 2</label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={12}
+                                  value={divG2Hours}
+                                  onChange={(e) => setDivG2Hours(Number(e.target.value))}
+                                  className="w-full bg-slate-900 border border-white/10 text-white rounded-lg px-2 py-1 text-xs focus:outline-none"
+                                />
+                              </div>
+                            </div>
+
+                            {/* SYNCHRONIZED HOURS CONFIG */}
+                            <div className="p-3 rounded-lg bg-purple-900/20 border border-purple-500/30 space-y-1.5">
+                              <label className="block text-[10px] font-bold text-purple-200">
+                                ⏱️ Heures à synchroniser en simultané (même heure, même jour) :
+                              </label>
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={Math.min(divG1Hours, divG2Hours)}
+                                  value={divSyncHours}
+                                  onChange={(e) => setDivSyncHours(Math.max(1, Math.min(Number(e.target.value), Math.min(divG1Hours, divG2Hours))))}
+                                  className="w-24 bg-slate-900 border border-white/10 text-white rounded-lg px-3 py-1.5 text-xs font-bold font-mono focus:outline-none"
+                                />
+                                <span className="text-[11px] text-gray-300">
+                                  heure(s) en parallèle (max: {Math.min(divG1Hours, divG2Hours)}h)
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-purple-300/80 italic">
+                                {divG1Hours > divSyncHours || divG2Hours > divSyncHours
+                                  ? `💡 ${divSyncHours}h seront programmées au même créneau pour les deux groupes. Les heures restantes (${divG1Hours - divSyncHours > 0 ? `${divG1Hours - divSyncHours}h pour ${divG1Label}` : ''}${divG1Hours - divSyncHours > 0 && divG2Hours - divSyncHours > 0 ? ' et ' : ''}${divG2Hours - divSyncHours > 0 ? `${divG2Hours - divSyncHours}h pour ${divG2Label}` : ''}) seront planifiées de façon autonome.`
+                                  : `💡 La totalité des ${divSyncHours}h sera programmée en parfait simultané.`
+                                }
+                              </p>
+                            </div>
+
+                            {/* ACTION BUTTON */}
+                            <button
+                              type="button"
+                              onClick={handleAddDivisionV1ToClassForm}
+                              className="w-full py-2.5 text-xs font-bold rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-purple-900/30"
+                            >
+                              <Sparkles className="w-4 h-4" />
+                              <span>Lier cette classe scindée</span>
+                            </button>
+                          </div>
+                        )}
 
                         {/* List of currently associated assignments in form */}
-                        <div className="space-y-2 bg-slate-950/40 p-3 rounded-xl border border-white/10 max-h-40 overflow-y-auto">
+                        <div className="space-y-2 bg-slate-950/40 p-3 rounded-xl border border-white/10 max-h-56 overflow-y-auto mt-4">
                           <p className="text-[10px] font-mono uppercase text-gray-400 tracking-wider font-semibold">
-                            {"Plan d'études lié"} ({classAssignments.length})
+                            {"Plan d'études lié"} ({classAssignments.length} affectations)
                           </p>
                           {classAssignments.length === 0 ? (
                             <p className="text-xs text-gray-500 italic">{"Aucun cours rattaché pour l'instant."}</p>
                           ) : (
-                            classAssignments.map((a, i) => {
-                              const tName = teachers.find(t => t.id === a.teacherId)?.name || 'Prof inconnu';
-                              const sName = subjects.find(s => s.id === a.subjectId)?.name || 'Matière';
+                            (() => {
+                              // Group assignments by pairedGroupId to display paired classes clearly
+                              const pairedMap: Record<string, ClassAssignment[]> = {};
+                              const singles: ClassAssignment[] = [];
+                              classAssignments.forEach(a => {
+                                if (a.pairedGroupId) {
+                                  if (!pairedMap[a.pairedGroupId]) pairedMap[a.pairedGroupId] = [];
+                                  pairedMap[a.pairedGroupId].push(a);
+                                } else {
+                                  singles.push(a);
+                                }
+                              });
+
                               return (
-                                <div key={i} className="flex items-center justify-between text-xs py-1.5 px-3 rounded-lg bg-white/5 border border-white/10">
-                                  <span className="text-gray-200 font-medium">
-                                    {sName} <span className="text-gray-500">avec</span> {tName}
-                                  </span>
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-mono font-bold bg-indigo-500/20 px-2 py-0.5 rounded-full text-[10px] text-indigo-300 border border-indigo-500/30">
-                                      {a.hoursPerWeek}h
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRemoveAssignmentFromClassForm(a.teacherId, a.subjectId)}
-                                      className="text-red-400 hover:text-red-300 transition-colors p-1"
-                                    >
-                                      <Trash className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
+                                <div className="space-y-2">
+                                  {/* Paired Classes Cards */}
+                                  {Object.entries(pairedMap).map(([pairId, pairList]) => {
+                                    const a1 = pairList[0];
+                                    const a2 = pairList[1] || pairList[0];
+                                    const t1Name = teachers.find(t => t.id === a1.teacherId)?.name || 'Prof 1';
+                                    const s1Name = subjects.find(s => s.id === a1.subjectId)?.name || 'Matière 1';
+                                    const t2Name = teachers.find(t => t.id === a2.teacherId)?.name || 'Prof 2';
+                                    const s2Name = subjects.find(s => s.id === a2.subjectId)?.name || 'Matière 2';
+                                    const sync = a1.syncHours || Math.min(a1.hoursPerWeek, a2.hoursPerWeek);
+
+                                    return (
+                                      <div key={pairId} className="p-2.5 rounded-xl bg-purple-950/30 border border-purple-500/30 space-y-1.5">
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-[9px] font-mono font-bold text-purple-300 flex items-center gap-1">
+                                            <Sparkles className="w-3 h-3 text-purple-400" />
+                                            <span>🔗 Classe scindée ({sync}h simultanées)</span>
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveAssignmentFromClassForm(a1.id || pairId)}
+                                            className="text-red-400 hover:text-red-300 p-0.5 rounded cursor-pointer"
+                                            title="Supprimer cette classe scindée"
+                                          >
+                                            <Trash className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                                          <div className="p-1.5 rounded-lg bg-black/20 border border-white/5">
+                                            <span className="font-bold text-indigo-300 block">{a1.groupLabel || 'Gr. A'} ({a1.hoursPerWeek}h)</span>
+                                            <span className="text-gray-300 text-[10px]">{s1Name} • {t1Name}</span>
+                                          </div>
+                                          <div className="p-1.5 rounded-lg bg-black/20 border border-white/5">
+                                            <span className="font-bold text-pink-300 block">{a2.groupLabel || 'Gr. B'} ({a2.hoursPerWeek}h)</span>
+                                            <span className="text-gray-300 text-[10px]">{s2Name} • {t2Name}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+
+                                  {/* Single / Standard Cards */}
+                                  {singles.map((a, i) => {
+                                    const tName = teachers.find(t => t.id === a.teacherId)?.name || 'Prof inconnu';
+                                    const sName = subjects.find(s => s.id === a.subjectId)?.name || 'Matière';
+                                    return (
+                                      <div key={a.id || i} className="flex items-center justify-between text-xs py-1.5 px-3 rounded-lg bg-white/5 border border-white/10">
+                                        <div className="flex flex-col">
+                                          <span className="text-gray-200 font-medium">
+                                            {sName} <span className="text-gray-500">avec</span> {tName}
+                                          </span>
+                                          {a.fixedDay && a.fixedStartSlot !== undefined && (
+                                            <span className="text-[9px] font-mono text-emerald-300 flex items-center gap-1 mt-0.5">
+                                              📍 Fixé : {a.fixedDay} à {(slotLabels[a.fixedStartSlot] || '').split(' - ')[0]}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="font-mono font-bold bg-indigo-500/20 px-2 py-0.5 rounded-full text-[10px] text-indigo-300 border border-indigo-500/30">
+                                            {a.hoursPerWeek}h
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleEditAssignmentInForm(a)}
+                                            className="text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 transition-all p-1 rounded cursor-pointer"
+                                            title="Modifier ce cours"
+                                          >
+                                            <Edit className="w-3.5 h-3.5" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveAssignmentFromClassForm(a.id || '', a.teacherId, a.subjectId)}
+                                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all p-1 rounded cursor-pointer"
+                                            title="Supprimer cette liaison"
+                                          >
+                                            <Trash className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               );
-                            })
+                            })()
                           )}
                         </div>
                       </div>
@@ -4411,11 +5340,21 @@ export default function TimetableDashboard({
                                       const s = subjects.find(su => su.id === a.subjectId);
                                       return (
                                         <div key={i} className="flex items-center justify-between text-xs font-mono">
-                                          <span className="text-gray-300 truncate flex items-center gap-1.5">
+                                          <div className="flex items-center gap-1.5 truncate">
                                             <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t?.color || '#fff' }} />
-                                            {s?.name || a.subjectId}
-                                          </span>
-                                          <span className="text-gray-200 font-bold">{a.hoursPerWeek}h</span>
+                                            <span className="text-gray-300 truncate">{s?.name || a.subjectId}</span>
+                                            {a.group && a.group !== 'all' && (
+                                              <span className="text-[8.5px] bg-purple-500/20 text-purple-300 px-1 py-0.2 rounded border border-purple-500/30">
+                                                {a.groupLabel || (a.group === 'G1' ? 'Gr. A' : 'Gr. B')}
+                                              </span>
+                                            )}
+                                            {a.fixedDay && a.fixedStartSlot !== undefined && (
+                                              <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded border border-emerald-500/30">
+                                                📍 {a.fixedDay} {(slotLabels[a.fixedStartSlot] || '').split(' - ')[0]}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <span className="text-gray-200 font-bold shrink-0">{a.hoursPerWeek}h</span>
                                         </div>
                                       );
                                     })
