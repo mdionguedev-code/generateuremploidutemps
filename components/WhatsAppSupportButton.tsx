@@ -18,7 +18,7 @@ export default function WhatsAppSupportButton({
   const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 
   return (
-    <div className="fixed bottom-5 right-5 z-[9999] flex flex-col items-end pointer-events-auto">
+    <div className="fixed bottom-5 right-5 z-[99999] flex flex-col items-end pointer-events-auto">
       {/* Tooltip on hover */}
       <AnimatePresence>
         {isHovered && (

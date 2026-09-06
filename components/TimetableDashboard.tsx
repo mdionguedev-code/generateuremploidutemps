@@ -3052,6 +3052,8 @@ Pour débloquer votre formule :
           onClose={() => setIsAuthModalOpen(false)}
           theme={theme}
         />
+        {/* FLOATING WHATSAPP ASSISTANCE SUPPORT BUTTON */}
+        <WhatsAppSupportButton phoneNumber="221785927510" />
       </div>
     );
   }
