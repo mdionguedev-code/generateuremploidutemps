@@ -725,6 +725,119 @@ Pour activer votre formule :
     onUpdateLicenseKeys(updated);
   };
 
+  // Download PDF certificate directly to computer for any license key
+  const handleDownloadLicenseKeyPdf = async (keyObj: SaaSLicenseKey) => {
+    try {
+      const { generateKeyPdfFile } = await import('@/lib/pdfKeyGenerator');
+      const targetPlan = plans.find(p => p.id === keyObj.planId) || plans[0];
+      const associatedClient = clients.find(c => c.licenseKey === keyObj.key || c.schoolName === keyObj.usedByClientName);
+
+      const dummyClient: SaaSClient = associatedClient || {
+        id: `cli_${Date.now()}`,
+        schoolName: keyObj.usedByClientName || "Établissement Bénéficiaire",
+        logoIcon: 'GraduationCap',
+        adminName: "Administrateur Établissement",
+        adminEmail: "contact@etablissement.com",
+        phone: "",
+        whatsapp: "",
+        cityCountry: "Sénégal",
+        planId: keyObj.planId,
+        status: 'pending_key',
+        startDate: keyObj.generatedAt,
+        trialEndDate: keyObj.generatedAt,
+        subscriptionEndDate: new Date(Date.now() + (keyObj.durationDays || 365) * 86400000).toISOString().split('T')[0],
+        paymentMethod: "Clé Licence",
+        totalPaidFCFA: targetPlan?.annualPriceFCFA || 0,
+        createdAt: keyObj.generatedAt,
+        lastActiveAt: "À l'instant",
+        classesCount: 0,
+        teachersCount: 0
+      };
+
+      if (targetPlan) {
+        const { doc, fileName } = generateKeyPdfFile(dummyClient, targetPlan, keyObj.key);
+        doc.save(fileName);
+      }
+    } catch (err) {
+      console.error("Erreur lors du téléchargement du PDF de la clé", err);
+    }
+  };
+
+  // Share PDF certificate directly via Web Share API or open delivery guide modal
+  const handleShareLicenseKeyPdf = async (keyObj: SaaSLicenseKey) => {
+    try {
+      const { generateKeyPdfFile } = await import('@/lib/pdfKeyGenerator');
+      const targetPlan = plans.find(p => p.id === keyObj.planId) || plans[0];
+      const associatedClient = clients.find(c => c.licenseKey === keyObj.key || c.schoolName === keyObj.usedByClientName);
+
+      const dummyClient: SaaSClient = associatedClient || {
+        id: `cli_${Date.now()}`,
+        schoolName: keyObj.usedByClientName || "Établissement Bénéficiaire",
+        logoIcon: 'GraduationCap',
+        adminName: "Administrateur Établissement",
+        adminEmail: "contact@etablissement.com",
+        phone: "",
+        whatsapp: "",
+        cityCountry: "Sénégal",
+        planId: keyObj.planId,
+        status: 'pending_key',
+        startDate: keyObj.generatedAt,
+        trialEndDate: keyObj.generatedAt,
+        subscriptionEndDate: new Date(Date.now() + (keyObj.durationDays || 365) * 86400000).toISOString().split('T')[0],
+        paymentMethod: "Clé Licence",
+        totalPaidFCFA: targetPlan?.annualPriceFCFA || 0,
+        createdAt: keyObj.generatedAt,
+        lastActiveAt: "À l'instant",
+        classesCount: 0,
+        teachersCount: 0
+      };
+
+      const planName = targetPlan?.name || 'Abonnement';
+      const emailSubject = `Votre certificat officiel d'activation Planora - ${dummyClient.schoolName}`;
+      const messageText = `Bonjour ! Voici votre certificat officiel et clé d'activation Planora pour l'établissement "${dummyClient.schoolName}" (${planName}) : ${keyObj.key}.
+
+📄 Le certificat PDF officiel avec tous les détails de votre souscription est disponible.
+
+Pour activer votre formule :
+1. Connectez-vous sur votre Espace Établissement Planora.
+2. Rendez-vous dans la section "Activer ma clé de licence".
+3. Renseignez votre clé : ${keyObj.key}`;
+
+      if (targetPlan) {
+        const { doc, file, fileName } = generateKeyPdfFile(dummyClient, targetPlan, keyObj.key);
+
+        if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: emailSubject,
+              text: messageText
+            });
+            return;
+          } catch (err: any) {
+            if (err.name !== 'AbortError') {
+              console.warn("Partage web échoué ou annulé, ouverture du guide de livraison", err);
+            }
+          }
+        }
+
+        // Fallback: download PDF and open guide modal
+        doc.save(fileName);
+        setDeliveryGuideModal({
+          isOpen: true,
+          client: dummyClient,
+          planName,
+          key: keyObj.key,
+          type: 'share',
+          fileName,
+          messageText
+        });
+      }
+    } catch (err) {
+      console.error("Erreur lors du partage du PDF de la clé", err);
+    }
+  };
+
   // Render Status Badge
   const renderStatusBadge = (status: SubscriptionStatus) => {
     switch (status) {
@@ -1628,14 +1741,29 @@ Pour activer votre formule :
 
                           <td className="p-4 font-mono text-[11px]">
                             {client.licenseKey ? (
-                              <button
-                                onClick={() => handleCopyKey(client.licenseKey!, client.id)}
-                                className="px-2 py-1 rounded bg-slate-950 border border-white/10 text-indigo-300 hover:text-white flex items-center gap-1 cursor-pointer"
-                                title="Cliquer pour copier la clé"
-                              >
-                                {copiedKeyId === client.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Key className="w-3 h-3 text-amber-400" />}
-                                {client.licenseKey.substring(0, 14)}...
-                              </button>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleCopyKey(client.licenseKey!, client.id)}
+                                  className="px-2 py-1 rounded bg-slate-950 border border-white/10 text-indigo-300 hover:text-white flex items-center gap-1 cursor-pointer"
+                                  title="Cliquer pour copier la clé"
+                                >
+                                  {copiedKeyId === client.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Key className="w-3 h-3 text-amber-400" />}
+                                  {client.licenseKey.substring(0, 14)}...
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    import('@/lib/pdfKeyGenerator').then(({ generateKeyPdfFile }) => {
+                                      const targetPlan = plans.find(p => p.id === client.planId) || plans[0];
+                                      const { doc, fileName } = generateKeyPdfFile(client, targetPlan, client.licenseKey!);
+                                      doc.save(fileName);
+                                    });
+                                  }}
+                                  className="p-1 rounded bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-white border border-indigo-500/20 cursor-pointer"
+                                  title="Télécharger le certificat PDF directement sur l'ordinateur"
+                                >
+                                  <Download className="w-3 h-3" />
+                                </button>
+                              </div>
                             ) : (
                               <span className="text-gray-600 font-sans italic">Aucune clé</span>
                             )}
@@ -1966,7 +2094,26 @@ Pour activer votre formule :
                             {k.usedByClientName || '—'}
                           </td>
                           <td className="p-4 text-right font-sans">
-                            <div className="flex items-center justify-end gap-2">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* DOWNLOAD PDF CERTIFICATE DIRECTLY TO COMPUTER */}
+                              <button
+                                onClick={() => handleDownloadLicenseKeyPdf(k)}
+                                className="p-2 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-white border border-indigo-500/20 cursor-pointer"
+                                title="Télécharger le certificat PDF directement sur l'ordinateur"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* SHARE PDF CERTIFICATE DIRECTLY */}
+                              <button
+                                onClick={() => handleShareLicenseKeyPdf(k)}
+                                className="p-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 hover:text-white border border-purple-500/20 cursor-pointer"
+                                title="Partager le certificat PDF (WhatsApp / Email / Applications)"
+                              >
+                                <Share2 className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* COPY KEY */}
                               <button
                                 onClick={() => handleCopyKey(k.key, k.id)}
                                 className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 cursor-pointer"
@@ -1974,11 +2121,13 @@ Pour activer votre formule :
                               >
                                 {copiedKeyId === k.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                               </button>
+
+                              {/* REVOKE KEY */}
                               {k.status === 'unused' && (
                                 <button
                                   onClick={() => handleRevokeKey(k.id)}
                                   className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 cursor-pointer"
-                                  title="Révolutionner / Révoquer"
+                                  title="Révoquer la clé"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
