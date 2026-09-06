@@ -54,6 +54,7 @@ import {
 
 import dynamic from 'next/dynamic';
 import LandingPage from '@/components/LandingPage';
+import WhatsAppSupportButton from '@/components/WhatsAppSupportButton';
 import type { ChefChartType } from '@/components/ChefAnalyticsDetailModal';
 
 const SaaSAdminPortal = dynamic(() => import('@/components/SaaSAdminPortal'), {
@@ -7385,6 +7386,9 @@ Pour débloquer votre formule :
           }}
           theme={theme}
         />
+
+        {/* FLOATING WHATSAPP ASSISTANCE SUPPORT BUTTON */}
+        <WhatsAppSupportButton phoneNumber="221785927510" />
 
       </div>
     </div>
