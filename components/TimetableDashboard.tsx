@@ -52,13 +52,57 @@ import {
   ShieldCheck
 } from 'lucide-react';
 
-import SaaSAdminPortal from '@/components/SaaSAdminPortal';
-import ClientSubscriptionModal from '@/components/ClientSubscriptionModal';
+import dynamic from 'next/dynamic';
 import LandingPage from '@/components/LandingPage';
-import AuthModal from '@/components/AuthModal';
-import ChefAnalyticsDetailModal, { ChefChartType } from '@/components/ChefAnalyticsDetailModal';
-import DocumentationView from '@/components/DocumentationView';
-import PedagogicalPlanningTab from '@/components/PedagogicalPlanningTab';
+import type { ChefChartType } from '@/components/ChefAnalyticsDetailModal';
+
+const SaaSAdminPortal = dynamic(() => import('@/components/SaaSAdminPortal'), {
+  loading: () => (
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-8 text-center space-y-4">
+      <div className="w-10 h-10 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 animate-spin">
+        <RefreshCw className="w-5 h-5" />
+      </div>
+      <p className="text-xs font-bold text-gray-300">Chargement du Portail d'Administration SaaS...</p>
+    </div>
+  ),
+  ssr: false
+});
+
+const DocumentationView = dynamic(() => import('@/components/DocumentationView'), {
+  loading: () => (
+    <div className="p-12 text-center text-indigo-400 space-y-3">
+      <div className="w-8 h-8 rounded-xl bg-indigo-500/20 mx-auto flex items-center justify-center animate-spin">
+        <RefreshCw className="w-4 h-4" />
+      </div>
+      <p className="text-xs font-bold text-gray-400">Chargement du Guide &amp; Documentation...</p>
+    </div>
+  ),
+  ssr: false
+});
+
+const PedagogicalPlanningTab = dynamic(() => import('@/components/PedagogicalPlanningTab'), {
+  loading: () => (
+    <div className="p-12 text-center text-indigo-400 space-y-3">
+      <div className="w-8 h-8 rounded-xl bg-indigo-500/20 mx-auto flex items-center justify-center animate-spin">
+        <RefreshCw className="w-4 h-4" />
+      </div>
+      <p className="text-xs font-bold text-gray-400">Chargement de la Répartition Pédagogique...</p>
+    </div>
+  ),
+  ssr: false
+});
+
+const ChefAnalyticsDetailModal = dynamic(() => import('@/components/ChefAnalyticsDetailModal'), {
+  ssr: false
+});
+
+const ClientSubscriptionModal = dynamic(() => import('@/components/ClientSubscriptionModal'), {
+  ssr: false
+});
+
+const AuthModal = dynamic(() => import('@/components/AuthModal'), {
+  ssr: false
+});
 import { createClient } from '@/utils/supabase/client';
 import {
   getEstablishmentData,

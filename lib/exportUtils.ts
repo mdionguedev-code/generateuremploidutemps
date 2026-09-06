@@ -1,5 +1,3 @@
-import { jsPDF } from 'jspdf';
-import * as XLSX from 'xlsx';
 import { TimetableEntry, ClassGroup, Teacher, Subject } from './types';
 
 function escapeHtml(str: string): string {
@@ -168,7 +166,7 @@ function getDayBlocksForTeacher(
 // =========================================================================
 // 1. EXPORT EMPLOI DU TEMPS PDF PAR CLASSE (SOIGNÉ, ACADÉMIQUE, 2H UNIFIÉES)
 // =========================================================================
-export function exportTimetableToPdf(
+export async function exportTimetableToPdf(
   classId: string,
   timetable: TimetableEntry[],
   classes: ClassGroup[],
@@ -178,6 +176,7 @@ export function exportTimetableToPdf(
   schoolSlogan: string = "Validé par la direction des études.",
   schoolBreaks: any[] = []
 ) {
+  const { jsPDF } = await import('jspdf');
   const DAYS = activeExportDays;
   const SLOT_LABELS = activeExportSlotLabels;
   const doc = new jsPDF({
@@ -471,7 +470,7 @@ export function exportTimetableToPdf(
 // =========================================================================
 // 2. EXPORT EMPLOI DU TEMPS PDF PAR ENSEIGNANT (2H UNIFIÉES, "Prof libre")
 // =========================================================================
-export function exportTeacherTimetableToPdf(
+export async function exportTeacherTimetableToPdf(
   teacherId: string,
   timetable: TimetableEntry[],
   classes: ClassGroup[],
@@ -480,6 +479,7 @@ export function exportTeacherTimetableToPdf(
   schoolName: string = "Diongue-IziSchool",
   schoolSlogan: string = "Validé par la direction des études."
 ) {
+  const { jsPDF } = await import('jspdf');
   const DAYS = activeExportDays;
   const SLOT_LABELS = activeExportSlotLabels;
   const doc = new jsPDF({
@@ -671,7 +671,7 @@ export function exportTeacherTimetableToPdf(
 // =========================================================================
 // 3. EXPORT ENSEMBLE DES ENSEIGNANTS EN PDF (RELIÉ)
 // =========================================================================
-export function exportAllTeachersTimetableToPdf(
+export async function exportAllTeachersTimetableToPdf(
   timetable: TimetableEntry[],
   classes: ClassGroup[],
   teachers: Teacher[],
@@ -681,6 +681,7 @@ export function exportAllTeachersTimetableToPdf(
 ) {
   if (teachers.length === 0) return;
 
+  const { jsPDF } = await import('jspdf');
   const DAYS = activeExportDays;
   const SLOT_LABELS = activeExportSlotLabels;
   const doc = new jsPDF({
@@ -870,13 +871,14 @@ export function exportAllTeachersTimetableToPdf(
 // =========================================================================
 // 4. EXPORT EXCEL PAR CLASSE & ENSEIGNANTS
 // =========================================================================
-export function exportTimetableToExcel(
+export async function exportTimetableToExcel(
   timetable: TimetableEntry[],
   classes: ClassGroup[],
   teachers: Teacher[],
   subjects: Subject[],
   schoolBreaks: any[] = []
 ) {
+  const XLSX = await import('xlsx');
   const DAYS = activeExportDays;
   const SLOT_LABELS = activeExportSlotLabels;
   const wb = XLSX.utils.book_new();
@@ -953,13 +955,14 @@ export function exportTimetableToExcel(
   XLSX.writeFile(wb, `emplois_du_temps.xlsx`);
 }
 
-export function exportTeacherTimetableToExcel(
+export async function exportTeacherTimetableToExcel(
   teacherId: string,
   timetable: TimetableEntry[],
   classes: ClassGroup[],
   teachers: Teacher[],
   subjects: Subject[]
 ) {
+  const XLSX = await import('xlsx');
   const DAYS = activeExportDays;
   const SLOT_LABELS = activeExportSlotLabels;
   const wb = XLSX.utils.book_new();
