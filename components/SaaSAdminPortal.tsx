@@ -52,7 +52,10 @@ import {
   KeyRound,
   ShieldCheck,
   Share2,
-  Paperclip
+  Paperclip,
+  RotateCcw,
+  AlertOctagon,
+  Trash
 } from 'lucide-react';
 import {
   dbAdminCreateClientUser,
@@ -181,6 +184,70 @@ export default function SaaSAdminPortal({
   const [resetPasswordError, setResetPasswordError] = useState<string | null>(null);
   const [resetPasswordSuccess, setResetPasswordSuccess] = useState<string | null>(null);
   const [copiedResetCreds, setCopiedResetCreds] = useState(false);
+
+  // Data Reset Modal State
+  const [isResetDataModalOpen, setIsResetDataModalOpen] = useState(false);
+  const [resetDataType, setResetDataType] = useState<'test_requests' | 'unused_keys' | 'test_clients' | 'full_saas'>('test_requests');
+  const [resetConfirmInput, setResetConfirmInput] = useState('');
+  const [isResettingData, setIsResettingData] = useState(false);
+  const [resetDataSuccess, setResetDataSuccess] = useState<string | null>(null);
+  const [resetDataError, setResetDataError] = useState<string | null>(null);
+
+  const handleOpenResetDataModal = (type: 'test_requests' | 'unused_keys' | 'test_clients' | 'full_saas' = 'test_requests') => {
+    setResetDataType(type);
+    setResetConfirmInput('');
+    setResetDataError(null);
+    setResetDataSuccess(null);
+    setIsResetDataModalOpen(true);
+  };
+
+  const handleExecuteAdminReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (resetConfirmInput.trim().toUpperCase() !== 'REINITIALISER') {
+      setResetDataError("Veuillez saisir exactement 'REINITIALISER' pour déverrouiller et confirmer.");
+      return;
+    }
+
+    setIsResettingData(true);
+    setResetDataError(null);
+    setResetDataSuccess(null);
+
+    try {
+      if (resetDataType === 'test_requests') {
+        if (onUpdateActivationRequests) onUpdateActivationRequests([]);
+        onUpdateTransactions([]);
+        localStorage.removeItem('saas_activation_requests');
+        localStorage.removeItem('saas_transactions');
+        setResetDataSuccess("Les demandes d'activation et le journal de transactions ont été réinitialisés avec succès !");
+      } else if (resetDataType === 'unused_keys') {
+        const activeKeys = licenseKeys.filter(k => k.status === 'used');
+        onUpdateLicenseKeys(activeKeys);
+        localStorage.setItem('saas_keys', JSON.stringify(activeKeys));
+        setResetDataSuccess(`Toutes les clés de licence non attribuées ont été supprimées (${licenseKeys.length - activeKeys.length} clés nettoyées).`);
+      } else if (resetDataType === 'test_clients') {
+        onUpdateClients([]);
+        localStorage.removeItem('saas_clients');
+        setResetDataSuccess("La liste des établissements clients a été réinitialisée.");
+      } else if (resetDataType === 'full_saas') {
+        localStorage.removeItem('saas_clients');
+        localStorage.removeItem('saas_keys');
+        localStorage.removeItem('saas_transactions');
+        localStorage.removeItem('saas_activation_requests');
+        localStorage.removeItem('saas_settings');
+        
+        onUpdateClients([]);
+        onUpdateLicenseKeys([]);
+        onUpdateTransactions([]);
+        if (onUpdateActivationRequests) onUpdateActivationRequests([]);
+        
+        setResetDataSuccess("Réinitialisation Générale SaaS effectuée avec succès ! Les données locales ont été remises à zéro.");
+      }
+    } catch (err) {
+      setResetDataError("Une erreur est survenue lors de la réinitialisation des données.");
+    } finally {
+      setIsResettingData(false);
+    }
+  };
 
   const handleOpenResetPasswordModal = (client: SaaSClient) => {
     setResetPasswordClient(client);
@@ -953,6 +1020,19 @@ Pour activer votre formule :
             >
               <KeyRound className="w-4 h-4 text-purple-400" />
               <span>Mon Mot de Passe</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleOpenResetDataModal('test_requests')}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all cursor-pointer hover:scale-[1.02] active:scale-95 ${
+                theme === 'light'
+                  ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200 shadow-sm'
+                  : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border-rose-500/30'
+              }`}
+              title="Réinitialiser les données administrateur"
+            >
+              <RotateCcw className="w-4 h-4 text-rose-400" />
+              <span>Réinitialiser Données</span>
             </button>
           </div>
         </div>
@@ -2608,6 +2688,138 @@ Pour activer votre formule :
             </form>
           </div>
 
+          {/* ZONE DE DANGER / REINITIALISATION DES DONNEES ADMIN */}
+          <div className={`p-6 rounded-2xl border shadow-xl space-y-5 transition-all ${
+            theme === 'light'
+              ? 'bg-rose-50/50 border-rose-200 shadow-rose-100/50'
+              : 'bg-gradient-to-br from-rose-950/30 via-slate-900 to-slate-950 border-rose-500/30'
+          }`}>
+            <div className="flex items-center justify-between pb-3 border-b border-rose-500/20">
+              <div className="flex items-center gap-3">
+                <span className="p-2.5 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                  <ShieldAlert className="w-5 h-5" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-black text-white flex items-center gap-2">
+                    Zone de Danger — Réinitialisation des Données Administrateur
+                    <span className="text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-full font-mono">
+                      Sensible
+                    </span>
+                  </h3>
+                  <p className="text-xs text-gray-400">
+                    Outils de purge et remise à zéro des données locales, transactions de test et clés de licence.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Reset Option 1: Demandes & Transactions */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-white/10 hover:border-amber-500/40 transition-all flex flex-col justify-between gap-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Purger les Demandes &amp; Transactions
+                    </span>
+                    <span className="text-[10px] bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded-md border border-amber-500/20">
+                      {activationRequests.length} demandes
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400">
+                    Efface l&apos;historique des demandes d&apos;activation WhatsApp/Email et les reçus de test sans affecter les comptes clients existants.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleOpenResetDataModal('test_requests')}
+                  className="w-full py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Réinitialiser les Demandes</span>
+                </button>
+              </div>
+
+              {/* Reset Option 2: Clés non utilisées */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-white/10 hover:border-purple-500/40 transition-all flex flex-col justify-between gap-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                      <Key className="w-3.5 h-3.5" />
+                      Purger les Clés Non Attribuées
+                    </span>
+                    <span className="text-[10px] bg-purple-500/10 text-purple-300 px-2 py-0.5 rounded-md border border-purple-500/20">
+                      {licenseKeys.filter(k => k.status === 'unused').length} clés disponibles
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400">
+                    Supprime uniquement les clés de licence générées qui n&apos;ont pas encore été activées par un établissement.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleOpenResetDataModal('unused_keys')}
+                  className="w-full py-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Supprimer les Clés Inactivées</span>
+                </button>
+              </div>
+
+              {/* Reset Option 3: Clients Démo / Test */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-white/10 hover:border-rose-500/40 transition-all flex flex-col justify-between gap-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold text-rose-300 flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5" />
+                      Réinitialiser la Liste des Clients
+                    </span>
+                    <span className="text-[10px] bg-rose-500/10 text-rose-300 px-2 py-0.5 rounded-md border border-rose-500/20">
+                      {clients.length} établissements
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400">
+                    Remet à zéro la liste des comptes établissements clients pour réinitialiser votre environnement de test.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleOpenResetDataModal('test_clients')}
+                  className="w-full py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Réinitialiser les Clients</span>
+                </button>
+              </div>
+
+              {/* Reset Option 4: Full SaaS Reset */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-rose-500/40 hover:border-rose-500 transition-all flex flex-col justify-between gap-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-black text-rose-400 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      Réinitialisation Générale (Usine)
+                    </span>
+                    <span className="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-md border border-rose-500/40 font-mono font-bold">
+                      COMPLET
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400">
+                    Vide intégralement la mémoire du SaaS (clients, clés, transactions, demandes) pour recommencer à zéro.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleOpenResetDataModal('full_saas')}
+                  className="w-full py-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-700 hover:from-rose-500 hover:to-red-600 text-white shadow-lg shadow-rose-600/30 text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Réinitialisation Générale SaaS</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
         </div>
       )}
 
@@ -3943,6 +4155,136 @@ Pour activer votre formule :
                   Fermer
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================= */}
+      {/* MODAL: ADMIN DATA RESET SAFETY CONFIRMATION               */}
+      {/* ========================================================= */}
+      <AnimatePresence>
+        {isResetDataModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-slate-900 border border-rose-500/30 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4 text-xs"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <ShieldAlert className="w-5 h-5 text-rose-400" />
+                  Confirmation de Réinitialisation des Données Admin
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsResetDataModalOpen(false)}
+                  className="text-gray-400 hover:text-white cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {resetDataSuccess ? (
+                <div className="space-y-4 py-3 text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto shadow-lg">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-white">Données Réinitialisées avec Succès !</h4>
+                    <p className="text-xs text-gray-300 mt-1">{resetDataSuccess}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsResetDataModalOpen(false)}
+                    className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold cursor-pointer"
+                  >
+                    Fermer
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleExecuteAdminReset} className="space-y-4">
+                  {resetDataError && (
+                    <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-300 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>{resetDataError}</span>
+                    </div>
+                  )}
+
+                  <div className="p-3.5 rounded-xl bg-rose-950/30 border border-rose-500/20 text-rose-200 space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-rose-400 text-xs">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>Attention : Action irréversible</span>
+                    </div>
+                    <p className="text-gray-300 text-[11px]">
+                      {resetDataType === 'test_requests' && "Vous allez supprimer tout l'historique des demandes d'activation et reçus de test."}
+                      {resetDataType === 'unused_keys' && "Vous allez supprimer toutes les clés de licence non encore attribuées à un client."}
+                      {resetDataType === 'test_clients' && "Vous allez réinitialiser la liste des établissements clients dans votre mémoire local."}
+                      {resetDataType === 'full_saas' && "Vous allez effectuer une REMISE À ZÉRO TOTALE des données SaaS locales (clients, clés, transactions et demandes)."}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-300 font-bold mb-1">
+                      Mode de Réinitialisation Sélectionné :
+                    </label>
+                    <select
+                      value={resetDataType}
+                      onChange={e => setResetDataType(e.target.value as any)}
+                      className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white font-semibold focus:outline-none focus:border-rose-500"
+                    >
+                      <option value="test_requests">Purger les Demandes &amp; Transactions de Test</option>
+                      <option value="unused_keys">Purger les Clés de Licence Non Attribuées</option>
+                      <option value="test_clients">Réinitialiser la Liste des Clients</option>
+                      <option value="full_saas">Réinitialisation Générale SaaS (Usine)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-300 font-bold mb-1">
+                      Tapez <strong className="text-rose-400 font-mono">REINITIALISER</strong> pour confirmer :
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={resetConfirmInput}
+                      onChange={e => setResetConfirmInput(e.target.value)}
+                      placeholder="REINITIALISER"
+                      className="w-full bg-slate-950 border border-rose-500/30 rounded-xl p-2.5 text-rose-300 font-mono font-bold text-xs uppercase focus:outline-none focus:border-rose-400"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-end gap-3 border-t border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setIsResetDataModalOpen(false)}
+                      className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 font-bold cursor-pointer"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isResettingData || resetConfirmInput.trim().toUpperCase() !== 'REINITIALISER'}
+                      className={`px-5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-extrabold shadow-lg shadow-rose-600/30 cursor-pointer flex items-center gap-2 ${
+                        isResettingData || resetConfirmInput.trim().toUpperCase() !== 'REINITIALISER' ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      {isResettingData ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>Réinitialisation en cours...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="w-4 h-4" />
+                          <span>Confirmer la Réinitialisation</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
             </motion.div>
           </div>
         )}

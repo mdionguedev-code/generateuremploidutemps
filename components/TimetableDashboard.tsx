@@ -1238,6 +1238,9 @@ Pour débloquer votre formule :
   };
 
   const handleResetData = async () => {
+    if (!window.confirm("Êtes-vous sûr de vouloir réinitialiser les données de l'établissement aux données d'origine ?")) {
+      return;
+    }
     if (currentUserId) {
       setIsLoadingDb(true);
       const estData = await getEstablishmentData(currentUserId);
@@ -1248,7 +1251,7 @@ Pour débloquer votre formule :
       setUnscheduled(estData.savedUnscheduled);
       setGenerationScore(estData.savedScore);
       setIsLoadingDb(false);
-      showNotification("Données actualisées depuis la base de données Supabase !", "info");
+      triggerNotification("Données réinitialisées avec succès depuis la base de données !", "info");
     }
   };
 
