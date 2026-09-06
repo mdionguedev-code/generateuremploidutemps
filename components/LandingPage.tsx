@@ -746,6 +746,7 @@ export default function LandingPage({
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> 20 classes max</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> 25 profs max</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> 50 exportations max (PDF, Word, Excel)</li>
+                    <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Module Planification &amp; Répartition Équitable</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Assistant IA Gemini</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Support Prioritaire</li>
                   </ul>
@@ -772,6 +773,7 @@ export default function LandingPage({
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Enseignants illimités</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Générations illimitées</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Exportations illimitées (Tout format)</li>
+                    <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Module Planification &amp; Répartition Équitable</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Assistant IA prioritaire</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Custom Branding (Logo &amp; URL)</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Multi-comptes &amp; Réseaux</li>

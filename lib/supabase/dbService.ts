@@ -30,12 +30,22 @@ export interface EstablishmentSettingsData {
 export async function getEstablishmentData(userId: string) {
   const supabase = createClient();
 
-  // 1. Fetch settings
-  let { data: settings } = await supabase
-    .from('establishment_settings')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle();
+  // Execute all queries in parallel for ultra-fast load time
+  const [
+    settingsRes,
+    dbSubjectsRes,
+    dbTeachersRes,
+    dbClassesRes,
+    dbTimetablesRes
+  ] = await Promise.all([
+    supabase.from('establishment_settings').select('*').eq('user_id', userId).maybeSingle(),
+    supabase.from('subjects').select('id, name').eq('user_id', userId).order('created_at', { ascending: true }),
+    supabase.from('teachers').select('id, name, subject_ids, weekly_quota, color, unavailability').eq('user_id', userId).order('created_at', { ascending: true }),
+    supabase.from('classes').select('id, name, assignments, unavailability').eq('user_id', userId).order('created_at', { ascending: true }),
+    supabase.from('timetables').select('id, title, data, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(1)
+  ]);
+
+  let settings = settingsRes.data;
 
   if (!settings) {
     // Create initial settings for this user if first time
@@ -58,34 +68,10 @@ export async function getEstablishmentData(userId: string) {
     settings = newSettings;
   }
 
-  // 2. Fetch subjects
-  const { data: dbSubjects } = await supabase
-    .from('subjects')
-    .select('id, name')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: true });
-
-  // 3. Fetch teachers
-  const { data: dbTeachers } = await supabase
-    .from('teachers')
-    .select('id, name, subject_ids, weekly_quota, color, unavailability')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: true });
-
-  // 4. Fetch classes
-  const { data: dbClasses } = await supabase
-    .from('classes')
-    .select('id, name, assignments, unavailability')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: true });
-
-  // 5. Fetch latest timetable
-  const { data: dbTimetables } = await supabase
-    .from('timetables')
-    .select('id, title, data, created_at')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(1);
+  const dbSubjects = dbSubjectsRes.data;
+  const dbTeachers = dbTeachersRes.data;
+  const dbClasses = dbClassesRes.data;
+  const dbTimetables = dbTimetablesRes.data;
 
   const subjects: Subject[] = (dbSubjects || []).map(s => ({
     id: s.id,

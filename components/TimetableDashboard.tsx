@@ -58,6 +58,7 @@ import LandingPage from '@/components/LandingPage';
 import AuthModal from '@/components/AuthModal';
 import ChefAnalyticsDetailModal, { ChefChartType } from '@/components/ChefAnalyticsDetailModal';
 import DocumentationView from '@/components/DocumentationView';
+import PedagogicalPlanningTab from '@/components/PedagogicalPlanningTab';
 import { createClient } from '@/utils/supabase/client';
 import {
   getEstablishmentData,
@@ -90,19 +91,19 @@ import {
   SaaSActivationRequest
 } from '@/lib/saasTypes';
 
-import { 
-  ResponsiveContainer, 
-  BarChart as RechartsBarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  Legend, 
-  PieChart, 
-  Pie, 
-  Cell, 
-  LineChart, 
-  Line, 
+import {
+  ResponsiveContainer,
+  BarChart as RechartsBarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
   CartesianGrid,
   AreaChart,
   Area
@@ -159,7 +160,7 @@ export default function TimetableDashboard({
     for (let i = 0; i < totalSlots; i++) {
       const startMin = currentMinutes;
       const endMin = currentMinutes + 60;
-      
+
       const startH = Math.floor(startMin / 60);
       const startM = startMin % 60;
       const endH = Math.floor(endMin / 60);
@@ -167,7 +168,7 @@ export default function TimetableDashboard({
 
       const startStr = `${String(startH).padStart(2, '0')}h${String(startM).padStart(2, '0')}`;
       const endStr = `${String(endH).padStart(2, '0')}h${String(endM).padStart(2, '0')}`;
-      
+
       labels.push(`${startStr} - ${endStr}`);
 
       currentMinutes = endMin;
@@ -222,7 +223,7 @@ export default function TimetableDashboard({
   const [timetable, setTimetable] = useState<TimetableEntry[]>([]);
   const [unscheduled, setUnscheduled] = useState<any[]>([]);
   const [generationScore, setGenerationScore] = useState<number>(0);
-  
+
   // --- School / Etablissement Settings States ---
   const [schoolName, setSchoolName] = useState<string>('Diongue-IziSchool');
   const [schoolSlogan, setSchoolSlogan] = useState<string>("Validé par la direction des études.");
@@ -243,7 +244,7 @@ export default function TimetableDashboard({
       localStorage.setItem('school_breaks', JSON.stringify(schoolBreaks));
       setExportScheduleConfig(activeDays, slotLabels);
 
-      if (currentUserId) {
+      if (currentUserId && !isLoadingDb) {
         saveEstablishmentSettings(currentUserId, {
           schoolName,
           schoolSlogan,
@@ -257,10 +258,10 @@ export default function TimetableDashboard({
         });
       }
     }
-  }, [schoolName, schoolSlogan, schoolLogo, schoolLogoType, schoolLogoIcon, activeDays, startHour, endHour, schoolBreaks, slotLabels, isMounted, currentUserId]);
+  }, [schoolName, schoolSlogan, schoolLogo, schoolLogoType, schoolLogoIcon, activeDays, startHour, endHour, schoolBreaks, slotLabels, isMounted, currentUserId, isLoadingDb]);
 
   // --- UI Control States ---
-  const [activeTab, setActiveTab] = useState<'scheduleConfig' | 'subjects' | 'teachers' | 'classes' | 'timetable' | 'stats' | 'ai' | 'settings'>('scheduleConfig');
+  const [activeTab, setActiveTab] = useState<'scheduleConfig' | 'subjects' | 'teachers' | 'classes' | 'timetable' | 'planning' | 'stats' | 'ai' | 'settings'>('scheduleConfig');
   const [timetableViewMode, setTimetableViewMode] = useState<'class' | 'teacher'>('class');
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('all');
@@ -275,7 +276,7 @@ export default function TimetableDashboard({
       setNotification(null);
     }, 4000);
   };
-  
+
   // --- Drag & Drop State ---
   const [draggedItem, setDraggedItem] = useState<{ type: 'grid' | 'basket'; entryId?: string; info?: any } | null>(null);
   const [dragOverCell, setDragOverCell] = useState<{ day: string; slotIndex: number } | null>(null);
@@ -372,75 +373,116 @@ export default function TimetableDashboard({
     }
   };
 
+  const loadUserData = async (user: any) => {
+    try {
+      setIsLoadingDb(true);
+      const supabase = createClient();
+      setCurrentUserId(user.id);
+      setCurrentClientId(user.id);
+      setCurrentUserEmail(user.email || '');
+
+      // 1. Fetch profile role, establishment data, and saas data in parallel
+      const [profileRes, estData, saasData] = await Promise.all([
+        supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+        getEstablishmentData(user.id),
+        getSaaSAdminLivePlatformData()
+      ]);
+
+      const role = profileRes.data?.role || 'user';
+      if (role === 'admin') {
+        setSaasPortalMode('admin');
+      } else {
+        setSaasPortalMode('client');
+      }
+      setCurrentViewMode('app');
+
+      // 2. Set SaaS platform data
+      if (saasData.plans.length > 0) setSaasPlans(saasData.plans);
+      if (saasData.clients.length > 0) setSaasClients(saasData.clients);
+      setSaasLicenseKeys(saasData.licenseKeys);
+      setSaasActivationRequests(saasData.activationRequests);
+      if (saasData.transactions && saasData.transactions.length > 0) setSaasTransactions(saasData.transactions);
+      setSaasSettings(saasData.settings);
+
+      // 3. Set client's actual data from database
+      setSubjects(estData.subjects);
+      setTeachers(estData.teachers);
+      setClasses(estData.classes);
+      setTimetable(estData.savedTimetable);
+      setUnscheduled(estData.savedUnscheduled);
+      setGenerationScore(estData.savedScore);
+      setSchoolName(estData.settings.schoolName);
+      setSchoolSlogan(estData.settings.schoolSlogan);
+      setSchoolLogo(estData.settings.schoolLogo);
+      setSchoolLogoType(estData.settings.schoolLogoType);
+      setSchoolLogoIcon(estData.settings.schoolLogoIcon);
+      setActiveDays(estData.settings.activeDays);
+      setStartHour(estData.settings.startHour);
+      setEndHour(estData.settings.endHour);
+      setSchoolBreaks(estData.settings.schoolBreaks || []);
+      setUserPlanId(estData.settings.planId || 'plan_trial');
+
+      if (estData.classes.length > 0) {
+        setSelectedClassId(estData.classes[0].id);
+      }
+      if (estData.teachers.length > 0) {
+        setSelectedTeacherId('all');
+      }
+    } catch (err) {
+      console.error('Error loading Supabase real data:', err);
+    } finally {
+      setIsLoadingDb(false);
+      setIsMounted(true);
+    }
+  };
+
   useEffect(() => {
-    const loadRealSupabaseData = async () => {
+    const supabase = createClient();
+
+    // 1. Initial user check
+    const checkInitialAuth = async () => {
       try {
         setIsLoadingDb(true);
-        const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
-
-        // 1. Fetch live SaaS platform data (plans, registered users from profiles, live license keys)
-        const saasData = await getSaaSAdminLivePlatformData();
-        if (saasData.plans.length > 0) setSaasPlans(saasData.plans);
-        if (saasData.clients.length > 0) setSaasClients(saasData.clients);
-        setSaasLicenseKeys(saasData.licenseKeys);
-        setSaasActivationRequests(saasData.activationRequests);
-        if (saasData.transactions && saasData.transactions.length > 0) setSaasTransactions(saasData.transactions);
-        setSaasSettings(saasData.settings);
-
-        // 2. If user is authenticated, fetch their real establishment data from Supabase
         if (user) {
-          setCurrentUserId(user.id);
-          setCurrentClientId(user.id);
-          setCurrentUserEmail(user.email || '');
-          
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single();
-
-          const role = profile?.role || 'user';
-          if (role === 'admin') {
-            setSaasPortalMode('admin');
-          } else {
-            setSaasPortalMode('client');
-          }
-          setCurrentViewMode('app');
-
-          const estData = await getEstablishmentData(user.id);
-          setSubjects(estData.subjects);
-          setTeachers(estData.teachers);
-          setClasses(estData.classes);
-          setTimetable(estData.savedTimetable);
-          setUnscheduled(estData.savedUnscheduled);
-          setGenerationScore(estData.savedScore);
-          setSchoolName(estData.settings.schoolName);
-          setSchoolSlogan(estData.settings.schoolSlogan);
-          setSchoolLogo(estData.settings.schoolLogo);
-          setSchoolLogoType(estData.settings.schoolLogoType);
-          setSchoolLogoIcon(estData.settings.schoolLogoIcon);
-          setActiveDays(estData.settings.activeDays);
-          setStartHour(estData.settings.startHour);
-          setEndHour(estData.settings.endHour);
-          setSchoolBreaks(estData.settings.schoolBreaks || []);
-          setUserPlanId(estData.settings.planId || 'plan_trial');
-
-          if (estData.classes.length > 0) {
-            setSelectedClassId(estData.classes[0].id);
-          }
-          if (estData.teachers.length > 0) {
-            setSelectedTeacherId('all');
-          }
+          await loadUserData(user);
+        } else {
+          // Anonymous visitor on landing page
+          const saasData = await getSaaSAdminLivePlatformData();
+          if (saasData.plans.length > 0) setSaasPlans(saasData.plans);
+          setIsLoadingDb(false);
+          setIsMounted(true);
         }
       } catch (err) {
-        console.error('Error loading Supabase real data:', err);
-      } finally {
+        console.error('Auth check error:', err);
         setIsLoadingDb(false);
         setIsMounted(true);
       }
     };
-    loadRealSupabaseData();
+
+    checkInitialAuth();
+
+    // 2. Real-time auth listener: automatically load client data upon login or session change
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user) {
+        await loadUserData(session.user);
+      } else if (event === 'SIGNED_OUT') {
+        setCurrentUserId('');
+        setCurrentClientId('');
+        setCurrentUserEmail('');
+        setCurrentViewMode('landing');
+        setSubjects([]);
+        setTeachers([]);
+        setClasses([]);
+        setTimetable([]);
+        setUnscheduled([]);
+        setGenerationScore(0);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Sync SaaS states to localStorage once mounted
@@ -957,12 +999,12 @@ export default function TimetableDashboard({
   // --- New Item Form States ---
   // Subject Form
   const [newSubName, setNewSubName] = useState('');
-  
+
   // Breaks Form
   const [newBreakName, setNewBreakName] = useState('');
   const [newBreakAfterSlot, setNewBreakAfterSlot] = useState<number>(0);
   const [newBreakDuration, setNewBreakDuration] = useState<number>(15);
-  
+
   // Teacher Form
   const [newTeacherName, setNewTeacherName] = useState('');
   const [newTeacherQuota, setNewTeacherQuota] = useState<number>(18);
@@ -1167,7 +1209,7 @@ export default function TimetableDashboard({
     }
     setIsGenerating(true);
     triggerNotification("Lancement du moteur de résolution sous contraintes...", "info");
-    
+
     setTimeout(async () => {
       const sanitizedClasses = classes.map(c => ({
         ...c,
@@ -1195,7 +1237,7 @@ export default function TimetableDashboard({
         setUnscheduled(data.unscheduled);
         setGenerationScore(data.score);
         setGenerationCount(prev => prev + 1);
-        
+
         if (currentUserId) {
           await dbSaveTimetable(
             currentUserId,
@@ -1206,7 +1248,7 @@ export default function TimetableDashboard({
             { subjects, teachers, classes: sanitizedClasses, activeDays, totalSlots }
           );
         }
-        
+
         if (data.isFullyScheduled) {
           triggerNotification("Emploi du temps résolu et sauvegardé en base de données ! Score: 100%", "success");
         } else {
@@ -1247,7 +1289,7 @@ export default function TimetableDashboard({
     }
     setIsLoadingAi(true);
     setAiSuggestions("L'assistant Gemini analyse vos conflits de planning, les temps d'attente des professeurs et les plages horaires...");
-    
+
     try {
       const response = await fetch('/api/timetable/ai-suggest', {
         method: 'POST',
@@ -1346,7 +1388,7 @@ export default function TimetableDashboard({
         setUnscheduled(data.unscheduled);
         setGenerationScore(data.score);
         setAiExecutionReasoning(data.reasoning);
-        
+
         syncToLocalStorage(subjects, teachers, classes, data.timetable, data.unscheduled, data.score);
         triggerNotification("L'emploi du temps a été mis à jour par l'Agent IA !", "success");
 
@@ -1380,7 +1422,7 @@ export default function TimetableDashboard({
   const handleDragOverCell = (e: React.DragEvent, day: string, slotIndex: number) => {
     e.preventDefault();
     if (!draggedItem) return;
-    
+
     // Check if cell is different
     if (dragOverCell?.day === day && dragOverCell?.slotIndex === slotIndex) {
       return;
@@ -1449,7 +1491,7 @@ export default function TimetableDashboard({
         day,
         slotIndex
       };
-      
+
       const val = validateManualMove(timetable, classes, teachers, mockEntry, day, slotIndex, startHour);
       if (val.isValid) {
         // Create new entry
@@ -1473,7 +1515,7 @@ export default function TimetableDashboard({
 
         setTimetable(updatedTable);
         setUnscheduled(updatedUnscheduled);
-        
+
         // Recalculate score
         const totalTarget = classes.reduce((sum, c) => sum + c.assignments.reduce((s, a) => s + a.hoursPerWeek, 0), 0);
         const newScore = totalTarget > 0 ? Math.round((updatedTable.length / totalTarget) * 100) : 100;
@@ -1498,7 +1540,7 @@ export default function TimetableDashboard({
     if (window.confirm("Enlever ce cours et le renvoyer dans la corbeille des heures non planifiées ?")) {
       const pairedPartnerId = entry.pairedEntryId;
       const updatedTable = timetable.filter(item => item.id !== entryId && (!pairedPartnerId || item.id !== pairedPartnerId));
-      
+
       // Send back to basket
       const existingUnscheduledIdx = unscheduled.findIndex(
         u => u.classId === entry.classId && u.teacherId === entry.teacherId && u.subjectId === entry.subjectId
@@ -1565,7 +1607,7 @@ export default function TimetableDashboard({
     if (window.confirm(`Enlever ce cours de ${count}h de ${subName} et le renvoyer dans la corbeille ?`)) {
       const idsToRemove = new Set(entries.map(e => e.id));
       const updatedTable = timetable.filter(item => !idsToRemove.has(item.id));
-      
+
       const existingUnscheduledIdx = unscheduled.findIndex(
         u => u.classId === sample.classId && u.teacherId === sample.teacherId && u.subjectId === sample.subjectId
       );
@@ -1755,7 +1797,7 @@ export default function TimetableDashboard({
     // Check if multiple entries exist on this slot (Classes Scindées: multi-group)
     const matchingEntries = timetable.filter(e => e.classId === selectedClassId && e.day === day && e.slotIndex === slotIndex);
     const entry = matchingEntries[0];
-    
+
     // Check if class itself is marked as unavailable during this slot
     const currentCls = classes.find(c => c.id === selectedClassId);
     const isClassUnavailable = currentCls?.unavailability.some(u => u.day === day && u.slotIndex === slotIndex);
@@ -1782,11 +1824,10 @@ export default function TimetableDashboard({
           id={`split-card-${e1.id}`}
           draggable="true"
           onDragStart={(e) => handleGridDragStart(e, e1.id)}
-          className={`relative h-full w-full p-2 rounded-xl border flex flex-col justify-between cursor-grab active:cursor-grabbing shadow-sm transition-all select-none group ${
-            theme === 'light'
+          className={`relative h-full w-full p-2 rounded-xl border flex flex-col justify-between cursor-grab active:cursor-grabbing shadow-sm transition-all select-none group ${theme === 'light'
               ? 'border-purple-200 bg-purple-50/50 hover:border-purple-300 hover:shadow-md'
               : 'border-purple-500/30 bg-purple-950/20 hover:border-purple-500/50 hover:shadow-md'
-          }`}
+            }`}
           style={{ borderLeft: '4px solid #a855f7' }}
         >
           {/* Header of split cell */}
@@ -1846,7 +1887,7 @@ export default function TimetableDashboard({
       const teacher = teachers.find(t => t.id === entry.teacherId);
       const subject = subjects.find(s => s.id === entry.subjectId);
       const cardColor = teacher?.color || '#6366f1';
-      
+
       const startHour = (slotLabels[slotIndex] || '').split(' - ')[0];
       const endSlotIndex = slotIndex + rowSpan - 1;
       const endHour = slotLabels[endSlotIndex] ? slotLabels[endSlotIndex].split(' - ')[1] : (slotLabels[slotIndex] || '').split(' - ')[1];
@@ -1859,13 +1900,12 @@ export default function TimetableDashboard({
           id={`card-${entry.id}`}
           draggable="true"
           onDragStart={(e) => handleGridDragStart(e, entry.id)}
-          className={`relative h-full w-full p-2.5 rounded-xl border flex flex-col justify-between cursor-grab active:cursor-grabbing shadow-sm transition-all select-none group ${
-            theme === 'light'
+          className={`relative h-full w-full p-2.5 rounded-xl border flex flex-col justify-between cursor-grab active:cursor-grabbing shadow-sm transition-all select-none group ${theme === 'light'
               ? 'border-slate-200/80 hover:border-slate-300 hover:shadow-md'
               : 'border-white/10 hover:border-white/20 hover:shadow-md'
-          }`}
-          style={{ 
-            backgroundColor: theme === 'light' ? `${cardColor}18` : `${cardColor}25`, 
+            }`}
+          style={{
+            backgroundColor: theme === 'light' ? `${cardColor}18` : `${cardColor}25`,
             borderLeft: `4px solid ${cardColor}`
           }}
         >
@@ -1873,9 +1913,8 @@ export default function TimetableDashboard({
           <div>
             <div className="flex items-start justify-between gap-1 mb-1">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <h4 className={`font-sans font-bold text-xs sm:text-sm leading-tight ${
-                  theme === 'light' ? 'text-slate-900' : 'text-white'
-                }`}>
+                <h4 className={`font-sans font-bold text-xs sm:text-sm leading-tight ${theme === 'light' ? 'text-slate-900' : 'text-white'
+                  }`}>
                   {subject?.name || entry.subjectId}
                 </h4>
                 {entry.group && entry.group !== 'all' && (
@@ -1890,8 +1929,8 @@ export default function TimetableDashboard({
                 )}
               </div>
               <button
-                onClick={(e) => { 
-                  e.stopPropagation(); 
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (blockEntries.length > 1) {
                     handleDeleteBlockEntries(blockEntries);
                   } else {
@@ -1906,9 +1945,8 @@ export default function TimetableDashboard({
             </div>
 
             {/* Subtitle: Teacher Name with dot */}
-            <div className={`text-[11px] font-medium flex items-center gap-1.5 ${
-              theme === 'light' ? 'text-slate-700' : 'text-gray-300'
-            }`}>
+            <div className={`text-[11px] font-medium flex items-center gap-1.5 ${theme === 'light' ? 'text-slate-700' : 'text-gray-300'
+              }`}>
               <span className="w-2 h-2 rounded-full shrink-0 shadow-2xs" style={{ backgroundColor: cardColor }} />
               <span className="truncate">{teacher?.name || entry.teacherId}</span>
             </div>
@@ -1916,17 +1954,16 @@ export default function TimetableDashboard({
 
           {/* Bottom Row: Time Pill & Avatar Circle */}
           <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-black/5 dark:border-white/5">
-            <span className={`inline-flex items-center gap-1 text-[9.5px] font-mono px-2 py-0.5 rounded-full font-semibold ${
-              theme === 'light' 
-                ? 'bg-white/90 text-slate-700 border border-slate-200/80 shadow-2xs' 
+            <span className={`inline-flex items-center gap-1 text-[9.5px] font-mono px-2 py-0.5 rounded-full font-semibold ${theme === 'light'
+                ? 'bg-white/90 text-slate-700 border border-slate-200/80 shadow-2xs'
                 : 'bg-black/40 text-gray-300 border border-white/10'
-            }`}>
+              }`}>
               <Clock className="w-2.5 h-2.5 opacity-70" />
               {formattedTimeText}
             </span>
 
             {/* Teacher Initial Avatar Badge */}
-            <div 
+            <div
               className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold shadow-xs shrink-0 ring-1 ring-white/20"
               style={{
                 backgroundColor: cardColor,
@@ -1962,13 +1999,12 @@ export default function TimetableDashboard({
         onDragOver={(e) => handleDragOverCell(e, day, slotIndex)}
         onDragLeave={handleDragLeave}
         onDrop={(e) => handleDropOnCell(e, day, slotIndex)}
-        className={`h-full w-full min-h-[56px] rounded-md border border-dashed border-white/10 flex items-center justify-center ${
-          isHovered 
-            ? dragValidation?.isValid 
-              ? 'bg-emerald-950/40 border-emerald-500' 
+        className={`h-full w-full min-h-[56px] rounded-md border border-dashed border-white/10 flex items-center justify-center ${isHovered
+            ? dragValidation?.isValid
+              ? 'bg-emerald-950/40 border-emerald-500'
               : 'bg-red-950/40 border-red-500'
             : 'bg-slate-950/20 hover:bg-white/5'
-        }`}
+          }`}
       >
         {isHovered && draggedItem && (
           <div className="text-center p-1">
@@ -2007,7 +2043,7 @@ export default function TimetableDashboard({
       const cls = classes.find(c => c.id === entry.classId);
       const subj = subjects.find(s => s.id === entry.subjectId);
       const color = teacher.color || '#6366f1';
-      
+
       const startHour = (slotLabels[slotIndex] || '').split(' - ')[0];
       const endSlotIndex = slotIndex + rowSpan - 1;
       const endHour = slotLabels[endSlotIndex] ? slotLabels[endSlotIndex].split(' - ')[1] : (slotLabels[slotIndex] || '').split(' - ')[1];
@@ -2015,11 +2051,10 @@ export default function TimetableDashboard({
 
       return (
         <div
-          className={`h-full w-full p-2.5 rounded-xl border flex flex-col justify-between shadow-2xs select-none transition-all ${
-            theme === 'light'
+          className={`h-full w-full p-2.5 rounded-xl border flex flex-col justify-between shadow-2xs select-none transition-all ${theme === 'light'
               ? 'border-slate-200/90 shadow-2xs'
               : 'border-white/10'
-          }`}
+            }`}
           style={{
             backgroundColor: theme === 'light' ? `${color}18` : `${color}28`,
             borderLeft: `4px solid ${color}`
@@ -2027,9 +2062,8 @@ export default function TimetableDashboard({
         >
           <div>
             <div className="flex items-center justify-between gap-1 mb-0.5">
-              <h4 className={`font-sans font-bold text-xs sm:text-sm leading-snug truncate ${
-                theme === 'light' ? 'text-slate-900' : 'text-white'
-              }`}>
+              <h4 className={`font-sans font-bold text-xs sm:text-sm leading-snug truncate ${theme === 'light' ? 'text-slate-900' : 'text-white'
+                }`}>
                 {subj?.name || entry.subjectId}
               </h4>
               {rowSpan > 1 && (
@@ -2038,9 +2072,8 @@ export default function TimetableDashboard({
                 </span>
               )}
             </div>
-            <div className={`text-[11px] font-semibold flex items-center gap-1 flex-wrap ${
-              theme === 'light' ? 'text-indigo-800' : 'text-indigo-300'
-            }`}>
+            <div className={`text-[11px] font-semibold flex items-center gap-1 flex-wrap ${theme === 'light' ? 'text-indigo-800' : 'text-indigo-300'
+              }`}>
               <Users className="w-3 h-3 shrink-0" />
               <span className="truncate">{cls?.name || entry.classId}</span>
               {entry.group && entry.group !== 'all' && (
@@ -2052,11 +2085,10 @@ export default function TimetableDashboard({
           </div>
 
           <div className="flex items-center justify-between mt-1 pt-1 border-t border-black/5 dark:border-white/5">
-            <span className={`inline-flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.2 rounded font-medium ${
-              theme === 'light'
+            <span className={`inline-flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.2 rounded font-medium ${theme === 'light'
                 ? 'bg-white text-slate-700 border border-slate-200'
                 : 'bg-black/40 text-gray-300 border border-white/10'
-            }`}>
+              }`}>
               <Clock className="w-2.5 h-2.5 opacity-70" />
               {formattedTimeText}
             </span>
@@ -2203,7 +2235,7 @@ export default function TimetableDashboard({
         setIsClientSubModalOpen(true);
         return;
       }
-      
+
       const newTeachData = {
         name: newTeacherName.trim(),
         subjectIds: newTeacherSubjects,
@@ -2284,7 +2316,7 @@ export default function TimetableDashboard({
     const targetSlot = Number(tempFixedStartSlot);
     const targetDay = tempFixedDay;
     const dur = Math.min(2, Math.max(1, tempHours || 2));
-    
+
     // 1. Check teacher unavailability
     const teach = teachers.find(t => t.id === tempTeacherId);
     if (teach) {
@@ -2367,7 +2399,7 @@ export default function TimetableDashboard({
       triggerNotification(fixedSlotConflict, "error");
       return;
     }
-    
+
     // Check if assignments combination already exists in temporary assignments list
     const existsIndex = classAssignments.findIndex(as => as.teacherId === tempTeacherId && as.subjectId === tempSubjectId && !as.pairedGroupId);
     if (existsIndex !== -1) {
@@ -2475,7 +2507,7 @@ export default function TimetableDashboard({
       setClassAssignments(classAssignments.filter(a => a.pairedGroupId !== target!.pairedGroupId));
       triggerNotification("Paire de cours scindés supprimée.", "info");
     } else {
-      setClassAssignments(classAssignments.filter(a => !( (a.id && a.id === identifier) || (a.teacherId === teachId && a.subjectId === subjId) )));
+      setClassAssignments(classAssignments.filter(a => !((a.id && a.id === identifier) || (a.teacherId === teachId && a.subjectId === subjId))));
       triggerNotification("Liaison cours supprimée.");
     }
   };
@@ -2530,7 +2562,7 @@ export default function TimetableDashboard({
         setIsClientSubModalOpen(true);
         return;
       }
-      
+
       const newClassPayload = {
         name: newClassName.trim(),
         assignments: sanitizedAssignments,
@@ -2844,15 +2876,15 @@ export default function TimetableDashboard({
   const renderLogoIcon = () => {
     if (schoolLogoType === 'url' && schoolLogo) {
       return (
-        <img 
-          src={schoolLogo} 
-          alt="Logo" 
-          className="w-8 h-8 object-cover rounded-lg" 
+        <img
+          src={schoolLogo}
+          alt="Logo"
+          className="w-8 h-8 object-cover rounded-lg"
           referrerPolicy="no-referrer"
         />
       );
     }
-    
+
     const iconClass = theme === 'light' ? "w-5 h-5 text-indigo-600" : "w-5 h-5 text-white";
     switch (schoolLogoIcon) {
       case 'Building2':
@@ -2865,6 +2897,34 @@ export default function TimetableDashboard({
         return <GraduationCap className={iconClass} />;
     }
   };
+
+  if (isLoadingDb) {
+    return (
+      <div className={`min-h-screen flex flex-col items-center justify-center font-sans ${theme === 'light' ? 'bg-slate-50 text-slate-800' : 'bg-[#0b1326] text-slate-100'
+        }`}>
+        <div className={`flex flex-col items-center gap-5 p-8 rounded-3xl border backdrop-blur-xl shadow-2xl max-w-sm text-center animate-in fade-in duration-300 ${theme === 'light' ? 'bg-white border-slate-200/80 shadow-slate-200' : 'bg-slate-900/60 border-white/10'
+          }`}>
+          <div className="relative">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/25 animate-pulse">
+              <GraduationCap className="w-8 h-8 text-white" />
+            </div>
+            <div className="absolute -inset-1 rounded-2xl bg-indigo-500/20 blur-sm -z-10 animate-ping" />
+          </div>
+          <div className="space-y-1.5">
+            <h3 className="font-black text-base tracking-tight">Chargement de votre établissement...</h3>
+            <p className={`text-xs ${theme === 'light' ? 'text-slate-500' : 'text-gray-400'}`}>
+              Récupération automatique de vos classes, matières et plannings
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 pt-1">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (currentViewMode === 'landing') {
     return (
@@ -2890,7 +2950,7 @@ export default function TimetableDashboard({
 
   return (
     <div className="min-h-screen pb-16 relative">
-      
+
       {/* Background Decor */}
       <div className="absolute top-0 left-0 right-0 h-[500px] bg-gradient-to-b from-indigo-500/5 to-transparent pointer-events-none" />
       <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full filter blur-[120px] pointer-events-none" />
@@ -2898,7 +2958,7 @@ export default function TimetableDashboard({
 
       {/* Main Container */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 relative">
-        
+
         {/* --- TOAST NOTIFICATIONS --- */}
         <AnimatePresence>
           {notification && (
@@ -2911,11 +2971,10 @@ export default function TimetableDashboard({
                 boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)'
               }}
             >
-              <div className={`p-1.5 rounded-lg ${
-                notification.type === 'success' ? 'bg-emerald-500/20 text-emerald-400' :
-                notification.type === 'error' ? 'bg-red-500/20 text-red-400' :
-                'bg-blue-500/20 text-blue-400'
-              }`}>
+              <div className={`p-1.5 rounded-lg ${notification.type === 'success' ? 'bg-emerald-500/20 text-emerald-400' :
+                  notification.type === 'error' ? 'bg-red-500/20 text-red-400' :
+                    'bg-blue-500/20 text-blue-400'
+                }`}>
                 {notification.type === 'error' ? <AlertCircle className="w-5 h-5" /> : <Check className="w-5 h-5" />}
               </div>
               <p className="text-sm font-medium text-white max-w-sm leading-snug">
@@ -2927,13 +2986,12 @@ export default function TimetableDashboard({
 
         {/* --- GLOBAL SAAS ANNOUNCEMENT BANNER --- */}
         {saasPortalMode === 'admin' && saasSettings.globalAnnouncement && saasSettings.announcementType !== 'none' && (
-          <div className={`mb-6 p-3 rounded-2xl border text-xs flex items-center justify-between gap-4 shadow-lg ${
-            saasSettings.announcementType === 'warning'
+          <div className={`mb-6 p-3 rounded-2xl border text-xs flex items-center justify-between gap-4 shadow-lg ${saasSettings.announcementType === 'warning'
               ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
               : saasSettings.announcementType === 'success'
-              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
-              : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-200'
-          }`}>
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+                : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-200'
+            }`}>
             <div className="flex items-center gap-2.5">
               <Radio className="w-4 h-4 animate-pulse shrink-0" />
               <span className="font-medium">{saasSettings.globalAnnouncement}</span>
@@ -2991,22 +3049,19 @@ export default function TimetableDashboard({
 
         {/* --- PENDING ACTIVATION REQUEST BANNER --- */}
         {saasPortalMode === 'client' && pendingActivationRequest && (
-          <div className={`mb-6 p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 relative overflow-hidden ${
-            isLight ? 'bg-indigo-50/70 border-indigo-200 text-slate-800 shadow-sm' : 'border-indigo-500/30 bg-gradient-to-r from-indigo-500/10 via-slate-900/40 to-emerald-500/10 text-slate-200 shadow-xl'
-          }`}>
+          <div className={`mb-6 p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 relative overflow-hidden ${isLight ? 'bg-indigo-50/70 border-indigo-200 text-slate-800 shadow-sm' : 'border-indigo-500/30 bg-gradient-to-r from-indigo-500/10 via-slate-900/40 to-emerald-500/10 text-slate-200 shadow-xl'
+            }`}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-xl pointer-events-none" />
             <div className="flex items-center gap-3.5 relative z-10">
-              <div className={`p-3 rounded-2xl shrink-0 shadow-sm animate-pulse ${
-                isLight ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-              }`}>
+              <div className={`p-3 rounded-2xl shrink-0 shadow-sm animate-pulse ${isLight ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                }`}>
                 <Clock className="w-5 h-5" />
               </div>
               <div className="text-left">
                 <h4 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
                   <span>Demande d'activation en cours de traitement</span>
-                  <span className={`text-[9px] px-2 py-0.5 rounded-full font-mono uppercase font-bold ${
-                    isLight ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-black'
-                  }`}>
+                  <span className={`text-[9px] px-2 py-0.5 rounded-full font-mono uppercase font-bold ${isLight ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-black'
+                    }`}>
                     En attente
                   </span>
                 </h4>
@@ -3015,7 +3070,7 @@ export default function TimetableDashboard({
                 </p>
               </div>
             </div>
-            
+
             <button
               onClick={() => setIsClientSubModalOpen(true)}
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold text-xs shadow-lg transition-all flex items-center gap-1.5 cursor-pointer shrink-0 active:scale-95 border border-indigo-400/20"
@@ -3028,21 +3083,18 @@ export default function TimetableDashboard({
 
         {/* --- PENDING KEY ACTIVATION ALERT BANNER --- */}
         {saasPortalMode === 'client' && currentClient.status === 'pending_key' && !pendingActivationRequest && (
-          <div className={`mb-6 p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 ${
-            isLight ? 'bg-amber-50/80 border-amber-200 text-slate-800 shadow-sm' : 'border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-600/10 to-orange-500/10 text-amber-200 shadow-xl'
-          }`}>
+          <div className={`mb-6 p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 ${isLight ? 'bg-amber-50/80 border-amber-200 text-slate-800 shadow-sm' : 'border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-600/10 to-orange-500/10 text-amber-200 shadow-xl'
+            }`}>
             <div className="flex items-center gap-3.5">
-              <div className={`p-3 rounded-2xl shrink-0 shadow-sm ${
-                isLight ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-              }`}>
+              <div className={`p-3 rounded-2xl shrink-0 shadow-sm ${isLight ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                }`}>
                 <Key className="w-5 h-5 animate-bounce" />
               </div>
               <div>
                 <h4 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
                   <span>Clé d'activation requise</span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono ${
-                    isLight ? 'bg-amber-100 text-amber-800 border border-amber-200 font-semibold' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                  }`}>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono ${isLight ? 'bg-amber-100 text-amber-800 border border-amber-200 font-semibold' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    }`}>
                     Forfait Gratuit Restreint
                   </span>
                 </h4>
@@ -3083,9 +3135,9 @@ export default function TimetableDashboard({
             {/* LIGNE 1 : Indications de consommation et de remplissage (strictement sur une seule ligne) */}
             <div className="flex flex-nowrap items-center gap-2 sm:gap-2.5 whitespace-nowrap shrink-0">
               {/* Offre */}
-              <div 
+              <div
                 onClick={() => setIsClientSubModalOpen(true)}
-                className="bg-emerald-500 hover:bg-emerald-600 text-white border border-emerald-400 transition-all cursor-pointer rounded-xl px-2.5 py-1 font-mono text-[11px] flex items-center gap-1.5 shadow-sm shrink-0" 
+                className="bg-emerald-500 hover:bg-emerald-600 text-white border border-emerald-400 transition-all cursor-pointer rounded-xl px-2.5 py-1 font-mono text-[11px] flex items-center gap-1.5 shadow-sm shrink-0"
                 title="Cliquez pour gérer votre abonnement"
               >
                 <Sparkles className="w-3 h-3 text-white animate-pulse shrink-0" />
@@ -3131,9 +3183,8 @@ export default function TimetableDashboard({
                     </>
                   )}
                 </button>
-                <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block text-[10px] font-normal py-1 px-2.5 rounded-lg whitespace-nowrap shadow-xl z-50 pointer-events-none ${
-                  isLight ? 'bg-slate-900/90 text-slate-100 border border-slate-700/50' : 'bg-slate-950/95 text-gray-300 border border-white/10'
-                }`}>
+                <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block text-[10px] font-normal py-1 px-2.5 rounded-lg whitespace-nowrap shadow-xl z-50 pointer-events-none ${isLight ? 'bg-slate-900/90 text-slate-100 border border-slate-700/50' : 'bg-slate-950/95 text-gray-300 border border-white/10'
+                  }`}>
                   {theme === 'dark' ? "Passer en thème d'affichage clair" : "Passer en thème d'affichage sombre"}
                 </div>
               </div>
@@ -3149,9 +3200,8 @@ export default function TimetableDashboard({
                   <BookOpen className="w-3.5 h-3.5 text-indigo-500" />
                   <span>Documentation</span>
                 </button>
-                <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block text-[10px] font-normal py-1 px-2.5 rounded-lg whitespace-nowrap shadow-xl z-50 pointer-events-none ${
-                  isLight ? 'bg-slate-900/90 text-slate-100 border border-slate-700/50' : 'bg-slate-950/95 text-gray-300 border border-white/10'
-                }`}>
+                <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block text-[10px] font-normal py-1 px-2.5 rounded-lg whitespace-nowrap shadow-xl z-50 pointer-events-none ${isLight ? 'bg-slate-900/90 text-slate-100 border border-slate-700/50' : 'bg-slate-950/95 text-gray-300 border border-white/10'
+                  }`}>
                   Consulter la notice et le guide d'utilisation
                 </div>
               </div>
@@ -3167,9 +3217,8 @@ export default function TimetableDashboard({
                   <Key className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Activer une clé</span>
                 </button>
-                <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block text-[10px] font-normal py-1 px-2.5 rounded-lg whitespace-nowrap shadow-xl z-50 pointer-events-none ${
-                  isLight ? 'bg-slate-900/90 text-slate-100 border border-slate-700/50' : 'bg-slate-950/95 text-gray-300 border border-white/10'
-                }`}>
+                <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block text-[10px] font-normal py-1 px-2.5 rounded-lg whitespace-nowrap shadow-xl z-50 pointer-events-none ${isLight ? 'bg-slate-900/90 text-slate-100 border border-slate-700/50' : 'bg-slate-950/95 text-gray-300 border border-white/10'
+                  }`}>
                   Saisir une clé d'activation ou renouveler l'offre
                 </div>
               </div>
@@ -3180,18 +3229,16 @@ export default function TimetableDashboard({
               <div className="relative group">
                 <button
                   onClick={handleWipeAll}
-                  className={`px-3 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer shadow-sm hover:-translate-y-0.5 ${
-                    isLight 
-                      ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200' 
+                  className={`px-3 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer shadow-sm hover:-translate-y-0.5 ${isLight
+                      ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
                       : 'bg-red-500/10 hover:bg-red-500/20 text-red-300 hover:text-white border-red-500/20'
-                  }`}
+                    }`}
                 >
                   <Eraser className={`w-3.5 h-3.5 ${isLight ? 'text-rose-600' : 'text-red-400'}`} />
                   <span>Réinitialiser</span>
                 </button>
-                <div className={`absolute bottom-full right-0 mb-2 hidden group-hover:block text-[10px] font-normal py-1 px-2.5 rounded-lg whitespace-nowrap shadow-xl z-50 pointer-events-none ${
-                  isLight ? 'bg-slate-900/90 text-slate-100 border border-slate-700/50' : 'bg-slate-950/95 text-gray-300 border border-white/10'
-                }`}>
+                <div className={`absolute bottom-full right-0 mb-2 hidden group-hover:block text-[10px] font-normal py-1 px-2.5 rounded-lg whitespace-nowrap shadow-xl z-50 pointer-events-none ${isLight ? 'bg-slate-900/90 text-slate-100 border border-slate-700/50' : 'bg-slate-950/95 text-gray-300 border border-white/10'
+                  }`}>
                   Réinitialiser à blanc (effacer toutes vos données)
                 </div>
               </div>
@@ -3208,9 +3255,8 @@ export default function TimetableDashboard({
                       <LogOut className="w-3.5 h-3.5" />
                       <span>Déconnexion</span>
                     </button>
-                    <div className={`absolute bottom-full right-0 mb-2 hidden group-hover:block text-[10px] font-normal py-1 px-2.5 rounded-lg whitespace-nowrap shadow-xl z-50 pointer-events-none ${
-                      isLight ? 'bg-slate-900/90 text-slate-100 border border-slate-700/50' : 'bg-slate-950/95 text-gray-300 border border-white/10'
-                    }`}>
+                    <div className={`absolute bottom-full right-0 mb-2 hidden group-hover:block text-[10px] font-normal py-1 px-2.5 rounded-lg whitespace-nowrap shadow-xl z-50 pointer-events-none ${isLight ? 'bg-slate-900/90 text-slate-100 border border-slate-700/50' : 'bg-slate-950/95 text-gray-300 border border-white/10'
+                      }`}>
                       Se déconnecter de votre espace établissement
                     </div>
                   </div>
@@ -3248,13 +3294,12 @@ export default function TimetableDashboard({
                 {/* Step 1: Jours & Horaires */}
                 <button
                   onClick={() => setActiveTab('scheduleConfig')}
-                  className={`flex-1 p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 relative ${
-                    activeTab === 'scheduleConfig'
+                  className={`flex-1 p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 relative ${activeTab === 'scheduleConfig'
                       ? `bg-indigo-500/20 border-indigo-500 shadow-xl shadow-indigo-500/20 ring-2 ring-indigo-400/70 ring-offset-2 scale-[1.02] ${isLight ? 'text-indigo-950 ring-offset-white' : 'text-white ring-offset-slate-900'}`
                       : activeDays.length > 0
-                      ? isLight ? 'bg-slate-50 border-emerald-500/40 text-slate-700 hover:bg-slate-100' : 'bg-slate-950/40 border-emerald-500/30 text-gray-300 hover:bg-white/5 hover:border-white/20'
-                      : isLight ? 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100' : 'bg-slate-950/30 border-white/5 text-gray-400 hover:bg-white/5'
-                  }`}
+                        ? isLight ? 'bg-slate-50 border-emerald-500/40 text-slate-700 hover:bg-slate-100' : 'bg-slate-950/40 border-emerald-500/30 text-gray-300 hover:bg-white/5 hover:border-white/20'
+                        : isLight ? 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100' : 'bg-slate-950/30 border-white/5 text-gray-400 hover:bg-white/5'
+                    }`}
                 >
                   {activeTab === 'scheduleConfig' && (
                     <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5">
@@ -3262,13 +3307,12 @@ export default function TimetableDashboard({
                       <span className={`relative inline-flex rounded-full h-3.5 w-3.5 bg-indigo-500 border-2 shadow-sm ${isLight ? 'border-white' : 'border-slate-900'}`}></span>
                     </span>
                   )}
-                  <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 ${
-                    activeTab === 'scheduleConfig'
+                  <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 ${activeTab === 'scheduleConfig'
                       ? 'bg-indigo-600 text-white border border-indigo-300 shadow-md shadow-indigo-500/30 animate-pulse'
-                      : activeDays.length > 0 
-                      ? isLight ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
-                      : isLight ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                  }`}>
+                      : activeDays.length > 0
+                        ? isLight ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                        : isLight ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                    }`}>
                     {activeDays.length > 0 && activeTab !== 'scheduleConfig' ? '✓' : '1'}
                   </span>
                   <div className="min-w-0">
@@ -3285,13 +3329,12 @@ export default function TimetableDashboard({
                 {/* Step 2: Matières */}
                 <button
                   onClick={() => setActiveTab('subjects')}
-                  className={`flex-1 p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 relative ${
-                    activeTab === 'subjects'
+                  className={`flex-1 p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 relative ${activeTab === 'subjects'
                       ? `bg-indigo-500/20 border-indigo-500 shadow-xl shadow-indigo-500/20 ring-2 ring-indigo-400/70 ring-offset-2 scale-[1.02] ${isLight ? 'text-indigo-950 ring-offset-white' : 'text-white ring-offset-slate-900'}`
                       : subjects.length > 0
-                      ? isLight ? 'bg-slate-50 border-emerald-500/40 text-slate-700 hover:bg-slate-100' : 'bg-slate-950/40 border-emerald-500/30 text-gray-300 hover:bg-white/5 hover:border-white/20'
-                      : isLight ? 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100' : 'bg-slate-950/30 border-white/5 text-gray-400 hover:bg-white/5'
-                  }`}
+                        ? isLight ? 'bg-slate-50 border-emerald-500/40 text-slate-700 hover:bg-slate-100' : 'bg-slate-950/40 border-emerald-500/30 text-gray-300 hover:bg-white/5 hover:border-white/20'
+                        : isLight ? 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100' : 'bg-slate-950/30 border-white/5 text-gray-400 hover:bg-white/5'
+                    }`}
                 >
                   {activeTab === 'subjects' && (
                     <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5">
@@ -3299,13 +3342,12 @@ export default function TimetableDashboard({
                       <span className={`relative inline-flex rounded-full h-3.5 w-3.5 bg-indigo-500 border-2 shadow-sm ${isLight ? 'border-white' : 'border-slate-900'}`}></span>
                     </span>
                   )}
-                  <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 ${
-                    activeTab === 'subjects'
+                  <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 ${activeTab === 'subjects'
                       ? 'bg-indigo-600 text-white border border-indigo-300 shadow-md shadow-indigo-500/30 animate-pulse'
-                      : subjects.length > 0 
-                      ? isLight ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
-                      : isLight ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                  }`}>
+                      : subjects.length > 0
+                        ? isLight ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                        : isLight ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                    }`}>
                     {subjects.length > 0 && activeTab !== 'subjects' ? '✓' : '2'}
                   </span>
                   <div className="min-w-0">
@@ -3322,13 +3364,12 @@ export default function TimetableDashboard({
                 {/* Step 3: Professeurs */}
                 <button
                   onClick={() => setActiveTab('teachers')}
-                  className={`flex-1 p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 relative ${
-                    activeTab === 'teachers'
+                  className={`flex-1 p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 relative ${activeTab === 'teachers'
                       ? `bg-indigo-500/20 border-indigo-500 shadow-xl shadow-indigo-500/20 ring-2 ring-indigo-400/70 ring-offset-2 scale-[1.02] ${isLight ? 'text-indigo-950 ring-offset-white' : 'text-white ring-offset-slate-900'}`
                       : teachers.length > 0
-                      ? isLight ? 'bg-slate-50 border-emerald-500/40 text-slate-700 hover:bg-slate-100' : 'bg-slate-950/40 border-emerald-500/30 text-gray-300 hover:bg-white/5 hover:border-white/20'
-                      : isLight ? 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100' : 'bg-slate-950/30 border-white/5 text-gray-400 hover:bg-white/5'
-                  }`}
+                        ? isLight ? 'bg-slate-50 border-emerald-500/40 text-slate-700 hover:bg-slate-100' : 'bg-slate-950/40 border-emerald-500/30 text-gray-300 hover:bg-white/5 hover:border-white/20'
+                        : isLight ? 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100' : 'bg-slate-950/30 border-white/5 text-gray-400 hover:bg-white/5'
+                    }`}
                 >
                   {activeTab === 'teachers' && (
                     <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5">
@@ -3336,13 +3377,12 @@ export default function TimetableDashboard({
                       <span className={`relative inline-flex rounded-full h-3.5 w-3.5 bg-indigo-500 border-2 shadow-sm ${isLight ? 'border-white' : 'border-slate-900'}`}></span>
                     </span>
                   )}
-                  <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 ${
-                    activeTab === 'teachers'
+                  <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 ${activeTab === 'teachers'
                       ? 'bg-indigo-600 text-white border border-indigo-300 shadow-md shadow-indigo-500/30 animate-pulse'
-                      : teachers.length > 0 
-                      ? isLight ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
-                      : isLight ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                  }`}>
+                      : teachers.length > 0
+                        ? isLight ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                        : isLight ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                    }`}>
                     {teachers.length > 0 && activeTab !== 'teachers' ? '✓' : '3'}
                   </span>
                   <div className="min-w-0">
@@ -3359,13 +3399,12 @@ export default function TimetableDashboard({
                 {/* Step 4: Classes & Affectations */}
                 <button
                   onClick={() => setActiveTab('classes')}
-                  className={`flex-1 p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 relative ${
-                    activeTab === 'classes'
+                  className={`flex-1 p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 relative ${activeTab === 'classes'
                       ? `bg-indigo-500/20 border-indigo-500 shadow-xl shadow-indigo-500/20 ring-2 ring-indigo-400/70 ring-offset-2 scale-[1.02] ${isLight ? 'text-indigo-950 ring-offset-white' : 'text-white ring-offset-slate-900'}`
                       : classes.length > 0
-                      ? isLight ? 'bg-slate-50 border-emerald-500/40 text-slate-700 hover:bg-slate-100' : 'bg-slate-950/40 border-emerald-500/30 text-gray-300 hover:bg-white/5 hover:border-white/20'
-                      : isLight ? 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100' : 'bg-slate-950/30 border-white/5 text-gray-400 hover:bg-white/5'
-                  }`}
+                        ? isLight ? 'bg-slate-50 border-emerald-500/40 text-slate-700 hover:bg-slate-100' : 'bg-slate-950/40 border-emerald-500/30 text-gray-300 hover:bg-white/5 hover:border-white/20'
+                        : isLight ? 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100' : 'bg-slate-950/30 border-white/5 text-gray-400 hover:bg-white/5'
+                    }`}
                 >
                   {activeTab === 'classes' && (
                     <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5">
@@ -3373,13 +3412,12 @@ export default function TimetableDashboard({
                       <span className={`relative inline-flex rounded-full h-3.5 w-3.5 bg-indigo-500 border-2 shadow-sm ${isLight ? 'border-white' : 'border-slate-900'}`}></span>
                     </span>
                   )}
-                  <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 ${
-                    activeTab === 'classes'
+                  <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 ${activeTab === 'classes'
                       ? 'bg-indigo-600 text-white border border-indigo-300 shadow-md shadow-indigo-500/30 animate-pulse'
-                      : classes.length > 0 
-                      ? isLight ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
-                      : isLight ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                  }`}>
+                      : classes.length > 0
+                        ? isLight ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                        : isLight ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                    }`}>
                     {classes.length > 0 && activeTab !== 'classes' ? '✓' : '4'}
                   </span>
                   <div className="min-w-0">
@@ -3396,11 +3434,10 @@ export default function TimetableDashboard({
                 {/* Step 5: Emploi du Temps */}
                 <button
                   onClick={() => setActiveTab('timetable')}
-                  className={`flex-1 p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 relative ${
-                    activeTab === 'timetable'
+                  className={`flex-1 p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 relative ${activeTab === 'timetable'
                       ? `bg-indigo-500/20 border-indigo-500 shadow-xl shadow-indigo-500/20 ring-2 ring-indigo-400/70 ring-offset-2 scale-[1.02] ${isLight ? 'text-indigo-950 ring-offset-white' : 'text-white ring-offset-slate-900'}`
                       : isLight ? 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:border-slate-300' : 'bg-slate-950/30 border-white/5 text-gray-400 hover:bg-white/5 hover:border-white/20'
-                  }`}
+                    }`}
                 >
                   {activeTab === 'timetable' && (
                     <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5">
@@ -3408,11 +3445,10 @@ export default function TimetableDashboard({
                       <span className={`relative inline-flex rounded-full h-3.5 w-3.5 bg-indigo-500 border-2 shadow-sm ${isLight ? 'border-white' : 'border-slate-900'}`}></span>
                     </span>
                   )}
-                  <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 shadow-md shadow-indigo-500/20 ${
-                    activeTab === 'timetable'
+                  <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 shadow-md shadow-indigo-500/20 ${activeTab === 'timetable'
                       ? 'bg-gradient-to-br from-indigo-500 to-indigo-600 text-white ring-1 ring-white/50 animate-pulse'
                       : 'bg-gradient-to-br from-indigo-500/60 to-indigo-600/60 text-white'
-                  }`}>
+                    }`}>
                     5
                   </span>
                   <div className="min-w-0">
@@ -3428,3713 +3464,3686 @@ export default function TimetableDashboard({
 
 
             <div className="flex flex-wrap lg:flex-nowrap gap-6 items-start">
-            <nav className={`w-full lg:w-64 shrink-0 flex flex-row lg:flex-col gap-1.5 p-2 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/60 border-white/10 shadow-xl'} backdrop-blur-xl border rounded-2xl overflow-x-auto select-none`}>
-              {/* 1. Jours & Horaires */}
-              <button
-                onClick={() => setActiveTab('scheduleConfig')}
-                className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'scheduleConfig'
-                    ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30'
-                    : isLight
-                    ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
-                    : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
-                }`}
-              >
-                <Clock className={`w-4 h-4 shrink-0 ${activeTab === 'scheduleConfig' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
-                <span className="hidden sm:inline lg:inline">1. Jours & Horaires</span>
-              </button>
+              <nav className={`w-full lg:w-64 shrink-0 flex flex-row lg:flex-col gap-1.5 p-2 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/60 border-white/10 shadow-xl'} backdrop-blur-xl border rounded-2xl overflow-x-auto select-none`}>
+                {/* 1. Jours & Horaires */}
+                <button
+                  onClick={() => setActiveTab('scheduleConfig')}
+                  className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'scheduleConfig'
+                      ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30'
+                      : isLight
+                        ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
+                        : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+                    }`}
+                >
+                  <Clock className={`w-4 h-4 shrink-0 ${activeTab === 'scheduleConfig' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
+                  <span className="hidden sm:inline lg:inline">1. Jours & Horaires</span>
+                </button>
 
-              {/* 2. Matières */}
-              <button
-                onClick={() => setActiveTab('subjects')}
-                className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'subjects'
-                    ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30'
-                    : isLight
-                    ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
-                    : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
-                }`}
-              >
-                <BookOpen className={`w-4 h-4 shrink-0 ${activeTab === 'subjects' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
-                <span className="hidden sm:inline lg:inline">2. Matières ({subjects.length})</span>
-              </button>
+                {/* 2. Matières */}
+                <button
+                  onClick={() => setActiveTab('subjects')}
+                  className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'subjects'
+                      ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30'
+                      : isLight
+                        ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
+                        : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+                    }`}
+                >
+                  <BookOpen className={`w-4 h-4 shrink-0 ${activeTab === 'subjects' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
+                  <span className="hidden sm:inline lg:inline">2. Matières ({subjects.length})</span>
+                </button>
 
-              {/* 3. Enseignants */}
-              <button
-                onClick={() => setActiveTab('teachers')}
-                className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'teachers'
-                    ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30'
-                    : isLight
-                    ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
-                    : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
-                }`}
-              >
-                <GraduationCap className={`w-4 h-4 shrink-0 ${activeTab === 'teachers' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
-                <span className="hidden sm:inline lg:inline">3. Enseignants ({teachers.length})</span>
-              </button>
+                {/* 3. Enseignants */}
+                <button
+                  onClick={() => setActiveTab('teachers')}
+                  className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'teachers'
+                      ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30'
+                      : isLight
+                        ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
+                        : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+                    }`}
+                >
+                  <GraduationCap className={`w-4 h-4 shrink-0 ${activeTab === 'teachers' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
+                  <span className="hidden sm:inline lg:inline">3. Enseignants ({teachers.length})</span>
+                </button>
 
-              {/* 4. Classes */}
-              <button
-                onClick={() => setActiveTab('classes')}
-                className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'classes'
-                    ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30'
-                    : isLight
-                    ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
-                    : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
-                }`}
-              >
-                <Users className={`w-4 h-4 shrink-0 ${activeTab === 'classes' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
-                <span className="hidden sm:inline lg:inline">4. Classes ({classes.length})</span>
-              </button>
+                {/* 4. Classes */}
+                <button
+                  onClick={() => setActiveTab('classes')}
+                  className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'classes'
+                      ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30'
+                      : isLight
+                        ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
+                        : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+                    }`}
+                >
+                  <Users className={`w-4 h-4 shrink-0 ${activeTab === 'classes' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
+                  <span className="hidden sm:inline lg:inline">4. Classes ({classes.length})</span>
+                </button>
 
-              {/* 5. Emploi du Temps */}
-              <button
-                onClick={() => setActiveTab('timetable')}
-                className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'timetable'
-                    ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30'
-                    : isLight
-                    ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
-                    : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
-                }`}
-              >
-                <Grid className={`w-4 h-4 shrink-0 ${activeTab === 'timetable' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
-                <span className="hidden sm:inline lg:inline">5. Emploi du Temps</span>
-              </button>
+                {/* 5. Emploi du Temps */}
+                <button
+                  onClick={() => setActiveTab('timetable')}
+                  className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'timetable'
+                      ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30'
+                      : isLight
+                        ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
+                        : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+                    }`}
+                >
+                  <Grid className={`w-4 h-4 shrink-0 ${activeTab === 'timetable' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
+                  <span className="hidden sm:inline lg:inline">5. Emploi du Temps</span>
+                </button>
 
-              <div className={`h-px my-1 hidden lg:block ${isLight ? 'bg-slate-200' : 'bg-white/10'}`} />
+                <div className={`h-px my-1 hidden lg:block ${isLight ? 'bg-slate-200' : 'bg-white/10'}`} />
 
-              <button
-                onClick={() => setActiveTab('stats')}
-                className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'stats'
-                    ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30'
-                    : isLight
-                    ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
-                    : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
-                }`}
-              >
-                <BarChart className={`w-4 h-4 shrink-0 ${activeTab === 'stats' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
-                <span className="hidden sm:inline lg:inline">Synthèse Chef</span>
-              </button>
+                {/* --- MODULE PLANIFICATION (PLURI-PROF / QUOTAS / AFFECTATION) --- */}
+                <button
+                  onClick={() => setActiveTab('planning')}
+                  className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer relative ${activeTab === 'planning'
+                      ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 text-white shadow-lg shadow-purple-500/25 border border-purple-400/30'
+                      : isLight
+                        ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
+                        : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+                    }`}
+                >
+                  <SlidersHorizontal className={`w-4 h-4 shrink-0 ${activeTab === 'planning' ? 'text-white' : isLight ? 'text-purple-600' : 'text-purple-400'}`} />
+                  <span className="hidden sm:inline lg:inline">Planification</span>
+                  <span className={`hidden sm:inline text-[9px] font-mono px-1.5 py-0.2 rounded font-black ${activeTab === 'planning' ? 'bg-white/20 text-white' : isLight ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
+                    VIP
+                  </span>
+                </button>
 
-              <button
-                onClick={() => setActiveTab('ai')}
-                className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'ai'
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25 border border-emerald-400/30'
-                    : isLight
-                    ? 'bg-transparent text-emerald-600 hover:text-emerald-700 hover:bg-slate-100/80 border border-transparent'
-                    : 'bg-transparent text-emerald-400 hover:text-emerald-300 hover:bg-white/5 border border-transparent'
-                }`}
-              >
-                <Sparkles className={`w-4 h-4 shrink-0 ${activeTab === 'ai' ? 'text-white' : isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
-                <span className={activeTab === 'ai' ? 'text-white' : isLight ? 'text-emerald-600 font-bold' : 'text-emerald-400 font-bold'}>
-                  Conseils IA Gemini
-                </span>
-              </button>
+                <button
+                  onClick={() => setActiveTab('stats')}
+                  className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'stats'
+                      ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30'
+                      : isLight
+                        ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
+                        : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+                    }`}
+                >
+                  <BarChart className={`w-4 h-4 shrink-0 ${activeTab === 'stats' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
+                  <span className="hidden sm:inline lg:inline">Synthèse Chef</span>
+                </button>
 
-              <button
-                onClick={() => setActiveTab('settings')}
-                className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'settings'
-                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/25 border border-purple-400/30'
-                    : isLight
-                    ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
-                    : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
-                }`}
-              >
-                <Settings className={`w-4 h-4 shrink-0 ${activeTab === 'settings' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
-                <span>Paramètres</span>
-              </button>
-            </nav>
+                <button
+                  onClick={() => setActiveTab('ai')}
+                  className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'ai'
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25 border border-emerald-400/30'
+                      : isLight
+                        ? 'bg-transparent text-emerald-600 hover:text-emerald-700 hover:bg-slate-100/80 border border-transparent'
+                        : 'bg-transparent text-emerald-400 hover:text-emerald-300 hover:bg-white/5 border border-transparent'
+                    }`}
+                >
+                  <Sparkles className={`w-4 h-4 shrink-0 ${activeTab === 'ai' ? 'text-white' : isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
+                  <span className={activeTab === 'ai' ? 'text-white' : isLight ? 'text-emerald-600 font-bold' : 'text-emerald-400 font-bold'}>
+                    Conseils IA Gemini
+                  </span>
+                </button>
 
-          {/* --- WORKSPACE VIEWPORT (Tab Contents) --- */}
-          <main className="flex-1 min-w-0" id="main-content-viewport">
-            
-            {/* STEP 1: CONFIGURATION DES JOURS ET HORAIRES */}
-            {activeTab === 'scheduleConfig' && (
-              <div className="space-y-6">
-                {/* HEADER BANNER WITH STEP-BY-STEP BEGINNER GUIDE */}
-                <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'}`}>
-                  <div className={`flex items-center justify-between gap-4 flex-wrap pb-4 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
-                    <div className="flex items-center gap-4">
-                      <div className={`p-3 rounded-2xl border shrink-0 ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'}`}>
-                        <Clock className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h2 className={`text-lg font-bold flex items-center gap-2 flex-wrap ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                          <span>Étape 1 : Configuration des Jours & Plages Horaires</span>
-                          <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'}`}>
-                            Fondation de l'Établissement
-                          </span>
-                        </h2>
-                        <p className={`text-sm mt-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
-                          Définissez les jours ouvrés et l'amplitude horaire de votre école. Toutes les grilles s'adapteront à ces paramètres.
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {/* QUICK PRESETS */}
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveDays(["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"]);
-                          triggerNotification("Semaine configurée : Lundi au Vendredi (5 jours)", "info");
-                        }}
-                        className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                          activeDays.length === 5 && !activeDays.includes("Samedi")
-                            ? 'bg-indigo-600 !text-white border-indigo-500 shadow-md shadow-indigo-600/30 ring-2 ring-indigo-400/40'
-                            : isLight
-                              ? 'bg-slate-50 border-slate-200 text-slate-700 hover:text-indigo-600 hover:bg-indigo-50/50'
-                              : 'bg-slate-950/40 border-white/10 text-gray-400 hover:text-white hover:bg-white/5'
-                        }`}
-                      >
-                        Lundi - Vendredi (5j)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveDays(["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"]);
-                          triggerNotification("Semaine configurée : Lundi au Samedi (6 jours)", "info");
-                        }}
-                        className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                          activeDays.length === 6
-                            ? 'bg-indigo-600 !text-white border-indigo-500 shadow-md shadow-indigo-600/30 ring-2 ring-indigo-400/40'
-                            : isLight
-                              ? 'bg-slate-50 border-slate-200 text-slate-700 hover:text-indigo-600 hover:bg-indigo-50/50'
-                              : 'bg-slate-950/40 border-white/10 text-gray-400 hover:text-white hover:bg-white/5'
-                        }`}
-                      >
-                        Lundi - Samedi (6j)
-                      </button>
-                    </div>
-                  </div>
+                <button
+                  onClick={() => setActiveTab('settings')}
+                  className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'settings'
+                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/25 border border-purple-400/30'
+                      : isLight
+                        ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
+                        : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+                    }`}
+                >
+                  <Settings className={`w-4 h-4 shrink-0 ${activeTab === 'settings' ? 'text-white' : isLight ? 'text-blue-600' : 'text-blue-400'}`} />
+                  <span>Paramètres</span>
+                </button>
+              </nav>
 
-                  {/* GUIDE DÉBUTANT PAS-À-PAS */}
-                  <div className={`rounded-xl p-4 border ${isLight ? 'bg-blue-50/60 border-blue-200/80' : 'bg-slate-950/50 border-indigo-500/20'}`}>
-                    <div className={`flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider mb-2.5 ${isLight ? 'text-blue-600' : 'text-indigo-300'}`}>
-                      <Sparkles className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-indigo-400'}`} />
-                      <span className="font-bold">Guide Débutant : Ce que vous devez faire sur cette étape</span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
-                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>1</span>
-                          <span className="font-bold">Choisir les jours ouverts</span>
-                        </div>
-                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Cochez les jours où l'école dispense des cours (ex: du Lundi au Samedi ou 5 jours).
-                        </p>
-                      </div>
-                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
-                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>2</span>
-                          <span className="font-bold">Régler la plage horaire</span>
-                        </div>
-                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Sélectionnez l'heure du premier cours (ex: 8h) et l'heure de sortie (ex: 18h).
-                        </p>
-                      </div>
-                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
-                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>3</span>
-                          <span className="font-bold">Pauses Établissement</span>
-                        </div>
-                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Configurez les récréations et temps de repas communs à toute l'école.
-                        </p>
-                      </div>
-                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
-                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>4</span>
-                          <span className="font-bold">Passer à l'étape 2 (Matières)</span>
-                        </div>
-                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Vérifiez la capacité hebdomadaire générée, puis cliquez sur le bouton pour continuer.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              {/* --- WORKSPACE VIEWPORT (Tab Contents) --- */}
+              <main className="flex-1 min-w-0" id="main-content-viewport">
 
-                {/* CONFIGURATION CARDS GRID */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  {/* 1. SELECTION DES JOURS OUVRÉS (7 COLS) */}
-                  <div className="lg:col-span-7 space-y-6">
-                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-5 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'}`}>
-                      <div className={`flex items-center justify-between pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
-                        <div className="flex items-center gap-2">
-                          <Calendar className={`w-5 h-5 ${isLight ? 'text-indigo-600' : 'text-indigo-400'}`} />
-                          <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                            1. Jours de Cours Actifs
-                          </h3>
-                        </div>
-                        <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20'}`}>
-                          {activeDays.length} jours configurés
-                        </span>
-                      </div>
-
-                      <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
-                        Cochez ou décochez les jours durant lesquels votre établissement dispense des cours.
-                      </p>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        {ALL_DAYS.map((day) => {
-                          const isSelected = activeDays.includes(day);
-                          return (
-                            <button
-                              key={day}
-                              type="button"
-                              onClick={() => {
-                                if (isSelected) {
-                                  if (activeDays.length <= 1) {
-                                    triggerNotification("Vous devez conserver au moins un jour actif.", "error");
-                                    return;
-                                  }
-                                  setActiveDays(activeDays.filter(d => d !== day));
-                                } else {
-                                  const newDays = ALL_DAYS.filter(d => activeDays.includes(d) || d === day);
-                                  setActiveDays(newDays);
-                                }
-                              }}
-                              className={`p-4 rounded-xl border flex flex-col items-start justify-between gap-3 transition-all cursor-pointer select-none ${
-                                isSelected
-                                  ? 'bg-indigo-600 hover:bg-indigo-700 border-indigo-500 !text-white ring-2 ring-indigo-400/50 shadow-md shadow-indigo-600/30'
-                                  : isLight
-                                    ? 'bg-slate-50 border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50/40'
-                                    : 'bg-slate-950/40 border-white/10 text-gray-400 hover:border-white/20 hover:text-gray-300'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between w-full">
-                                <span className={`font-bold text-sm ${isSelected ? '!text-white' : (isLight ? 'text-slate-800' : 'text-gray-300')}`}>
-                                  {day}
-                                </span>
-                                <span className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold ${
-                                  isSelected 
-                                    ? 'bg-white/25 !text-white border border-white/50' 
-                                    : isLight
-                                      ? 'border border-slate-300 bg-white text-transparent'
-                                      : 'border border-white/10 bg-slate-900 text-transparent'
-                                }`}>
-                                  {isSelected && <Check className="w-3.5 h-3.5 !text-white stroke-[2.5]" />}
-                                </span>
-                              </div>
-                              <span className={`text-[11px] font-mono ${isSelected ? '!text-white font-semibold' : (isLight ? 'text-slate-400' : 'text-gray-600')}`}>
-                                {isSelected ? `${totalSlots}h / jour` : 'Fermé'}
+                {/* STEP 1: CONFIGURATION DES JOURS ET HORAIRES */}
+                {activeTab === 'scheduleConfig' && (
+                  <div className="space-y-6">
+                    {/* HEADER BANNER WITH STEP-BY-STEP BEGINNER GUIDE */}
+                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'}`}>
+                      <div className={`flex items-center justify-between gap-4 flex-wrap pb-4 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                        <div className="flex items-center gap-4">
+                          <div className={`p-3 rounded-2xl border shrink-0 ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'}`}>
+                            <Clock className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <h2 className={`text-lg font-bold flex items-center gap-2 flex-wrap ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                              <span>Étape 1 : Configuration des Jours & Plages Horaires</span>
+                              <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'}`}>
+                                Fondation de l'Établissement
                               </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
+                            </h2>
+                            <p className={`text-sm mt-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
+                              Définissez les jours ouvrés et l'amplitude horaire de votre école. Toutes les grilles s'adapteront à ces paramètres.
+                            </p>
+                          </div>
+                        </div>
 
-                    {/* 2. PLAGE HORAIRE DE LA JOURNÉE (8h à 22h) */}
-                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-5 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'}`}>
-                      <div className={`flex items-center justify-between pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                        {/* QUICK PRESETS */}
                         <div className="flex items-center gap-2">
-                          <Clock className={`w-5 h-5 ${isLight ? 'text-indigo-600' : 'text-indigo-400'}`} />
-                          <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                            2. Amplitude Horaire Quotidienne (8h à 22h)
-                          </h3>
-                        </div>
-                        <span className="text-xs font-mono text-emerald-600 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                          {startHour}h00 → {endHour}h00 ({totalSlots} créneaux d'1h)
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className={`block text-xs font-medium mb-2 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
-                            Heure de début des cours (Matin)
-                          </label>
-                          <select
-                            value={startHour}
-                            onChange={(e) => {
-                              const val = Number(e.target.value);
-                              if (val >= endHour) {
-                                triggerNotification("L'heure de début doit être inférieure à l'heure de fin.", "error");
-                                return;
-                              }
-                              setStartHour(val);
-                            }}
-                            className={`w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors shadow-inner font-mono cursor-pointer border ${isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-slate-950 border-white/10 text-white'}`}
-                          >
-                            {[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21].map((h) => (
-                              <option key={h} value={h} disabled={h >= endHour}>
-                                {String(h).padStart(2, '0')}h00 {h <= 11 ? '(Matin)' : h <= 13 ? '(Midi)' : '(Après-midi)'}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className={`block text-xs font-medium mb-2 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
-                            Heure de fin des cours (Soir)
-                          </label>
-                          <select
-                            value={endHour}
-                            onChange={(e) => {
-                              const val = Number(e.target.value);
-                              if (val <= startHour) {
-                                triggerNotification("L'heure de fin doit être supérieure à l'heure de début.", "error");
-                                return;
-                              }
-                              setEndHour(val);
-                            }}
-                            className={`w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors shadow-inner font-mono cursor-pointer border ${isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-slate-950 border-white/10 text-white'}`}
-                          >
-                            {[9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22].map((h) => (
-                              <option key={h} value={h} disabled={h <= startHour}>
-                                {String(h).padStart(2, '0')}h00 {h <= 12 ? '(Matin)' : h <= 17 ? '(Après-midi)' : '(Soirée)'}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* VISUAL PILL OF GENERATED SLOTS */}
-                      <div className="pt-2">
-                        <label className={`block text-xs font-medium mb-2 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
-                          Créneaux horaires d'1 heure générés :
-                        </label>
-                        <div className={`flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2.5 rounded-xl border ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-white/5'}`}>
-                          {slotLabels.map((label, idx) => (
-                            <span
-                              key={idx}
-                              className={`px-2.5 py-1 rounded-lg text-xs font-mono border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20'}`}
-                            >
-                              Créneau {idx + 1} : {label}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* 3. CONFIGURATION DES PAUSES */}
-                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-5 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'}`}>
-                      <div className={`flex items-center justify-between pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
-                        <div className="flex items-center gap-2">
-                          <SlidersHorizontal className={`w-5 h-5 ${isLight ? 'text-indigo-600' : 'text-indigo-400'}`} />
-                          <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                            3. Pauses de l'Établissement (Communes)
-                          </h3>
-                        </div>
-                        <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20'}`}>
-                          {schoolBreaks.length} pause(s)
-                        </span>
-                      </div>
-
-                      <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
-                        Définissez les récréations ou temps de repas. Ces pauses s'afficheront sur les plannings de classes et décaleront les heures des cours suivants.
-                      </p>
-
-                      {/* LIST OF CURRENT BREAKS */}
-                      {schoolBreaks.length === 0 ? (
-                        <p className={`text-xs italic text-center py-4 ${isLight ? 'text-slate-400' : 'text-gray-500'}`}>
-                          Aucune pause configurée pour le moment.
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          {[...schoolBreaks]
-                            .sort((a, b) => a.afterSlotIndex - b.afterSlotIndex)
-                            .map((b) => {
-                              const slotLabel = slotLabels[b.afterSlotIndex] || `Créneau ${b.afterSlotIndex + 1}`;
-                              return (
-                                <div
-                                  key={b.id}
-                                  className={`flex items-center justify-between p-3 rounded-xl border text-xs ${
-                                    isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/40 border-white/5'
-                                  }`}
-                                >
-                                  <div>
-                                    <div className="font-bold flex items-center gap-1.5">
-                                      <span className={isLight ? 'text-slate-800' : 'text-white'}>{b.name}</span>
-                                      <span className={`px-2 py-0.5 rounded-md font-mono text-[10px] ${isLight ? 'bg-indigo-50 text-indigo-700' : 'bg-indigo-500/20 text-indigo-300'}`}>
-                                        {b.duration} min
-                                      </span>
-                                    </div>
-                                    <p className={`text-[10px] mt-0.5 ${isLight ? 'text-slate-400' : 'text-gray-500'}`}>
-                                      Placée après le : <strong className="font-mono">{slotLabel}</strong>
-                                    </p>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSchoolBreaks(schoolBreaks.filter((x) => x.id !== b.id));
-                                      triggerNotification(`Pause "${b.name}" supprimée.`, "info");
-                                    }}
-                                    className="text-gray-400 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
-                                    title="Supprimer la pause"
-                                  >
-                                    <Trash className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              );
-                            })}
-                        </div>
-                      )}
-
-                      {/* ADD BREAK FORM */}
-                      <div className={`p-4 rounded-xl border space-y-3.5 ${isLight ? 'bg-slate-50/50 border-slate-200' : 'bg-slate-950/20 border-white/10'}`}>
-                        <h4 className={`text-xs font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-800' : 'text-gray-300'}`}>
-                          Ajouter une Pause
-                        </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <div>
-                            <label className={`block text-[10px] font-medium mb-1 ${isLight ? 'text-slate-600' : 'text-gray-400'}`}>
-                              Nom de la pause
-                            </label>
-                            <input
-                              type="text"
-                              value={newBreakName}
-                              onChange={(e) => setNewBreakName(e.target.value)}
-                              placeholder="Ex: Récréation, Déjeuner"
-                              className={`w-full rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 transition-colors border ${
-                                isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-slate-950 border-white/10 text-white'
-                              }`}
-                            />
-                          </div>
-
-                          <div>
-                            <label className={`block text-[10px] font-medium mb-1 ${isLight ? 'text-slate-600' : 'text-gray-400'}`}>
-                              Placer après le créneau
-                            </label>
-                            <select
-                              value={newBreakAfterSlot}
-                              onChange={(e) => setNewBreakAfterSlot(Number(e.target.value))}
-                              className={`w-full rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 transition-colors font-mono cursor-pointer border ${
-                                isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-slate-950 border-white/10 text-white'
-                              }`}
-                            >
-                              {slotLabels.slice(0, slotLabels.length - 1).map((label, idx) => (
-                                <option key={idx} value={idx}>
-                                  Après Créneau {idx + 1} ({label})
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className={`block text-[10px] font-medium mb-1 ${isLight ? 'text-slate-600' : 'text-gray-400'}`}>
-                              Durée de la pause
-                            </label>
-                            <select
-                              value={newBreakDuration}
-                              onChange={(e) => setNewBreakDuration(Number(e.target.value))}
-                              className={`w-full rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 transition-colors font-mono cursor-pointer border ${
-                                isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-slate-950 border-white/10 text-white'
-                              }`}
-                            >
-                              {[5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60].map((m) => (
-                                <option key={m} value={m}>
-                                  {m === 60 ? '1h00 (60 min)' : `${m} min`}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="flex justify-end pt-1">
                           <button
                             type="button"
                             onClick={() => {
-                              const name = newBreakName.trim() || "Pause";
-                              if (schoolBreaks.some((b) => b.afterSlotIndex === newBreakAfterSlot)) {
-                                triggerNotification("Une pause est déjà configurée après ce créneau.", "error");
-                                return;
-                              }
-                              const newBreak: SchoolBreak = {
-                                id: `break_${Date.now()}`,
-                                name,
-                                afterSlotIndex: newBreakAfterSlot,
-                                duration: newBreakDuration
-                              };
-                              setSchoolBreaks([...schoolBreaks, newBreak]);
-                              setNewBreakName('');
-                              triggerNotification(`Pause "${name}" ajoutée avec succès !`, "success");
+                              setActiveDays(["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"]);
+                              triggerNotification("Semaine configurée : Lundi au Vendredi (5 jours)", "info");
                             }}
-                            className="py-2 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 !text-white text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${activeDays.length === 5 && !activeDays.includes("Samedi")
+                                ? 'bg-indigo-600 !text-white border-indigo-500 shadow-md shadow-indigo-600/30 ring-2 ring-indigo-400/40'
+                                : isLight
+                                  ? 'bg-slate-50 border-slate-200 text-slate-700 hover:text-indigo-600 hover:bg-indigo-50/50'
+                                  : 'bg-slate-950/40 border-white/10 text-gray-400 hover:text-white hover:bg-white/5'
+                              }`}
                           >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>Ajouter la pause</span>
+                            Lundi - Vendredi (5j)
                           </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 3. SYNTHÈSE DE CAPACITÉ & PASSAGE ÉTAPE 2 (5 COLS) */}
-                  <div className="lg:col-span-5 space-y-6">
-                    <div className={`p-6 rounded-2xl backdrop-blur-xl border shadow-xl space-y-5 ${isLight ? 'bg-gradient-to-br from-indigo-50/80 via-white to-purple-50/80 border-indigo-200/90 text-slate-900 shadow-indigo-950/5' : 'bg-gradient-to-br from-indigo-950/40 via-slate-900/60 to-purple-950/40 border-indigo-500/20 text-white'}`}>
-                      <div className={`flex items-center gap-2 pb-3 border-b ${isLight ? 'border-indigo-100' : 'border-white/10'}`}>
-                        <Sparkles className={`w-5 h-5 ${isLight ? 'text-indigo-600' : 'text-indigo-400'}`} />
-                        <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                          Capacité Hebdomadaire
-                        </h3>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className={`p-4 rounded-xl border space-y-3 ${isLight ? 'bg-white/90 border-indigo-100 shadow-xs' : 'bg-slate-950/60 border-white/10'}`}>
-                          <div className="flex items-center justify-between text-xs">
-                            <span className={isLight ? 'text-slate-500' : 'text-gray-400'}>Jours de cours :</span>
-                            <span className={`font-bold font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>{activeDays.length} jours / semaine</span>
-                          </div>
-                          <div className="flex items-center justify-between text-xs">
-                            <span className={isLight ? 'text-slate-500' : 'text-gray-400'}>Amplitude quotidienne :</span>
-                            <span className="font-bold text-indigo-600 font-mono">{startHour}h00 → {endHour}h00 ({totalSlots}h)</span>
-                          </div>
-                          <div className={`flex items-center justify-between text-xs border-t pt-2.5 ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
-                            <span className={`font-medium ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>Capacité totale par classe :</span>
-                            <span className="font-black text-emerald-600 font-mono text-sm">{activeDays.length * totalSlots} créneaux/sem</span>
-                          </div>
-                        </div>
-
-                        <div className={`p-3.5 rounded-xl border text-xs leading-relaxed ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-200'}`}>
-                          💡 <strong>Prise en compte globale :</strong> Toutes les grilles, filtres d'indisponibilité et le moteur d'optimisation mathématique s'ajustent instantanément à cette amplitude horaire.
-                        </div>
-
-                        <div className="pt-2">
                           <button
                             type="button"
                             onClick={() => {
-                              triggerNotification("Configuration des jours et horaires validée ! Passage à l'Étape 2 (Matières).", "success");
-                              setActiveTab('subjects');
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                              setActiveDays(["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"]);
+                              triggerNotification("Semaine configurée : Lundi au Samedi (6 jours)", "info");
                             }}
-                            className="w-full py-4 px-5 rounded-2xl bg-gradient-to-r from-indigo-500 via-purple-600 to-indigo-600 hover:from-indigo-400 hover:via-purple-500 hover:to-indigo-500 !text-white font-bold text-xs shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 cursor-pointer group border border-indigo-400/30"
+                            className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${activeDays.length === 6
+                                ? 'bg-indigo-600 !text-white border-indigo-500 shadow-md shadow-indigo-600/30 ring-2 ring-indigo-400/40'
+                                : isLight
+                                  ? 'bg-slate-50 border-slate-200 text-slate-700 hover:text-indigo-600 hover:bg-indigo-50/50'
+                                  : 'bg-slate-950/40 border-white/10 text-gray-400 hover:text-white hover:bg-white/5'
+                              }`}
                           >
-                            <span>👉 Passer à l'Étape 2 : Référentiel des Matières</span>
-                            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform animate-pulse" />
+                            Lundi - Samedi (6j)
                           </button>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
 
-            {/* TAB 5: EMPLOI DU TEMPS GRID WITH DND */}
-            {activeTab === 'timetable' && (
-              <div className="space-y-6">
-                
-                {/* HEADER BANNER WITH STEP-BY-STEP BEGINNER GUIDE */}
-                <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
-                  <div className={`flex items-center justify-between gap-4 flex-wrap pb-4 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
-                    <div className="flex items-center gap-4">
-                      <div className={`p-3 rounded-2xl border shrink-0 ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'}`}>
-                        <Grid className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h2 className={`text-lg font-bold flex items-center gap-2 flex-wrap ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span>Étape 5 : Emploi du Temps & Résolution Automatique</span>
-                          <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'}`}>
-                            Génération & Exports
-                          </span>
-                        </h2>
-                        <p className={`text-sm mt-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
-                          Générez automatiquement un emploi du temps 100% optimisé et sans aucun conflit, ajustez au besoin par glisser-déposer, et téléchargez vos documents officiels.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* GUIDE DÉBUTANT PAS-À-PAS */}
-                  <div className={`rounded-xl p-4 border ${isLight ? 'bg-blue-50/60 border-blue-200/80' : 'bg-slate-950/50 border-indigo-500/20'}`}>
-                    <div className={`flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider mb-2.5 ${isLight ? 'text-blue-600' : 'text-indigo-300'}`}>
-                      <Sparkles className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-indigo-400'}`} />
-                      <span className="font-bold">Guide Débutant : Ce que vous devez faire sur cette étape</span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
-                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>1</span>
-                          <span className="font-bold">Générer le planning</span>
+                      {/* GUIDE DÉBUTANT PAS-À-PAS */}
+                      <div className={`rounded-xl p-4 border ${isLight ? 'bg-blue-50/60 border-blue-200/80' : 'bg-slate-950/50 border-indigo-500/20'}`}>
+                        <div className={`flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider mb-2.5 ${isLight ? 'text-blue-600' : 'text-indigo-300'}`}>
+                          <Sparkles className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-indigo-400'}`} />
+                          <span className="font-bold">Guide Débutant : Ce que vous devez faire sur cette étape</span>
                         </div>
-                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Cliquez sur le bouton violet "Générer l'Emploi du Temps" ci-dessous pour calculer l'emploi du temps optimal sans chevauchement.
-                        </p>
-                      </div>
-                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
-                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>2</span>
-                          <span className="font-bold">Ajuster par Glisser-Déposer</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                          <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                            <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>1</span>
+                              <span className="font-bold">Choisir les jours ouverts</span>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                              Cochez les jours où l'école dispense des cours (ex: du Lundi au Samedi ou 5 jours).
+                            </p>
+                          </div>
+                          <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                            <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>2</span>
+                              <span className="font-bold">Régler la plage horaire</span>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                              Sélectionnez l'heure du premier cours (ex: 8h) et l'heure de sortie (ex: 18h).
+                            </p>
+                          </div>
+                          <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                            <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>3</span>
+                              <span className="font-bold">Pauses Établissement</span>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                              Configurez les récréations et temps de repas communs à toute l'école.
+                            </p>
+                          </div>
+                          <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                            <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>4</span>
+                              <span className="font-bold">Passer à l'étape 2 (Matières)</span>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                              Vérifiez la capacité hebdomadaire générée, puis cliquez sur le bouton pour continuer.
+                            </p>
+                          </div>
                         </div>
-                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Glissez un cours vers un autre créneau à la souris : le système anti-conflit valide instantanément en vert ou vous bloque en rouge.
-                        </p>
-                      </div>
-                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
-                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>3</span>
-                          <span className="font-bold">Exporter les documents</span>
-                        </div>
-                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Cliquez sur les boutons d'export PDF, Word (.doc) ou Excel (.xlsx) pour imprimer vos emplois du temps prêts pour la rentrée.
-                        </p>
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* VIEW MODE TOGGLE BAR */}
-                <div className="p-2.5 rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-white/10 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-2 p-1 bg-slate-950/70 rounded-xl border border-white/5 w-full sm:w-auto">
-                    <button
-                      onClick={() => setTimetableViewMode('class')}
-                      className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        timetableViewMode === 'class'
-                          ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-md shadow-indigo-500/20'
-                          : 'text-gray-400 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      <Users className="w-4 h-4" />
-                      <span>Vue par Classe</span>
-                    </button>
-
-                    <button
-                      onClick={() => setTimetableViewMode('teacher')}
-                      className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        timetableViewMode === 'teacher'
-                          ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-md shadow-indigo-500/20'
-                          : 'text-gray-400 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      <GraduationCap className="w-4 h-4" />
-                      <span>Emplois du Temps Professeurs ({teachers.length})</span>
-                    </button>
-                  </div>
-
-                  <div className="text-xs font-medium text-gray-300 flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-xl border border-white/5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>
-                      {timetableViewMode === 'class'
-                        ? `${classes.length} classes configurées`
-                        : `${teachers.length} plannings enseignants disponibles`
-                      }
-                    </span>
-                  </div>
-                </div>
-
-                {/* --- CLASS VIEW MODE --- */}
-                {timetableViewMode === 'class' && (
-                  <>
-                    {/* TIMETABLE METADATA CONTROLS */}
-                    <div className="p-5 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                      <div>
-                        <label className="block text-[11px] font-mono font-bold text-indigo-400 uppercase tracking-widest mb-1.5">
-                          SÉLECTION DE LA CLASSE VISUELLE
-                        </label>
-                        <select
-                          value={selectedClassId}
-                          onChange={(e) => setSelectedClassId(e.target.value)}
-                          className="bg-slate-950/85 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 w-64 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors font-medium cursor-pointer shadow-inner"
-                        >
-                          {classes.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-4 md:flex md:flex-row md:flex-nowrap md:items-center gap-2 mt-4 lg:mt-0 w-full md:w-auto">
-                        <button
-                          onClick={handleAutoGenerate}
-                          disabled={isGenerating || classes.length === 0}
-                          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/25 hover:-translate-y-0.5 cursor-pointer w-full md:w-auto"
-                        >
-                          {isGenerating ? (
-                            <>
-                              <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
-                              <span className="whitespace-nowrap">Moteur...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Play className="w-4 h-4 shrink-0" />
-                              <span className="whitespace-nowrap">Génération Auto</span>
-                            </>
-                          )}
-                        </button>
-
-                        <button
-                          onClick={handleExcelExport}
-                          className={`flex items-center justify-center gap-2 px-4 py-2.5 border text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto ${
-                            currentPlan.features.excelExport
-                              ? 'bg-white/5 hover:bg-white/10 border-white/10 text-white'
-                              : 'bg-slate-950/60 border-amber-500/30 text-gray-400 hover:text-white'
-                          }`}
-                        >
-                          <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
-                          <span className="whitespace-nowrap">Export Excel</span>
-                          {!currentPlan.features.excelExport && (
-                            <span className="flex items-center gap-1 text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono">
-                              <Lock className="w-2.5 h-2.5" /> Premium
+                    {/* CONFIGURATION CARDS GRID */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                      {/* 1. SELECTION DES JOURS OUVRÉS (7 COLS) */}
+                      <div className="lg:col-span-7 space-y-6">
+                        <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-5 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'}`}>
+                          <div className={`flex items-center justify-between pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                            <div className="flex items-center gap-2">
+                              <Calendar className={`w-5 h-5 ${isLight ? 'text-indigo-600' : 'text-indigo-400'}`} />
+                              <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                                1. Jours de Cours Actifs
+                              </h3>
+                            </div>
+                            <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20'}`}>
+                              {activeDays.length} jours configurés
                             </span>
-                          )}
-                        </button>
+                          </div>
 
-                        <button
-                          onClick={handlePdfExport}
-                          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto"
-                        >
-                          <Download className="w-4 h-4 text-red-400 shrink-0" />
-                          <span className="whitespace-nowrap">Export PDF</span>
-                        </button>
-
-                        <button
-                          onClick={handleWordExport}
-                          className={`flex items-center justify-center gap-2 px-4 py-2.5 border text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto ${
-                            currentPlan.features.wordExport
-                              ? 'bg-white/5 hover:bg-white/10 border-white/10 text-white'
-                              : 'bg-slate-950/60 border-amber-500/30 text-gray-400 hover:text-white'
-                          }`}
-                        >
-                          <FileText className="w-4 h-4 text-blue-400 shrink-0" />
-                          <span className="whitespace-nowrap">Export Word</span>
-                          {!currentPlan.features.wordExport && (
-                            <span className="flex items-center gap-1 text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono">
-                              <Lock className="w-2.5 h-2.5" /> Premium
-                            </span>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* THE LIVE WEAKLY PLANNING GRID */}
-                    {classes.length === 0 ? (
-                      <div className="p-12 text-center rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl">
-                        <div className="max-w-md mx-auto">
-                          <SlidersHorizontal className="w-12 h-12 text-indigo-400 mx-auto mb-4 opacity-50" />
-                          <h3 className="text-lg font-bold text-white">Aucune Classe Déclarée</h3>
-                          <p className="text-sm text-gray-400 mt-2">
-                            {"Enregistrez vos premières classes scolaires dans l'onglet \"Classes\" pour commencer à dresser l'emploi du temps."}
+                          <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
+                            Cochez ou décochez les jours durant lesquels votre établissement dispense des cours.
                           </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-900/40 backdrop-blur-md shadow-2xl">
-                        <table className="w-full min-w-[900px] border-collapse text-left">
-                          <thead>
-                            <tr className="border-b border-white/10 bg-slate-950/80">
-                              <th className="py-4 px-4 font-mono text-[11px] text-gray-400 uppercase tracking-wider w-[12%]">
-                                Heures
-                              </th>
-                              {activeDays.map(day => (
-                                <th key={day} className="py-4 px-2 font-sans font-bold text-sm text-white w-[14.6%] text-center border-l border-white/10">
-                                  {day}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {slotLabels.map((label, sIndex) => {
-                              const breakAfter = (schoolBreaks || []).find(b => b.afterSlotIndex === sIndex);
-                              
-                              let breakTimeStr = "";
-                              if (breakAfter) {
-                                const breakStartStr = label.split(' - ')[1];
-                                const [hStr, mStr] = breakStartStr.split('h');
-                                const bStartMin = parseInt(hStr) * 60 + parseInt(mStr);
-                                const bEndMin = bStartMin + breakAfter.duration;
-                                const bEndH = Math.floor(bEndMin / 60);
-                                const bEndM = bEndMin % 60;
-                                const breakEndStr = `${String(bEndH).padStart(2, '0')}h${String(bEndM).padStart(2, '0')}`;
-                                breakTimeStr = `${breakStartStr} - ${breakEndStr}`;
-                              }
 
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            {ALL_DAYS.map((day) => {
+                              const isSelected = activeDays.includes(day);
                               return (
-                                <React.Fragment key={sIndex}>
-                                  <tr className="border-b border-white/10 hover:bg-white/[0.02] transition-colors min-h-16">
-                                    {/* Time labels */}
-                                    <td className="py-2 px-4 font-mono text-xs text-gray-300 bg-slate-950/40 font-medium border-r border-white/5 whitespace-nowrap">
-                                      {label}
-                                    </td>
-                                    {/* Days blocks cells */}
-                                    {activeDays.map(day => {
-                                      const spanInfo = getClassCellSpanInfo(selectedClassId, day, sIndex);
-                                      if (spanInfo.isContinuation) return null;
-
-                                      return (
-                                        <td 
-                                          key={day} 
-                                          rowSpan={spanInfo.rowSpan}
-                                          className="p-1.5 border-l border-white/10 align-top"
-                                          onDragOver={(e) => handleDragOverCell(e, day, sIndex)}
-                                          onDragLeave={handleDragLeave}
-                                          onDrop={(e) => handleDropOnCell(e, day, sIndex)}
-                                        >
-                                          {renderCellContent(day, sIndex, spanInfo)}
-                                        </td>
-                                      );
-                                    })}
-                                  </tr>
-                                  
-                                  {breakAfter && (
-                                    <tr className={theme === 'light' ? 'bg-indigo-50/40 text-indigo-700' : 'bg-indigo-500/5 text-indigo-300'}>
-                                      <td className="py-2.5 px-4 font-mono text-xs font-semibold border-r border-white/5 whitespace-nowrap bg-slate-950/40 text-gray-400">
-                                        {breakTimeStr}
-                                      </td>
-                                      <td colSpan={activeDays.length} className="py-2.5 px-4 text-center font-bold text-xs uppercase tracking-wider font-mono">
-                                        ⏸️ PAUSE : {breakAfter.name || 'Pause'} ({breakAfter.duration} min)
-                                      </td>
-                                    </tr>
-                                  )}
-                                </React.Fragment>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-
-                    {/* --- THE UNSCHEDULED HOURS DRAWER / DRAWER FOR MANUAL MANIPULATION --- */}
-                    {classes.length > 0 && (
-                      <div className="p-5 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl">
-                        <div className="flex items-center justify-between mb-4">
-                          <div>
-                            <h3 className="text-base font-bold text-white flex items-center gap-2">
-                              <Sliders className="w-4 h-4 text-indigo-400" />
-                              Corbeille des heures à placer ({unscheduled.filter(u => u.hours > 0).length} matières)
-                            </h3>
-                            <p className="text-xs text-gray-400 mt-0.5">
-                              {"Glissez ces étiquettes de cours manuellement sur l'emploi du temps pour combler les trous ou modifier le planning."}
-                            </p>
-                          </div>
-                        </div>
-
-                        {unscheduled.filter(u => u.hours > 0).length === 0 ? (
-                          <div className="py-6 text-center rounded-xl bg-slate-950/25 border border-dashed border-white/5 select-none">
-                            <p className="text-xs font-mono text-emerald-400 flex items-center justify-center gap-2">
-                              <Check className="w-4 h-4" /> {"Félicitations : Toutes les charges d'enseignements assignées ont été harmonieusement planifiées ! Plus aucun reliquat."}
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="flex flex-wrap gap-2.5">
-                            {unscheduled.map((u, index) => {
-                              if (u.hours <= 0) return null;
-                              const clsName = classes.find(c => c.id === u.classId)?.name || u.classId;
-                              const teach = teachers.find(t => t.id === u.teacherId);
-                              const subjName = subjects.find(s => s.id === u.subjectId)?.name || u.subjectId;
-                              const teachColor = teach?.color || '#cbd5e1';
-
-                              return (
-                                <div
-                                  key={index}
-                                  draggable="true"
-                                  onDragStart={(e) => handleBasketDragStart(e, u)}
-                                  className={`px-3 py-2.5 rounded-xl border cursor-grab active:cursor-grabbing flex flex-col justify-between max-w-[220px] shadow-sm transition-all select-none group ${
-                                    theme === 'light'
-                                      ? 'border-slate-200/80 hover:border-slate-300 hover:shadow-md'
-                                      : 'border-white/10 hover:border-white/20'
-                                  }`}
-                                  style={{ 
-                                    backgroundColor: theme === 'light' ? `${teachColor}18` : `${teachColor}25`,
-                                    borderLeft: `4px solid ${teachColor}`
+                                <button
+                                  key={day}
+                                  type="button"
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      if (activeDays.length <= 1) {
+                                        triggerNotification("Vous devez conserver au moins un jour actif.", "error");
+                                        return;
+                                      }
+                                      setActiveDays(activeDays.filter(d => d !== day));
+                                    } else {
+                                      const newDays = ALL_DAYS.filter(d => activeDays.includes(d) || d === day);
+                                      setActiveDays(newDays);
+                                    }
                                   }}
+                                  className={`p-4 rounded-xl border flex flex-col items-start justify-between gap-3 transition-all cursor-pointer select-none ${isSelected
+                                      ? 'bg-indigo-600 hover:bg-indigo-700 border-indigo-500 !text-white ring-2 ring-indigo-400/50 shadow-md shadow-indigo-600/30'
+                                      : isLight
+                                        ? 'bg-slate-50 border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50/40'
+                                        : 'bg-slate-950/40 border-white/10 text-gray-400 hover:border-white/20 hover:text-gray-300'
+                                    }`}
                                 >
-                                  <div className={`font-sans font-bold text-xs line-clamp-1 mb-1 ${
-                                    theme === 'light' ? 'text-slate-900' : 'text-white'
-                                  }`}>
-                                    {subjName}
-                                  </div>
-                                  <div className={`text-[10px] flex items-center justify-between gap-2 mt-1 ${
-                                    theme === 'light' ? 'text-slate-700 font-medium' : 'text-gray-300 font-medium'
-                                  }`}>
-                                    <span className="line-clamp-1 truncate">{teach?.name || u.teacherId}</span>
-                                    <span className={`shrink-0 font-bold px-2 py-0.5 rounded-full text-[9px] ${
-                                      theme === 'light' 
-                                        ? 'bg-white/90 text-slate-800 border border-slate-200 shadow-2xs' 
-                                        : 'bg-black/40 text-indigo-300 border border-white/10'
-                                    }`}>
-                                      {clsName} ({u.hours}h)
+                                  <div className="flex items-center justify-between w-full">
+                                    <span className={`font-bold text-sm ${isSelected ? '!text-white' : (isLight ? 'text-slate-800' : 'text-gray-300')}`}>
+                                      {day}
+                                    </span>
+                                    <span className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold ${isSelected
+                                        ? 'bg-white/25 !text-white border border-white/50'
+                                        : isLight
+                                          ? 'border border-slate-300 bg-white text-transparent'
+                                          : 'border border-white/10 bg-slate-900 text-transparent'
+                                      }`}>
+                                      {isSelected && <Check className="w-3.5 h-3.5 !text-white stroke-[2.5]" />}
                                     </span>
                                   </div>
-                                </div>
+                                  <span className={`text-[11px] font-mono ${isSelected ? '!text-white font-semibold' : (isLight ? 'text-slate-400' : 'text-gray-600')}`}>
+                                    {isSelected ? `${totalSlots}h / jour` : 'Fermé'}
+                                  </span>
+                                </button>
                               );
                             })}
                           </div>
-                        )}
+                        </div>
+
+                        {/* 2. PLAGE HORAIRE DE LA JOURNÉE (8h à 22h) */}
+                        <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-5 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'}`}>
+                          <div className={`flex items-center justify-between pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                            <div className="flex items-center gap-2">
+                              <Clock className={`w-5 h-5 ${isLight ? 'text-indigo-600' : 'text-indigo-400'}`} />
+                              <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                                2. Amplitude Horaire Quotidienne (8h à 22h)
+                              </h3>
+                            </div>
+                            <span className="text-xs font-mono text-emerald-600 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                              {startHour}h00 → {endHour}h00 ({totalSlots} créneaux d'1h)
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <label className={`block text-xs font-medium mb-2 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
+                                Heure de début des cours (Matin)
+                              </label>
+                              <select
+                                value={startHour}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  if (val >= endHour) {
+                                    triggerNotification("L'heure de début doit être inférieure à l'heure de fin.", "error");
+                                    return;
+                                  }
+                                  setStartHour(val);
+                                }}
+                                className={`w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors shadow-inner font-mono cursor-pointer border ${isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-slate-950 border-white/10 text-white'}`}
+                              >
+                                {[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21].map((h) => (
+                                  <option key={h} value={h} disabled={h >= endHour}>
+                                    {String(h).padStart(2, '0')}h00 {h <= 11 ? '(Matin)' : h <= 13 ? '(Midi)' : '(Après-midi)'}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className={`block text-xs font-medium mb-2 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
+                                Heure de fin des cours (Soir)
+                              </label>
+                              <select
+                                value={endHour}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  if (val <= startHour) {
+                                    triggerNotification("L'heure de fin doit être supérieure à l'heure de début.", "error");
+                                    return;
+                                  }
+                                  setEndHour(val);
+                                }}
+                                className={`w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors shadow-inner font-mono cursor-pointer border ${isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-slate-950 border-white/10 text-white'}`}
+                              >
+                                {[9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22].map((h) => (
+                                  <option key={h} value={h} disabled={h <= startHour}>
+                                    {String(h).padStart(2, '0')}h00 {h <= 12 ? '(Matin)' : h <= 17 ? '(Après-midi)' : '(Soirée)'}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* VISUAL PILL OF GENERATED SLOTS */}
+                          <div className="pt-2">
+                            <label className={`block text-xs font-medium mb-2 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
+                              Créneaux horaires d'1 heure générés :
+                            </label>
+                            <div className={`flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2.5 rounded-xl border ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-white/5'}`}>
+                              {slotLabels.map((label, idx) => (
+                                <span
+                                  key={idx}
+                                  className={`px-2.5 py-1 rounded-lg text-xs font-mono border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20'}`}
+                                >
+                                  Créneau {idx + 1} : {label}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 3. CONFIGURATION DES PAUSES */}
+                        <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-5 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'}`}>
+                          <div className={`flex items-center justify-between pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                            <div className="flex items-center gap-2">
+                              <SlidersHorizontal className={`w-5 h-5 ${isLight ? 'text-indigo-600' : 'text-indigo-400'}`} />
+                              <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                                3. Pauses de l'Établissement (Communes)
+                              </h3>
+                            </div>
+                            <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20'}`}>
+                              {schoolBreaks.length} pause(s)
+                            </span>
+                          </div>
+
+                          <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
+                            Définissez les récréations ou temps de repas. Ces pauses s'afficheront sur les plannings de classes et décaleront les heures des cours suivants.
+                          </p>
+
+                          {/* LIST OF CURRENT BREAKS */}
+                          {schoolBreaks.length === 0 ? (
+                            <p className={`text-xs italic text-center py-4 ${isLight ? 'text-slate-400' : 'text-gray-500'}`}>
+                              Aucune pause configurée pour le moment.
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              {[...schoolBreaks]
+                                .sort((a, b) => a.afterSlotIndex - b.afterSlotIndex)
+                                .map((b) => {
+                                  const slotLabel = slotLabels[b.afterSlotIndex] || `Créneau ${b.afterSlotIndex + 1}`;
+                                  return (
+                                    <div
+                                      key={b.id}
+                                      className={`flex items-center justify-between p-3 rounded-xl border text-xs ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/40 border-white/5'
+                                        }`}
+                                    >
+                                      <div>
+                                        <div className="font-bold flex items-center gap-1.5">
+                                          <span className={isLight ? 'text-slate-800' : 'text-white'}>{b.name}</span>
+                                          <span className={`px-2 py-0.5 rounded-md font-mono text-[10px] ${isLight ? 'bg-indigo-50 text-indigo-700' : 'bg-indigo-500/20 text-indigo-300'}`}>
+                                            {b.duration} min
+                                          </span>
+                                        </div>
+                                        <p className={`text-[10px] mt-0.5 ${isLight ? 'text-slate-400' : 'text-gray-500'}`}>
+                                          Placée après le : <strong className="font-mono">{slotLabel}</strong>
+                                        </p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSchoolBreaks(schoolBreaks.filter((x) => x.id !== b.id));
+                                          triggerNotification(`Pause "${b.name}" supprimée.`, "info");
+                                        }}
+                                        className="text-gray-400 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+                                        title="Supprimer la pause"
+                                      >
+                                        <Trash className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          )}
+
+                          {/* ADD BREAK FORM */}
+                          <div className={`p-4 rounded-xl border space-y-3.5 ${isLight ? 'bg-slate-50/50 border-slate-200' : 'bg-slate-950/20 border-white/10'}`}>
+                            <h4 className={`text-xs font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-800' : 'text-gray-300'}`}>
+                              Ajouter une Pause
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div>
+                                <label className={`block text-[10px] font-medium mb-1 ${isLight ? 'text-slate-600' : 'text-gray-400'}`}>
+                                  Nom de la pause
+                                </label>
+                                <input
+                                  type="text"
+                                  value={newBreakName}
+                                  onChange={(e) => setNewBreakName(e.target.value)}
+                                  placeholder="Ex: Récréation, Déjeuner"
+                                  className={`w-full rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 transition-colors border ${isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-slate-950 border-white/10 text-white'
+                                    }`}
+                                />
+                              </div>
+
+                              <div>
+                                <label className={`block text-[10px] font-medium mb-1 ${isLight ? 'text-slate-600' : 'text-gray-400'}`}>
+                                  Placer après le créneau
+                                </label>
+                                <select
+                                  value={newBreakAfterSlot}
+                                  onChange={(e) => setNewBreakAfterSlot(Number(e.target.value))}
+                                  className={`w-full rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 transition-colors font-mono cursor-pointer border ${isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-slate-950 border-white/10 text-white'
+                                    }`}
+                                >
+                                  {slotLabels.slice(0, slotLabels.length - 1).map((label, idx) => (
+                                    <option key={idx} value={idx}>
+                                      Après Créneau {idx + 1} ({label})
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className={`block text-[10px] font-medium mb-1 ${isLight ? 'text-slate-600' : 'text-gray-400'}`}>
+                                  Durée de la pause
+                                </label>
+                                <select
+                                  value={newBreakDuration}
+                                  onChange={(e) => setNewBreakDuration(Number(e.target.value))}
+                                  className={`w-full rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 transition-colors font-mono cursor-pointer border ${isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-slate-950 border-white/10 text-white'
+                                    }`}
+                                >
+                                  {[5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60].map((m) => (
+                                    <option key={m} value={m}>
+                                      {m === 60 ? '1h00 (60 min)' : `${m} min`}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+
+                            <div className="flex justify-end pt-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const name = newBreakName.trim() || "Pause";
+                                  if (schoolBreaks.some((b) => b.afterSlotIndex === newBreakAfterSlot)) {
+                                    triggerNotification("Une pause est déjà configurée après ce créneau.", "error");
+                                    return;
+                                  }
+                                  const newBreak: SchoolBreak = {
+                                    id: `break_${Date.now()}`,
+                                    name,
+                                    afterSlotIndex: newBreakAfterSlot,
+                                    duration: newBreakDuration
+                                  };
+                                  setSchoolBreaks([...schoolBreaks, newBreak]);
+                                  setNewBreakName('');
+                                  triggerNotification(`Pause "${name}" ajoutée avec succès !`, "success");
+                                }}
+                                className="py-2 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 !text-white text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Ajouter la pause</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </>
+
+                      {/* 3. SYNTHÈSE DE CAPACITÉ & PASSAGE ÉTAPE 2 (5 COLS) */}
+                      <div className="lg:col-span-5 space-y-6">
+                        <div className={`p-6 rounded-2xl backdrop-blur-xl border shadow-xl space-y-5 ${isLight ? 'bg-gradient-to-br from-indigo-50/80 via-white to-purple-50/80 border-indigo-200/90 text-slate-900 shadow-indigo-950/5' : 'bg-gradient-to-br from-indigo-950/40 via-slate-900/60 to-purple-950/40 border-indigo-500/20 text-white'}`}>
+                          <div className={`flex items-center gap-2 pb-3 border-b ${isLight ? 'border-indigo-100' : 'border-white/10'}`}>
+                            <Sparkles className={`w-5 h-5 ${isLight ? 'text-indigo-600' : 'text-indigo-400'}`} />
+                            <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                              Capacité Hebdomadaire
+                            </h3>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div className={`p-4 rounded-xl border space-y-3 ${isLight ? 'bg-white/90 border-indigo-100 shadow-xs' : 'bg-slate-950/60 border-white/10'}`}>
+                              <div className="flex items-center justify-between text-xs">
+                                <span className={isLight ? 'text-slate-500' : 'text-gray-400'}>Jours de cours :</span>
+                                <span className={`font-bold font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>{activeDays.length} jours / semaine</span>
+                              </div>
+                              <div className="flex items-center justify-between text-xs">
+                                <span className={isLight ? 'text-slate-500' : 'text-gray-400'}>Amplitude quotidienne :</span>
+                                <span className="font-bold text-indigo-600 font-mono">{startHour}h00 → {endHour}h00 ({totalSlots}h)</span>
+                              </div>
+                              <div className={`flex items-center justify-between text-xs border-t pt-2.5 ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                                <span className={`font-medium ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>Capacité totale par classe :</span>
+                                <span className="font-black text-emerald-600 font-mono text-sm">{activeDays.length * totalSlots} créneaux/sem</span>
+                              </div>
+                            </div>
+
+                            <div className={`p-3.5 rounded-xl border text-xs leading-relaxed ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-200'}`}>
+                              💡 <strong>Prise en compte globale :</strong> Toutes les grilles, filtres d'indisponibilité et le moteur d'optimisation mathématique s'ajustent instantanément à cette amplitude horaire.
+                            </div>
+
+                            <div className="pt-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  triggerNotification("Configuration des jours et horaires validée ! Passage à l'Étape 2 (Matières).", "success");
+                                  setActiveTab('subjects');
+                                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                                className="w-full py-4 px-5 rounded-2xl bg-gradient-to-r from-indigo-500 via-purple-600 to-indigo-600 hover:from-indigo-400 hover:via-purple-500 hover:to-indigo-500 !text-white font-bold text-xs shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 cursor-pointer group border border-indigo-400/30"
+                              >
+                                <span>👉 Passer à l'Étape 2 : Référentiel des Matières</span>
+                                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform animate-pulse" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 )}
 
-                {/* --- TEACHER VIEW MODE --- */}
-                {timetableViewMode === 'teacher' && (
+                {/* TAB 5: EMPLOI DU TEMPS GRID WITH DND */}
+                {activeTab === 'timetable' && (
                   <div className="space-y-6">
-                    {/* TEACHER METADATA CONTROLS */}
-                    <div className="p-5 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                      <div>
-                        <label className="block text-[11px] font-mono font-bold text-indigo-400 uppercase tracking-widest mb-1.5">
-                          {"SÉLECTION DE L'ENSEIGNANT OU VUE GLOBALE"}
-                        </label>
-                        <select
-                          value={selectedTeacherId}
-                          onChange={(e) => setSelectedTeacherId(e.target.value)}
-                          className="bg-slate-950/85 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 w-full sm:w-80 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors font-medium cursor-pointer shadow-inner"
-                        >
-                          <option value="all">👥 Tous les enseignants (Vue Globale)</option>
-                          {teachers.map(t => {
-                            const assigned = timetable.filter(e => e.teacherId === t.id).length;
-                            return (
-                              <option key={t.id} value={t.id}>
-                                👨‍🏫 {t.name} ({assigned}h / {t.weeklyQuota}h)
-                              </option>
-                            );
-                          })}
-                        </select>
+
+                    {/* HEADER BANNER WITH STEP-BY-STEP BEGINNER GUIDE */}
+                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
+                      <div className={`flex items-center justify-between gap-4 flex-wrap pb-4 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                        <div className="flex items-center gap-4">
+                          <div className={`p-3 rounded-2xl border shrink-0 ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'}`}>
+                            <Grid className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <h2 className={`text-lg font-bold flex items-center gap-2 flex-wrap ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span>Étape 5 : Emploi du Temps & Résolution Automatique</span>
+                              <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'}`}>
+                                Génération & Exports
+                              </span>
+                            </h2>
+                            <p className={`text-sm mt-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
+                              Générez automatiquement un emploi du temps 100% optimisé et sans aucun conflit, ajustez au besoin par glisser-déposer, et téléchargez vos documents officiels.
+                            </p>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-4 md:flex md:flex-row md:flex-nowrap md:items-center gap-2 mt-4 lg:mt-0 w-full md:w-auto">
-                        <button
-                          onClick={handleAutoGenerate}
-                          disabled={isGenerating || classes.length === 0}
-                          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/25 hover:-translate-y-0.5 cursor-pointer w-full md:w-auto"
-                        >
-                          {isGenerating ? (
-                            <>
-                              <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
-                              <span className="whitespace-nowrap">Moteur...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Play className="w-4 h-4 shrink-0" />
-                              <span className="whitespace-nowrap">Génération Auto</span>
-                            </>
-                          )}
-                        </button>
-
-                        <button
-                          onClick={() => handleTeacherPdfExport(selectedTeacherId)}
-                          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto"
-                        >
-                          <Download className="w-4 h-4 text-red-400 shrink-0" />
-                          <span className="whitespace-nowrap">
-                            {selectedTeacherId === 'all' 
-                              ? `Export PDF (${teachers.length})`
-                              : `Export PDF`
-                            }
-                          </span>
-                        </button>
-
-                        <button
-                          onClick={() => handleTeacherExcelExport(selectedTeacherId)}
-                          className={`flex items-center justify-center gap-2 px-4 py-2.5 border text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto ${
-                            currentPlan.features.excelExport
-                              ? 'bg-white/5 hover:bg-white/10 border-white/10 text-white'
-                              : 'bg-slate-950/60 border-amber-500/30 text-gray-400 hover:text-white'
-                          }`}
-                        >
-                          <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
-                          <span className="whitespace-nowrap">
-                            {selectedTeacherId === 'all' 
-                              ? `Export Excel (${teachers.length})`
-                              : `Export Excel`
-                            }
-                          </span>
-                          {!currentPlan.features.excelExport && (
-                            <span className="flex items-center gap-1 text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono">
-                              <Lock className="w-2.5 h-2.5" /> Premium
-                            </span>
-                          )}
-                        </button>
-
-                        <button
-                          onClick={() => handleTeacherWordExport(selectedTeacherId)}
-                          className={`flex items-center justify-center gap-2 px-4 py-2.5 border text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto ${
-                            currentPlan.features.wordExport
-                              ? 'bg-white/5 hover:bg-white/10 border-white/10 text-white'
-                              : 'bg-slate-950/60 border-amber-500/30 text-gray-400 hover:text-white'
-                          }`}
-                        >
-                          <FileText className="w-4 h-4 text-blue-400 shrink-0" />
-                          <span className="whitespace-nowrap">
-                            {selectedTeacherId === 'all' 
-                              ? `Export Word (${teachers.length})`
-                              : `Export Word`
-                            }
-                          </span>
-                          {!currentPlan.features.wordExport && (
-                            <span className="flex items-center gap-1 text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono">
-                              <Lock className="w-2.5 h-2.5" /> Premium
-                            </span>
-                          )}
-                        </button>
+                      {/* GUIDE DÉBUTANT PAS-À-PAS */}
+                      <div className={`rounded-xl p-4 border ${isLight ? 'bg-blue-50/60 border-blue-200/80' : 'bg-slate-950/50 border-indigo-500/20'}`}>
+                        <div className={`flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider mb-2.5 ${isLight ? 'text-blue-600' : 'text-indigo-300'}`}>
+                          <Sparkles className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-indigo-400'}`} />
+                          <span className="font-bold">Guide Débutant : Ce que vous devez faire sur cette étape</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                          <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                            <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>1</span>
+                              <span className="font-bold">Générer le planning</span>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                              Cliquez sur le bouton violet "Générer l'Emploi du Temps" ci-dessous pour calculer l'emploi du temps optimal sans chevauchement.
+                            </p>
+                          </div>
+                          <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                            <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>2</span>
+                              <span className="font-bold">Ajuster par Glisser-Déposer</span>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                              Glissez un cours vers un autre créneau à la souris : le système anti-conflit valide instantanément en vert ou vous bloque en rouge.
+                            </p>
+                          </div>
+                          <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                            <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>3</span>
+                              <span className="font-bold">Exporter les documents</span>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                              Cliquez sur les boutons d'export PDF, Word (.doc) ou Excel (.xlsx) pour imprimer vos emplois du temps prêts pour la rentrée.
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    {/* NO TEACHERS STATE */}
-                    {teachers.length === 0 ? (
-                      <div className="p-12 text-center rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl">
-                        <div className="max-w-md mx-auto">
-                          <GraduationCap className="w-12 h-12 text-indigo-400 mx-auto mb-4 opacity-50" />
-                          <h3 className="text-lg font-bold text-white">Aucun Enseignant Enregistré</h3>
-                          <p className="text-sm text-gray-400 mt-2">
-                            {"Ajoutez des enseignants et attribuez-leur des cours dans l'onglet \"Profs\"."}
-                          </p>
-                        </div>
+                    {/* VIEW MODE TOGGLE BAR */}
+                    <div className="p-2.5 rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-white/10 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-center gap-2 p-1 bg-slate-950/70 rounded-xl border border-white/5 w-full sm:w-auto">
+                        <button
+                          onClick={() => setTimetableViewMode('class')}
+                          className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${timetableViewMode === 'class'
+                              ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-md shadow-indigo-500/20'
+                              : 'text-gray-400 hover:text-white hover:bg-white/5'
+                            }`}
+                        >
+                          <Users className="w-4 h-4" />
+                          <span>Vue par Classe</span>
+                        </button>
+
+                        <button
+                          onClick={() => setTimetableViewMode('teacher')}
+                          className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${timetableViewMode === 'teacher'
+                              ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-md shadow-indigo-500/20'
+                              : 'text-gray-400 hover:text-white hover:bg-white/5'
+                            }`}
+                        >
+                          <GraduationCap className="w-4 h-4" />
+                          <span>Emplois du Temps Professeurs ({teachers.length})</span>
+                        </button>
                       </div>
-                    ) : selectedTeacherId === 'all' ? (
-                      /* --- ALL TEACHERS GRID LIST --- */
-                      <div className="space-y-8">
-                        {teachers.map((teacher) => {
-                          const assignedHours = timetable.filter(e => e.teacherId === teacher.id).length;
-                          const subNames = teacher.subjectIds
-                            .map(sid => subjects.find(s => s.id === sid)?.name)
-                            .filter(Boolean)
-                            .join(', ');
-                          
-                          const isConforming = assignedHours === teacher.weeklyQuota;
 
-                          return (
-                            <div key={teacher.id} className="p-5 rounded-2xl bg-slate-900/40 backdrop-blur-md border border-white/10 shadow-xl space-y-4">
-                              {/* Teacher Banner Header */}
-                              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
-                                <div className="flex items-center gap-3">
-                                  <div
-                                    className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-md text-base shrink-0"
-                                    style={{ backgroundColor: teacher.color }}
-                                  >
-                                    {teacher.name.charAt(0)}
-                                  </div>
-                                  <div>
-                                    <h3 className="text-base font-bold text-white flex items-center gap-2">
-                                      <span>{teacher.name}</span>
-                                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-white/10 text-gray-300 font-mono font-medium">
-                                        {subNames || 'Enseignant'}
-                                      </span>
-                                    </h3>
-                                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                                      <span>Quota visé : <strong className="text-white">{teacher.weeklyQuota}h / sem</strong></span>
-                                      <span>•</span>
-                                      <span>Heures planifiées : <strong className={isConforming ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>{assignedHours}h</strong></span>
-                                    </div>
-                                  </div>
-                                </div>
+                      <div className="text-xs font-medium text-gray-300 flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-xl border border-white/5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>
+                          {timetableViewMode === 'class'
+                            ? `${classes.length} classes configurées`
+                            : `${teachers.length} plannings enseignants disponibles`
+                          }
+                        </span>
+                      </div>
+                    </div>
 
-                                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                                  <button
-                                    onClick={() => setSelectedTeacherId(teacher.id)}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-indigo-300 hover:text-white text-xs font-semibold rounded-lg border border-white/10 transition-colors cursor-pointer"
-                                  >
-                                    <span>Focus Individuel</span>
-                                    <ChevronRight className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleTeacherPdfExport(teacher.id)}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-300 text-xs font-semibold rounded-lg border border-red-500/20 transition-colors cursor-pointer"
-                                  >
-                                    <Download className="w-3.5 h-3.5" />
-                                    <span>PDF</span>
-                                  </button>
-                                </div>
-                              </div>
+                    {/* --- CLASS VIEW MODE --- */}
+                    {timetableViewMode === 'class' && (
+                      <>
+                        {/* TIMETABLE METADATA CONTROLS */}
+                        <div className="p-5 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                          <div>
+                            <label className="block text-[11px] font-mono font-bold text-indigo-400 uppercase tracking-widest mb-1.5">
+                              SÉLECTION DE LA CLASSE VISUELLE
+                            </label>
+                            <select
+                              value={selectedClassId}
+                              onChange={(e) => setSelectedClassId(e.target.value)}
+                              className="bg-slate-950/85 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 w-64 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors font-medium cursor-pointer shadow-inner"
+                            >
+                              {classes.map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                              ))}
+                            </select>
+                          </div>
 
-                              {/* Individual Teacher Grid Table */}
-                              <div className="overflow-x-auto rounded-xl border border-white/10 bg-slate-950/40">
-                                <table className="w-full min-w-[800px] border-collapse text-left">
-                                  <thead>
-                                    <tr className="border-b border-white/10 bg-slate-950/80">
-                                      <th className="py-2.5 px-3 font-mono text-[10px] text-gray-400 uppercase tracking-wider w-[12%]">
-                                        Heures
-                                      </th>
-                                      {activeDays.map(day => (
-                                        <th key={day} className="py-2.5 px-2 font-sans font-bold text-xs text-white w-[14.6%] text-center border-l border-white/10">
-                                          {day}
-                                        </th>
-                                      ))}
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {slotLabels.map((label, sIndex) => (
-                                      <tr key={sIndex} className="border-b border-white/5 hover:bg-white/[0.02] min-h-12">
-                                        <td className="py-1 px-3 font-mono text-[11px] text-gray-400 bg-slate-950/40 font-medium border-r border-white/5 whitespace-nowrap">
-                                          {label.split(' - ')[0]}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 md:flex md:flex-row md:flex-nowrap md:items-center gap-2 mt-4 lg:mt-0 w-full md:w-auto">
+                            <button
+                              onClick={handleAutoGenerate}
+                              disabled={isGenerating || classes.length === 0}
+                              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/25 hover:-translate-y-0.5 cursor-pointer w-full md:w-auto"
+                            >
+                              {isGenerating ? (
+                                <>
+                                  <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
+                                  <span className="whitespace-nowrap">Moteur...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Play className="w-4 h-4 shrink-0" />
+                                  <span className="whitespace-nowrap">Génération Auto</span>
+                                </>
+                              )}
+                            </button>
+
+                            <button
+                              onClick={handleExcelExport}
+                              className={`flex items-center justify-center gap-2 px-4 py-2.5 border text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto ${currentPlan.features.excelExport
+                                  ? 'bg-white/5 hover:bg-white/10 border-white/10 text-white'
+                                  : 'bg-slate-950/60 border-amber-500/30 text-gray-400 hover:text-white'
+                                }`}
+                            >
+                              <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
+                              <span className="whitespace-nowrap">Export Excel</span>
+                              {!currentPlan.features.excelExport && (
+                                <span className="flex items-center gap-1 text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono">
+                                  <Lock className="w-2.5 h-2.5" /> Premium
+                                </span>
+                              )}
+                            </button>
+
+                            <button
+                              onClick={handlePdfExport}
+                              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto"
+                            >
+                              <Download className="w-4 h-4 text-red-400 shrink-0" />
+                              <span className="whitespace-nowrap">Export PDF</span>
+                            </button>
+
+                            <button
+                              onClick={handleWordExport}
+                              className={`flex items-center justify-center gap-2 px-4 py-2.5 border text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto ${currentPlan.features.wordExport
+                                  ? 'bg-white/5 hover:bg-white/10 border-white/10 text-white'
+                                  : 'bg-slate-950/60 border-amber-500/30 text-gray-400 hover:text-white'
+                                }`}
+                            >
+                              <FileText className="w-4 h-4 text-blue-400 shrink-0" />
+                              <span className="whitespace-nowrap">Export Word</span>
+                              {!currentPlan.features.wordExport && (
+                                <span className="flex items-center gap-1 text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono">
+                                  <Lock className="w-2.5 h-2.5" /> Premium
+                                </span>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* THE LIVE WEAKLY PLANNING GRID */}
+                        {classes.length === 0 ? (
+                          <div className="p-12 text-center rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl">
+                            <div className="max-w-md mx-auto">
+                              <SlidersHorizontal className="w-12 h-12 text-indigo-400 mx-auto mb-4 opacity-50" />
+                              <h3 className="text-lg font-bold text-white">Aucune Classe Déclarée</h3>
+                              <p className="text-sm text-gray-400 mt-2">
+                                {"Enregistrez vos premières classes scolaires dans l'onglet \"Classes\" pour commencer à dresser l'emploi du temps."}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-900/40 backdrop-blur-md shadow-2xl">
+                            <table className="w-full min-w-[900px] border-collapse text-left">
+                              <thead>
+                                <tr className="border-b border-white/10 bg-slate-950/80">
+                                  <th className="py-4 px-4 font-mono text-[11px] text-gray-400 uppercase tracking-wider w-[12%]">
+                                    Heures
+                                  </th>
+                                  {activeDays.map(day => (
+                                    <th key={day} className="py-4 px-2 font-sans font-bold text-sm text-white w-[14.6%] text-center border-l border-white/10">
+                                      {day}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {slotLabels.map((label, sIndex) => {
+                                  const breakAfter = (schoolBreaks || []).find(b => b.afterSlotIndex === sIndex);
+
+                                  let breakTimeStr = "";
+                                  if (breakAfter) {
+                                    const breakStartStr = label.split(' - ')[1];
+                                    const [hStr, mStr] = breakStartStr.split('h');
+                                    const bStartMin = parseInt(hStr) * 60 + parseInt(mStr);
+                                    const bEndMin = bStartMin + breakAfter.duration;
+                                    const bEndH = Math.floor(bEndMin / 60);
+                                    const bEndM = bEndMin % 60;
+                                    const breakEndStr = `${String(bEndH).padStart(2, '0')}h${String(bEndM).padStart(2, '0')}`;
+                                    breakTimeStr = `${breakStartStr} - ${breakEndStr}`;
+                                  }
+
+                                  return (
+                                    <React.Fragment key={sIndex}>
+                                      <tr className="border-b border-white/10 hover:bg-white/[0.02] transition-colors min-h-16">
+                                        {/* Time labels */}
+                                        <td className="py-2 px-4 font-mono text-xs text-gray-300 bg-slate-950/40 font-medium border-r border-white/5 whitespace-nowrap">
+                                          {label}
                                         </td>
+                                        {/* Days blocks cells */}
                                         {activeDays.map(day => {
-                                          const spanInfo = getTeacherCellSpanInfo(teacher, day, sIndex);
+                                          const spanInfo = getClassCellSpanInfo(selectedClassId, day, sIndex);
                                           if (spanInfo.isContinuation) return null;
 
                                           return (
-                                            <td key={day} rowSpan={spanInfo.rowSpan} className="p-1 border-l border-white/10 align-top">
-                                              {renderTeacherCellContent(teacher, day, sIndex, spanInfo)}
+                                            <td
+                                              key={day}
+                                              rowSpan={spanInfo.rowSpan}
+                                              className="p-1.5 border-l border-white/10 align-top"
+                                              onDragOver={(e) => handleDragOverCell(e, day, sIndex)}
+                                              onDragLeave={handleDragLeave}
+                                              onDrop={(e) => handleDropOnCell(e, day, sIndex)}
+                                            >
+                                              {renderCellContent(day, sIndex, spanInfo)}
                                             </td>
                                           );
                                         })}
                                       </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      /* --- SINGLE TEACHER FOCUS VIEW --- */
-                      (() => {
-                        const teacher = teachers.find(t => t.id === selectedTeacherId);
-                        if (!teacher) return null;
 
-                        const assignedHours = timetable.filter(e => e.teacherId === teacher.id).length;
-                        const subNames = teacher.subjectIds
-                          .map(sid => subjects.find(s => s.id === sid)?.name)
-                          .filter(Boolean)
-                          .join(', ');
-
-                        const classBreakdown: { [cName: string]: number } = {};
-                        timetable.filter(e => e.teacherId === teacher.id).forEach(e => {
-                          const cName = classes.find(c => c.id === e.classId)?.name || e.classId;
-                          classBreakdown[cName] = (classBreakdown[cName] || 0) + 1;
-                        });
-
-                        return (
-                          <div className="space-y-6">
-                            {/* Focus Teacher Banner */}
-                            <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                              <div className="flex items-center gap-4">
-                                <div
-                                  className="w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-white shadow-xl text-xl shrink-0"
-                                  style={{ backgroundColor: teacher.color }}
-                                >
-                                  {teacher.name.charAt(0)}
-                                </div>
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <h2 className="text-xl font-bold text-white">{teacher.name}</h2>
-                                    <button
-                                      onClick={() => setSelectedTeacherId('all')}
-                                      className="text-xs text-indigo-400 hover:underline font-mono cursor-pointer"
-                                    >
-                                      (← Voir Tous les Profs)
-                                    </button>
-                                  </div>
-                                  <p className="text-xs text-gray-400 mt-1">
-                                    Matière(s) dispensée(s) : <strong className="text-indigo-300">{subNames || "Aucune"}</strong>
-                                  </p>
-                                  <div className="flex flex-wrap gap-2 mt-3">
-                                    {Object.entries(classBreakdown).map(([cName, hrs]) => (
-                                      <span key={cName} className="text-xs px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-semibold">
-                                        {cName} : {hrs}h/sem
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-                                <div className="p-3 rounded-xl bg-slate-950/60 border border-white/5 text-center min-w-[130px]">
-                                  <div className="text-[10px] font-mono text-gray-400 uppercase">Volume Planifié</div>
-                                  <div className="text-lg font-bold text-white mt-0.5">
-                                    {assignedHours}h <span className="text-xs text-gray-400 font-normal">/ {teacher.weeklyQuota}h</span>
-                                  </div>
-                                </div>
-
-                                <button
-                                  onClick={() => handleTeacherPdfExport(teacher.id)}
-                                  className="flex items-center gap-2 px-5 py-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 text-xs font-bold rounded-xl transition-all shadow-md w-full sm:w-auto justify-center cursor-pointer"
-                                >
-                                  <Download className="w-4 h-4" />
-                                  <span>Télécharger PDF Prof</span>
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Single Teacher Grid */}
-                            <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-900/40 backdrop-blur-md shadow-2xl">
-                              <table className="w-full min-w-[900px] border-collapse text-left">
-                                <thead>
-                                  <tr className="border-b border-white/10 bg-slate-950/80">
-                                    <th className="py-4 px-4 font-mono text-[11px] text-gray-400 uppercase tracking-wider w-[12%]">
-                                      Heures
-                                    </th>
-                                    {activeDays.map(day => (
-                                      <th key={day} className="py-4 px-2 font-sans font-bold text-sm text-white w-[14.6%] text-center border-l border-white/10">
-                                        {day}
-                                      </th>
-                                    ))}
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {slotLabels.map((label, sIndex) => (
-                                    <tr key={sIndex} className="border-b border-white/10 hover:bg-white/[0.02] transition-colors min-h-16">
-                                      <td className="py-2 px-4 font-mono text-xs text-gray-300 bg-slate-950/40 font-medium border-r border-white/5 whitespace-nowrap">
-                                        {label}
-                                      </td>
-                                      {activeDays.map(day => {
-                                        const spanInfo = getTeacherCellSpanInfo(teacher, day, sIndex);
-                                        if (spanInfo.isContinuation) return null;
-
-                                        return (
-                                          <td key={day} rowSpan={spanInfo.rowSpan} className="p-1.5 border-l border-white/10 align-top">
-                                            {renderTeacherCellContent(teacher, day, sIndex, spanInfo)}
+                                      {breakAfter && (
+                                        <tr className={theme === 'light' ? 'bg-indigo-50/40 text-indigo-700' : 'bg-indigo-500/5 text-indigo-300'}>
+                                          <td className="py-2.5 px-4 font-mono text-xs font-semibold border-r border-white/5 whitespace-nowrap bg-slate-950/40 text-gray-400">
+                                            {breakTimeStr}
                                           </td>
-                                        );
-                                      })}
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                                          <td colSpan={activeDays.length} className="py-2.5 px-4 text-center font-bold text-xs uppercase tracking-wider font-mono">
+                                            ⏸️ PAUSE : {breakAfter.name || 'Pause'} ({breakAfter.duration} min)
+                                          </td>
+                                        </tr>
+                                      )}
+                                    </React.Fragment>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+
+                        {/* --- THE UNSCHEDULED HOURS DRAWER / DRAWER FOR MANUAL MANIPULATION --- */}
+                        {classes.length > 0 && (
+                          <div className="p-5 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl">
+                            <div className="flex items-center justify-between mb-4">
+                              <div>
+                                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                  <Sliders className="w-4 h-4 text-indigo-400" />
+                                  Corbeille des heures à placer ({unscheduled.filter(u => u.hours > 0).length} matières)
+                                </h3>
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                  {"Glissez ces étiquettes de cours manuellement sur l'emploi du temps pour combler les trous ou modifier le planning."}
+                                </p>
+                              </div>
+                            </div>
+
+                            {unscheduled.filter(u => u.hours > 0).length === 0 ? (
+                              <div className="py-6 text-center rounded-xl bg-slate-950/25 border border-dashed border-white/5 select-none">
+                                <p className="text-xs font-mono text-emerald-400 flex items-center justify-center gap-2">
+                                  <Check className="w-4 h-4" /> {"Félicitations : Toutes les charges d'enseignements assignées ont été harmonieusement planifiées ! Plus aucun reliquat."}
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="flex flex-wrap gap-2.5">
+                                {unscheduled.map((u, index) => {
+                                  if (u.hours <= 0) return null;
+                                  const clsName = classes.find(c => c.id === u.classId)?.name || u.classId;
+                                  const teach = teachers.find(t => t.id === u.teacherId);
+                                  const subjName = subjects.find(s => s.id === u.subjectId)?.name || u.subjectId;
+                                  const teachColor = teach?.color || '#cbd5e1';
+
+                                  return (
+                                    <div
+                                      key={index}
+                                      draggable="true"
+                                      onDragStart={(e) => handleBasketDragStart(e, u)}
+                                      className={`px-3 py-2.5 rounded-xl border cursor-grab active:cursor-grabbing flex flex-col justify-between max-w-[220px] shadow-sm transition-all select-none group ${theme === 'light'
+                                          ? 'border-slate-200/80 hover:border-slate-300 hover:shadow-md'
+                                          : 'border-white/10 hover:border-white/20'
+                                        }`}
+                                      style={{
+                                        backgroundColor: theme === 'light' ? `${teachColor}18` : `${teachColor}25`,
+                                        borderLeft: `4px solid ${teachColor}`
+                                      }}
+                                    >
+                                      <div className={`font-sans font-bold text-xs line-clamp-1 mb-1 ${theme === 'light' ? 'text-slate-900' : 'text-white'
+                                        }`}>
+                                        {subjName}
+                                      </div>
+                                      <div className={`text-[10px] flex items-center justify-between gap-2 mt-1 ${theme === 'light' ? 'text-slate-700 font-medium' : 'text-gray-300 font-medium'
+                                        }`}>
+                                        <span className="line-clamp-1 truncate">{teach?.name || u.teacherId}</span>
+                                        <span className={`shrink-0 font-bold px-2 py-0.5 rounded-full text-[9px] ${theme === 'light'
+                                            ? 'bg-white/90 text-slate-800 border border-slate-200 shadow-2xs'
+                                            : 'bg-black/40 text-indigo-300 border border-white/10'
+                                          }`}>
+                                          {clsName} ({u.hours}h)
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* --- TEACHER VIEW MODE --- */}
+                    {timetableViewMode === 'teacher' && (
+                      <div className="space-y-6">
+                        {/* TEACHER METADATA CONTROLS */}
+                        <div className="p-5 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                          <div>
+                            <label className="block text-[11px] font-mono font-bold text-indigo-400 uppercase tracking-widest mb-1.5">
+                              {"SÉLECTION DE L'ENSEIGNANT OU VUE GLOBALE"}
+                            </label>
+                            <select
+                              value={selectedTeacherId}
+                              onChange={(e) => setSelectedTeacherId(e.target.value)}
+                              className="bg-slate-950/85 border border-white/10 text-white text-sm rounded-xl px-4 py-2.5 w-full sm:w-80 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors font-medium cursor-pointer shadow-inner"
+                            >
+                              <option value="all">👥 Tous les enseignants (Vue Globale)</option>
+                              {teachers.map(t => {
+                                const assigned = timetable.filter(e => e.teacherId === t.id).length;
+                                return (
+                                  <option key={t.id} value={t.id}>
+                                    👨‍🏫 {t.name} ({assigned}h / {t.weeklyQuota}h)
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-4 md:flex md:flex-row md:flex-nowrap md:items-center gap-2 mt-4 lg:mt-0 w-full md:w-auto">
+                            <button
+                              onClick={handleAutoGenerate}
+                              disabled={isGenerating || classes.length === 0}
+                              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/25 hover:-translate-y-0.5 cursor-pointer w-full md:w-auto"
+                            >
+                              {isGenerating ? (
+                                <>
+                                  <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
+                                  <span className="whitespace-nowrap">Moteur...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Play className="w-4 h-4 shrink-0" />
+                                  <span className="whitespace-nowrap">Génération Auto</span>
+                                </>
+                              )}
+                            </button>
+
+                            <button
+                              onClick={() => handleTeacherPdfExport(selectedTeacherId)}
+                              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto"
+                            >
+                              <Download className="w-4 h-4 text-red-400 shrink-0" />
+                              <span className="whitespace-nowrap">
+                                {selectedTeacherId === 'all'
+                                  ? `Export PDF (${teachers.length})`
+                                  : `Export PDF`
+                                }
+                              </span>
+                            </button>
+
+                            <button
+                              onClick={() => handleTeacherExcelExport(selectedTeacherId)}
+                              className={`flex items-center justify-center gap-2 px-4 py-2.5 border text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto ${currentPlan.features.excelExport
+                                  ? 'bg-white/5 hover:bg-white/10 border-white/10 text-white'
+                                  : 'bg-slate-950/60 border-amber-500/30 text-gray-400 hover:text-white'
+                                }`}
+                            >
+                              <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
+                              <span className="whitespace-nowrap">
+                                {selectedTeacherId === 'all'
+                                  ? `Export Excel (${teachers.length})`
+                                  : `Export Excel`
+                                }
+                              </span>
+                              {!currentPlan.features.excelExport && (
+                                <span className="flex items-center gap-1 text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono">
+                                  <Lock className="w-2.5 h-2.5" /> Premium
+                                </span>
+                              )}
+                            </button>
+
+                            <button
+                              onClick={() => handleTeacherWordExport(selectedTeacherId)}
+                              className={`flex items-center justify-center gap-2 px-4 py-2.5 border text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto ${currentPlan.features.wordExport
+                                  ? 'bg-white/5 hover:bg-white/10 border-white/10 text-white'
+                                  : 'bg-slate-950/60 border-amber-500/30 text-gray-400 hover:text-white'
+                                }`}
+                            >
+                              <FileText className="w-4 h-4 text-blue-400 shrink-0" />
+                              <span className="whitespace-nowrap">
+                                {selectedTeacherId === 'all'
+                                  ? `Export Word (${teachers.length})`
+                                  : `Export Word`
+                                }
+                              </span>
+                              {!currentPlan.features.wordExport && (
+                                <span className="flex items-center gap-1 text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono">
+                                  <Lock className="w-2.5 h-2.5" /> Premium
+                                </span>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* NO TEACHERS STATE */}
+                        {teachers.length === 0 ? (
+                          <div className="p-12 text-center rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl">
+                            <div className="max-w-md mx-auto">
+                              <GraduationCap className="w-12 h-12 text-indigo-400 mx-auto mb-4 opacity-50" />
+                              <h3 className="text-lg font-bold text-white">Aucun Enseignant Enregistré</h3>
+                              <p className="text-sm text-gray-400 mt-2">
+                                {"Ajoutez des enseignants et attribuez-leur des cours dans l'onglet \"Profs\"."}
+                              </p>
                             </div>
                           </div>
-                        );
-                      })()
+                        ) : selectedTeacherId === 'all' ? (
+                          /* --- ALL TEACHERS GRID LIST --- */
+                          <div className="space-y-8">
+                            {teachers.map((teacher) => {
+                              const assignedHours = timetable.filter(e => e.teacherId === teacher.id).length;
+                              const subNames = teacher.subjectIds
+                                .map(sid => subjects.find(s => s.id === sid)?.name)
+                                .filter(Boolean)
+                                .join(', ');
+
+                              const isConforming = assignedHours === teacher.weeklyQuota;
+
+                              return (
+                                <div key={teacher.id} className="p-5 rounded-2xl bg-slate-900/40 backdrop-blur-md border border-white/10 shadow-xl space-y-4">
+                                  {/* Teacher Banner Header */}
+                                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
+                                    <div className="flex items-center gap-3">
+                                      <div
+                                        className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-md text-base shrink-0"
+                                        style={{ backgroundColor: teacher.color }}
+                                      >
+                                        {teacher.name.charAt(0)}
+                                      </div>
+                                      <div>
+                                        <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                          <span>{teacher.name}</span>
+                                          <span className="text-xs px-2.5 py-0.5 rounded-full bg-white/10 text-gray-300 font-mono font-medium">
+                                            {subNames || 'Enseignant'}
+                                          </span>
+                                        </h3>
+                                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                                          <span>Quota visé : <strong className="text-white">{teacher.weeklyQuota}h / sem</strong></span>
+                                          <span>•</span>
+                                          <span>Heures planifiées : <strong className={isConforming ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>{assignedHours}h</strong></span>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                                      <button
+                                        onClick={() => setSelectedTeacherId(teacher.id)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-indigo-300 hover:text-white text-xs font-semibold rounded-lg border border-white/10 transition-colors cursor-pointer"
+                                      >
+                                        <span>Focus Individuel</span>
+                                        <ChevronRight className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleTeacherPdfExport(teacher.id)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-300 text-xs font-semibold rounded-lg border border-red-500/20 transition-colors cursor-pointer"
+                                      >
+                                        <Download className="w-3.5 h-3.5" />
+                                        <span>PDF</span>
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* Individual Teacher Grid Table */}
+                                  <div className="overflow-x-auto rounded-xl border border-white/10 bg-slate-950/40">
+                                    <table className="w-full min-w-[800px] border-collapse text-left">
+                                      <thead>
+                                        <tr className="border-b border-white/10 bg-slate-950/80">
+                                          <th className="py-2.5 px-3 font-mono text-[10px] text-gray-400 uppercase tracking-wider w-[12%]">
+                                            Heures
+                                          </th>
+                                          {activeDays.map(day => (
+                                            <th key={day} className="py-2.5 px-2 font-sans font-bold text-xs text-white w-[14.6%] text-center border-l border-white/10">
+                                              {day}
+                                            </th>
+                                          ))}
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {slotLabels.map((label, sIndex) => (
+                                          <tr key={sIndex} className="border-b border-white/5 hover:bg-white/[0.02] min-h-12">
+                                            <td className="py-1 px-3 font-mono text-[11px] text-gray-400 bg-slate-950/40 font-medium border-r border-white/5 whitespace-nowrap">
+                                              {label.split(' - ')[0]}
+                                            </td>
+                                            {activeDays.map(day => {
+                                              const spanInfo = getTeacherCellSpanInfo(teacher, day, sIndex);
+                                              if (spanInfo.isContinuation) return null;
+
+                                              return (
+                                                <td key={day} rowSpan={spanInfo.rowSpan} className="p-1 border-l border-white/10 align-top">
+                                                  {renderTeacherCellContent(teacher, day, sIndex, spanInfo)}
+                                                </td>
+                                              );
+                                            })}
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          /* --- SINGLE TEACHER FOCUS VIEW --- */
+                          (() => {
+                            const teacher = teachers.find(t => t.id === selectedTeacherId);
+                            if (!teacher) return null;
+
+                            const assignedHours = timetable.filter(e => e.teacherId === teacher.id).length;
+                            const subNames = teacher.subjectIds
+                              .map(sid => subjects.find(s => s.id === sid)?.name)
+                              .filter(Boolean)
+                              .join(', ');
+
+                            const classBreakdown: { [cName: string]: number } = {};
+                            timetable.filter(e => e.teacherId === teacher.id).forEach(e => {
+                              const cName = classes.find(c => c.id === e.classId)?.name || e.classId;
+                              classBreakdown[cName] = (classBreakdown[cName] || 0) + 1;
+                            });
+
+                            return (
+                              <div className="space-y-6">
+                                {/* Focus Teacher Banner */}
+                                <div className="p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                                  <div className="flex items-center gap-4">
+                                    <div
+                                      className="w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-white shadow-xl text-xl shrink-0"
+                                      style={{ backgroundColor: teacher.color }}
+                                    >
+                                      {teacher.name.charAt(0)}
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <h2 className="text-xl font-bold text-white">{teacher.name}</h2>
+                                        <button
+                                          onClick={() => setSelectedTeacherId('all')}
+                                          className="text-xs text-indigo-400 hover:underline font-mono cursor-pointer"
+                                        >
+                                          (← Voir Tous les Profs)
+                                        </button>
+                                      </div>
+                                      <p className="text-xs text-gray-400 mt-1">
+                                        Matière(s) dispensée(s) : <strong className="text-indigo-300">{subNames || "Aucune"}</strong>
+                                      </p>
+                                      <div className="flex flex-wrap gap-2 mt-3">
+                                        {Object.entries(classBreakdown).map(([cName, hrs]) => (
+                                          <span key={cName} className="text-xs px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-semibold">
+                                            {cName} : {hrs}h/sem
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                                    <div className="p-3 rounded-xl bg-slate-950/60 border border-white/5 text-center min-w-[130px]">
+                                      <div className="text-[10px] font-mono text-gray-400 uppercase">Volume Planifié</div>
+                                      <div className="text-lg font-bold text-white mt-0.5">
+                                        {assignedHours}h <span className="text-xs text-gray-400 font-normal">/ {teacher.weeklyQuota}h</span>
+                                      </div>
+                                    </div>
+
+                                    <button
+                                      onClick={() => handleTeacherPdfExport(teacher.id)}
+                                      className="flex items-center gap-2 px-5 py-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 text-xs font-bold rounded-xl transition-all shadow-md w-full sm:w-auto justify-center cursor-pointer"
+                                    >
+                                      <Download className="w-4 h-4" />
+                                      <span>Télécharger PDF Prof</span>
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Single Teacher Grid */}
+                                <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-900/40 backdrop-blur-md shadow-2xl">
+                                  <table className="w-full min-w-[900px] border-collapse text-left">
+                                    <thead>
+                                      <tr className="border-b border-white/10 bg-slate-950/80">
+                                        <th className="py-4 px-4 font-mono text-[11px] text-gray-400 uppercase tracking-wider w-[12%]">
+                                          Heures
+                                        </th>
+                                        {activeDays.map(day => (
+                                          <th key={day} className="py-4 px-2 font-sans font-bold text-sm text-white w-[14.6%] text-center border-l border-white/10">
+                                            {day}
+                                          </th>
+                                        ))}
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {slotLabels.map((label, sIndex) => (
+                                        <tr key={sIndex} className="border-b border-white/10 hover:bg-white/[0.02] transition-colors min-h-16">
+                                          <td className="py-2 px-4 font-mono text-xs text-gray-300 bg-slate-950/40 font-medium border-r border-white/5 whitespace-nowrap">
+                                            {label}
+                                          </td>
+                                          {activeDays.map(day => {
+                                            const spanInfo = getTeacherCellSpanInfo(teacher, day, sIndex);
+                                            if (spanInfo.isContinuation) return null;
+
+                                            return (
+                                              <td key={day} rowSpan={spanInfo.rowSpan} className="p-1.5 border-l border-white/10 align-top">
+                                                {renderTeacherCellContent(teacher, day, sIndex, spanInfo)}
+                                              </td>
+                                            );
+                                          })}
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            );
+                          })()
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* TAB 2: CLASSES MANAGEMENT */}
-            {activeTab === 'classes' && (
-              <div className="space-y-6">
-                
-                {/* HEADER BANNER WITH STEP-BY-STEP BEGINNER GUIDE */}
-                <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
-                  <div className={`flex items-center justify-between gap-4 flex-wrap pb-4 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
-                    <div className="flex items-center gap-4">
-                      <div className={`p-3 rounded-2xl border shrink-0 ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'}`}>
-                        <Users className="w-6 h-6" />
+                {/* TAB 2: CLASSES MANAGEMENT */}
+                {activeTab === 'classes' && (
+                  <div className="space-y-6">
+
+                    {/* HEADER BANNER WITH STEP-BY-STEP BEGINNER GUIDE */}
+                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
+                      <div className={`flex items-center justify-between gap-4 flex-wrap pb-4 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                        <div className="flex items-center gap-4">
+                          <div className={`p-3 rounded-2xl border shrink-0 ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'}`}>
+                            <Users className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <h2 className={`text-lg font-bold flex items-center gap-2 flex-wrap ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span>Étape 4 : Configuration des Classes, Affectations & Classes Scindées</span>
+                              <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'}`}>
+                                Groupes & Volumes Horaires
+                              </span>
+                            </h2>
+                            <p className={`text-sm mt-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
+                              Déclarez vos classes, attribuez les cours de classe entière ou configurez des classes scindées en deux sous-groupes simultanés.
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <h2 className={`text-lg font-bold flex items-center gap-2 flex-wrap ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span>Étape 4 : Configuration des Classes, Affectations & Classes Scindées</span>
-                          <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'}`}>
-                            Groupes & Volumes Horaires
-                          </span>
-                        </h2>
-                        <p className={`text-sm mt-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
-                          Déclarez vos classes, attribuez les cours de classe entière ou configurez des classes scindées en deux sous-groupes simultanés.
-                        </p>
+
+                      {/* GUIDE DÉBUTANT PAS-À-PAS POUR CLASSES SCINDÉES */}
+                      <div className={`rounded-xl p-4 border ${isLight ? 'bg-blue-50/60 border-blue-200/80' : 'bg-slate-950/50 border-indigo-500/20'}`}>
+                        <div className={`flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider mb-2.5 ${isLight ? 'text-blue-600' : 'text-indigo-300'}`}>
+                          <Sparkles className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-indigo-400'}`} />
+                          <span className="font-bold">Guide Débutant : Instructions de configuration & Classes Scindées</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+                          <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                            <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>1</span>
+                              <span className="font-bold">Nommer la classe</span>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                              Indiquez le nom de la classe (ex: 6ème A, Terminale S, 3ème B).
+                            </p>
+                          </div>
+                          <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                            <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>2</span>
+                              <span className="font-bold">Cours Standard</span>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                              Pour les matières suivies par toute la classe, choisissez le prof et les heures.
+                            </p>
+                          </div>
+                          <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-purple-50/70 border-purple-200 shadow-xs' : 'bg-purple-950/20 border-purple-500/30'}`}>
+                            <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-purple-900' : 'text-purple-300'}`}>
+                              <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-purple-200 text-purple-800' : 'bg-purple-500/30 text-purple-200'}`}>3</span>
+                              <span className="font-bold">Classe Scindée (Parallèle)</span>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-purple-800 font-normal' : 'text-purple-200/90'}`}>
+                              Scindez en Groupe A et B (ex: Espagnol & Arabe) pour faire cours à la même heure !
+                            </p>
+                          </div>
+                          <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                            <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>4</span>
+                              <span className="font-bold">Enregistrer la classe</span>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                              Enregistrez et passez à l'Étape 5 pour générer votre emploi du temps optimisé.
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* GUIDE DÉBUTANT PAS-À-PAS POUR CLASSES SCINDÉES */}
-                  <div className={`rounded-xl p-4 border ${isLight ? 'bg-blue-50/60 border-blue-200/80' : 'bg-slate-950/50 border-indigo-500/20'}`}>
-                    <div className={`flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider mb-2.5 ${isLight ? 'text-blue-600' : 'text-indigo-300'}`}>
-                      <Sparkles className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-indigo-400'}`} />
-                      <span className="font-bold">Guide Débutant : Instructions de configuration & Classes Scindées</span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
-                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
-                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>1</span>
-                          <span className="font-bold">Nommer la classe</span>
-                        </div>
-                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Indiquez le nom de la classe (ex: 6ème A, Terminale S, 3ème B).
-                        </p>
-                      </div>
-                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
-                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>2</span>
-                          <span className="font-bold">Cours Standard</span>
-                        </div>
-                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Pour les matières suivies par toute la classe, choisissez le prof et les heures.
-                        </p>
-                      </div>
-                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-purple-50/70 border-purple-200 shadow-xs' : 'bg-purple-950/20 border-purple-500/30'}`}>
-                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-purple-900' : 'text-purple-300'}`}>
-                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-purple-200 text-purple-800' : 'bg-purple-500/30 text-purple-200'}`}>3</span>
-                          <span className="font-bold">Classe Scindée (Parallèle)</span>
-                        </div>
-                        <p className={`text-xs leading-relaxed ${isLight ? 'text-purple-800 font-normal' : 'text-purple-200/90'}`}>
-                          Scindez en Groupe A et B (ex: Espagnol & Arabe) pour faire cours à la même heure !
-                        </p>
-                      </div>
-                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
-                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>4</span>
-                          <span className="font-bold">Enregistrer la classe</span>
-                        </div>
-                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Enregistrez et passez à l'Étape 5 pour générer votre emploi du temps optimisé.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                    {/* MAIN BLOCK: FORM + LIST */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                {/* MAIN BLOCK: FORM + LIST */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  
-                  {/* LEFT: FORM (5 COLS) */}
-                  <div className="lg:col-span-5 p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl">
-                    <h3 className="text-xs font-mono tracking-wider text-indigo-400 uppercase mb-4 font-bold">
-                      {editingClassId ? "Modifier la Classe" : "Ajouter une Classe"}
-                    </h3>
+                      {/* LEFT: FORM (5 COLS) */}
+                      <div className="lg:col-span-5 p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl">
+                        <h3 className="text-xs font-mono tracking-wider text-indigo-400 uppercase mb-4 font-bold">
+                          {editingClassId ? "Modifier la Classe" : "Ajouter une Classe"}
+                        </h3>
 
-                    <form onSubmit={handleSaveClass} className="space-y-4">
-                      <div>
-                        <label className="block text-xs text-gray-300 mb-1.5 font-medium">Libellé / Nom de la classe</label>
-                        <input
-                          type="text"
-                          placeholder="Ex: Terminale S, 6ème B, 1ère L"
-                          value={newClassName}
-                          onChange={(e) => setNewClassName(e.target.value)}
-                          className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 transition-colors shadow-inner"
-                        />
-                      </div>
+                        <form onSubmit={handleSaveClass} className="space-y-4">
+                          <div>
+                            <label className="block text-xs text-gray-300 mb-1.5 font-medium">Libellé / Nom de la classe</label>
+                            <input
+                              type="text"
+                              placeholder="Ex: Terminale S, 6ème B, 1ère L"
+                              value={newClassName}
+                              onChange={(e) => setNewClassName(e.target.value)}
+                              className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 transition-colors shadow-inner"
+                            />
+                          </div>
 
-                      {/* MODE SWITCHER: STANDARD VS CLASSE SCINDÉE */}
-                      <div className="border-t border-white/10 pt-4">
-                        <div className="flex items-center gap-2 p-1 bg-slate-950/80 rounded-xl border border-white/10 mb-4">
-                          <button
-                            type="button"
-                            onClick={() => setAssignmentMode('standard')}
-                            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                              assignmentMode === 'standard'
-                                ? 'bg-indigo-600 text-white shadow-md'
-                                : 'text-gray-400 hover:text-white'
-                            }`}
-                          >
-                            <BookOpen className="w-3.5 h-3.5" />
-                            <span>Cours Standard</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setAssignmentMode('divisionV1')}
-                            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                              assignmentMode === 'divisionV1'
-                                ? 'bg-purple-600 text-white shadow-md'
-                                : 'text-purple-300 hover:text-white'
-                            }`}
-                          >
-                            <Sparkles className="w-3.5 h-3.5" />
-                            <span>Classe Scindée</span>
-                          </button>
-                        </div>
+                          {/* MODE SWITCHER: STANDARD VS CLASSE SCINDÉE */}
+                          <div className="border-t border-white/10 pt-4">
+                            <div className="flex items-center gap-2 p-1 bg-slate-950/80 rounded-xl border border-white/10 mb-4">
+                              <button
+                                type="button"
+                                onClick={() => setAssignmentMode('standard')}
+                                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${assignmentMode === 'standard'
+                                    ? 'bg-indigo-600 text-white shadow-md'
+                                    : 'text-gray-400 hover:text-white'
+                                  }`}
+                              >
+                                <BookOpen className="w-3.5 h-3.5" />
+                                <span>Cours Standard</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setAssignmentMode('divisionV1')}
+                                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${assignmentMode === 'divisionV1'
+                                    ? 'bg-purple-600 text-white shadow-md'
+                                    : 'text-purple-300 hover:text-white'
+                                  }`}
+                              >
+                                <Sparkles className="w-3.5 h-3.5" />
+                                <span>Classe Scindée</span>
+                              </button>
+                            </div>
 
-                        {/* MODE 1: STANDARD ASSIGNMENT */}
-                        {assignmentMode === 'standard' && (
-                          <div className="space-y-3">
+                            {/* MODE 1: STANDARD ASSIGNMENT */}
+                            {assignmentMode === 'standard' && (
+                              <div className="space-y-3">
+                                <label className="block text-xs uppercase text-indigo-300 font-mono tracking-wider font-bold mb-1">
+                                  {"Affectation Standard (Classe Entière)"}
+                                </label>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="block text-[10px] text-gray-300 font-semibold mb-1">1. Professeur</label>
+                                    <select
+                                      value={tempTeacherId}
+                                      onChange={(e) => {
+                                        setTempTeacherId(e.target.value);
+                                        const prof = teachers.find(t => t.id === e.target.value);
+                                        if (prof && prof.subjectIds.length > 0) {
+                                          setTempSubjectId(prof.subjectIds[0]);
+                                        }
+                                      }}
+                                      className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 font-medium"
+                                    >
+                                      <option value="">-- Choisir Enseignant --</option>
+                                      {teachers.map(t => (
+                                        <option key={t.id} value={t.id}>{t.name} (Quota: {t.weeklyQuota}h)</option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-[10px] text-gray-300 font-semibold mb-1">2. Matière</label>
+                                    <select
+                                      value={tempSubjectId}
+                                      onChange={(e) => setTempSubjectId(e.target.value)}
+                                      className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 font-medium"
+                                    >
+                                      <option value="">-- Choisir Matière --</option>
+                                      {tempTeacherId
+                                        ? teachers.find(t => t.id === tempTeacherId)?.subjectIds.map(sid => (
+                                          <option key={sid} value={sid}>{subjects.find(s => s.id === sid)?.name || sid}</option>
+                                        ))
+                                        : subjects.map(s => (
+                                          <option key={s.id} value={s.id}>{s.name}</option>
+                                        ))
+                                      }
+                                    </select>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="block text-[10px] text-gray-400 mb-1">3. Volume horaire (heures / semaine)</label>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={15}
+                                    value={tempHours}
+                                    onChange={(e) => setTempHours(Number(e.target.value))}
+                                    className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none"
+                                  />
+                                </div>
+
+                                {/* Optional: Fix Time Slot (Specifically for EPS or User Defined) */}
+                                <div className={`p-3 rounded-xl bg-slate-950/60 border space-y-2 transition-all ${fixedSlotConflict ? 'border-rose-500/50 bg-rose-950/20' : 'border-indigo-500/20'
+                                  }`}>
+                                  <div className="flex items-center justify-between">
+                                    <label className="text-[10px] font-bold text-indigo-300 flex items-center gap-1.5">
+                                      <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                                      Horaire fixé par l'utilisateur (ex: EPS)
+                                    </label>
+                                    <span className="text-[9px] text-gray-400 font-mono">Optionnel</span>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="block text-[9px] text-gray-400 mb-1">Jour imposé</label>
+                                      <select
+                                        value={tempFixedDay}
+                                        onChange={(e) => {
+                                          setTempFixedDay(e.target.value);
+                                          if (!e.target.value) setTempFixedStartSlot('');
+                                        }}
+                                        className="w-full bg-slate-950 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500 font-medium"
+                                      >
+                                        <option value="">-- Auto (optimisé) --</option>
+                                        {activeDays.map(d => (
+                                          <option key={d} value={d}>{d}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="block text-[9px] text-gray-400 mb-1">Heure de début</label>
+                                      <select
+                                        value={tempFixedStartSlot}
+                                        onChange={(e) => setTempFixedStartSlot(e.target.value)}
+                                        disabled={!tempFixedDay}
+                                        className="w-full bg-slate-950 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500 font-medium disabled:opacity-40"
+                                      >
+                                        <option value="">-- Choisir l'heure --</option>
+                                        {slotLabels.map((sl, idx) => (
+                                          <option key={idx} value={idx}>{sl.split(' - ')[0]}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </div>
+
+                                  {fixedSlotConflict && (
+                                    <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-[10px] flex items-start gap-1.5">
+                                      <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                                      <span className="font-medium leading-tight">{fixedSlotConflict}</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={handleAddAssignmentToClassForm}
+                                  disabled={!!fixedSlotConflict}
+                                  className={`w-full py-2.5 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm ${fixedSlotConflict
+                                      ? 'bg-rose-500/10 border-rose-500/20 text-rose-400 cursor-not-allowed opacity-60'
+                                      : 'bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border-indigo-500/30 hover:border-indigo-500/50 shadow-indigo-500/10'
+                                    }`}
+                                >
+                                  <Plus className="w-4 h-4" />
+                                  <span>{fixedSlotConflict ? "Créneau en conflit (Impossible de lier)" : "Lier ce cours à la classe"}</span>
+                                </button>
+                              </div>
+                            )}
+
+                            {/* MODE 2: CLASSE SCINDÉE (SOUS-GROUPES ET COURS SIMULTANÉS) */}
+                            {assignmentMode === 'divisionV1' && (
+                              <div className="space-y-4 p-4 rounded-xl bg-purple-950/20 border border-purple-500/30">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold font-mono text-purple-300 flex items-center gap-1.5">
+                                    <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                                    Configuration Classe Scindée
+                                  </span>
+                                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-200 border border-purple-500/30 font-bold">
+                                    Cours Parallèles
+                                  </span>
+                                </div>
+
+                                <p className="text-[11px] text-gray-300 leading-relaxed">
+                                  Configurez les 2 sous-groupes de la classe. Les heures synchronisées seront programmées <strong>strictement au même moment</strong> avec leurs professeurs respectifs.
+                                </p>
+
+                                {/* GROUPE 1 / A */}
+                                <div className="p-3 rounded-lg bg-slate-950/70 border border-indigo-500/20 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-mono font-bold text-indigo-400 uppercase">Sous-Groupe 1 (ex: Groupe A)</span>
+                                    <input
+                                      type="text"
+                                      value={divG1Label}
+                                      onChange={(e) => setDivG1Label(e.target.value)}
+                                      placeholder="Nom du groupe (ex: Groupe A)"
+                                      className="w-28 bg-slate-900 border border-white/10 text-white rounded px-2 py-0.5 text-[10px] focus:outline-none"
+                                    />
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="block text-[9px] text-gray-400 mb-0.5">Professeur 1</label>
+                                      <select
+                                        value={divG1TeacherId}
+                                        onChange={(e) => {
+                                          setDivG1TeacherId(e.target.value);
+                                          const p = teachers.find(t => t.id === e.target.value);
+                                          if (p && p.subjectIds.length > 0) setDivG1SubjectId(p.subjectIds[0]);
+                                        }}
+                                        className="w-full bg-slate-900 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none font-medium"
+                                      >
+                                        <option value="">-- Choisir Prof --</option>
+                                        {teachers.map(t => (
+                                          <option key={t.id} value={t.id}>{t.name}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="block text-[9px] text-gray-400 mb-0.5">Matière 1</label>
+                                      <select
+                                        value={divG1SubjectId}
+                                        onChange={(e) => setDivG1SubjectId(e.target.value)}
+                                        className="w-full bg-slate-900 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none font-medium"
+                                      >
+                                        <option value="">-- Choisir Matière --</option>
+                                        {divG1TeacherId
+                                          ? teachers.find(t => t.id === divG1TeacherId)?.subjectIds.map(sid => (
+                                            <option key={sid} value={sid}>{subjects.find(s => s.id === sid)?.name || sid}</option>
+                                          ))
+                                          : subjects.map(s => (
+                                            <option key={s.id} value={s.id}>{s.name}</option>
+                                          ))
+                                        }
+                                      </select>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label className="block text-[9px] text-gray-400 mb-0.5">Total heures hebdo Groupe 1</label>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={12}
+                                      value={divG1Hours}
+                                      onChange={(e) => setDivG1Hours(Number(e.target.value))}
+                                      className="w-full bg-slate-900 border border-white/10 text-white rounded-lg px-2 py-1 text-xs focus:outline-none"
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* GROUPE 2 / B */}
+                                <div className="p-3 rounded-lg bg-slate-950/70 border border-pink-500/20 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-mono font-bold text-pink-400 uppercase">Sous-Groupe 2 (ex: Groupe B)</span>
+                                    <input
+                                      type="text"
+                                      value={divG2Label}
+                                      onChange={(e) => setDivG2Label(e.target.value)}
+                                      placeholder="Nom du groupe (ex: Groupe B)"
+                                      className="w-28 bg-slate-900 border border-white/10 text-white rounded px-2 py-0.5 text-[10px] focus:outline-none"
+                                    />
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="block text-[9px] text-gray-400 mb-0.5">Professeur 2</label>
+                                      <select
+                                        value={divG2TeacherId}
+                                        onChange={(e) => {
+                                          setDivG2TeacherId(e.target.value);
+                                          const p = teachers.find(t => t.id === e.target.value);
+                                          if (p && p.subjectIds.length > 0) setDivG2SubjectId(p.subjectIds[0]);
+                                        }}
+                                        className="w-full bg-slate-900 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none font-medium"
+                                      >
+                                        <option value="">-- Choisir Prof --</option>
+                                        {teachers.filter(t => t.id !== divG1TeacherId).map(t => (
+                                          <option key={t.id} value={t.id}>{t.name}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="block text-[9px] text-gray-400 mb-0.5">Matière 2</label>
+                                      <select
+                                        value={divG2SubjectId}
+                                        onChange={(e) => setDivG2SubjectId(e.target.value)}
+                                        className="w-full bg-slate-900 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none font-medium"
+                                      >
+                                        <option value="">-- Choisir Matière --</option>
+                                        {divG2TeacherId
+                                          ? teachers.find(t => t.id === divG2TeacherId)?.subjectIds.map(sid => (
+                                            <option key={sid} value={sid}>{subjects.find(s => s.id === sid)?.name || sid}</option>
+                                          ))
+                                          : subjects.map(s => (
+                                            <option key={s.id} value={s.id}>{s.name}</option>
+                                          ))
+                                        }
+                                      </select>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label className="block text-[9px] text-gray-400 mb-0.5">Total heures hebdo Groupe 2</label>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={12}
+                                      value={divG2Hours}
+                                      onChange={(e) => setDivG2Hours(Number(e.target.value))}
+                                      className="w-full bg-slate-900 border border-white/10 text-white rounded-lg px-2 py-1 text-xs focus:outline-none"
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* SYNCHRONIZED HOURS CONFIG */}
+                                <div className="p-3 rounded-lg bg-purple-900/20 border border-purple-500/30 space-y-1.5">
+                                  <label className="block text-[10px] font-bold text-purple-200">
+                                    ⏱️ Heures à synchroniser en simultané (même heure, même jour) :
+                                  </label>
+                                  <div className="flex items-center gap-3">
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={Math.min(divG1Hours, divG2Hours)}
+                                      value={divSyncHours}
+                                      onChange={(e) => setDivSyncHours(Math.max(1, Math.min(Number(e.target.value), Math.min(divG1Hours, divG2Hours))))}
+                                      className="w-24 bg-slate-900 border border-white/10 text-white rounded-lg px-3 py-1.5 text-xs font-bold font-mono focus:outline-none"
+                                    />
+                                    <span className="text-[11px] text-gray-300">
+                                      heure(s) en parallèle (max: {Math.min(divG1Hours, divG2Hours)}h)
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-purple-300/80 italic">
+                                    {divG1Hours > divSyncHours || divG2Hours > divSyncHours
+                                      ? `💡 ${divSyncHours}h seront programmées au même créneau pour les deux groupes. Les heures restantes (${divG1Hours - divSyncHours > 0 ? `${divG1Hours - divSyncHours}h pour ${divG1Label}` : ''}${divG1Hours - divSyncHours > 0 && divG2Hours - divSyncHours > 0 ? ' et ' : ''}${divG2Hours - divSyncHours > 0 ? `${divG2Hours - divSyncHours}h pour ${divG2Label}` : ''}) seront planifiées de façon autonome.`
+                                      : `💡 La totalité des ${divSyncHours}h sera programmée en parfait simultané.`
+                                    }
+                                  </p>
+                                </div>
+
+                                {/* ACTION BUTTON */}
+                                <button
+                                  type="button"
+                                  onClick={handleAddDivisionV1ToClassForm}
+                                  className="w-full py-2.5 text-xs font-bold rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-purple-900/30"
+                                >
+                                  <Sparkles className="w-4 h-4" />
+                                  <span>Lier cette classe scindée</span>
+                                </button>
+                              </div>
+                            )}
+
+                            {/* List of currently associated assignments in form */}
+                            <div className="space-y-2 bg-slate-950/40 p-3 rounded-xl border border-white/10 max-h-56 overflow-y-auto mt-4">
+                              <p className="text-[10px] font-mono uppercase text-gray-400 tracking-wider font-semibold">
+                                {"Plan d'études lié"} ({classAssignments.length} affectations)
+                              </p>
+                              {classAssignments.length === 0 ? (
+                                <p className="text-xs text-gray-500 italic">{"Aucun cours rattaché pour l'instant."}</p>
+                              ) : (
+                                (() => {
+                                  // Group assignments by pairedGroupId to display paired classes clearly
+                                  const pairedMap: Record<string, ClassAssignment[]> = {};
+                                  const singles: ClassAssignment[] = [];
+                                  classAssignments.forEach(a => {
+                                    if (a.pairedGroupId) {
+                                      if (!pairedMap[a.pairedGroupId]) pairedMap[a.pairedGroupId] = [];
+                                      pairedMap[a.pairedGroupId].push(a);
+                                    } else {
+                                      singles.push(a);
+                                    }
+                                  });
+
+                                  return (
+                                    <div className="space-y-2">
+                                      {/* Paired Classes Cards */}
+                                      {Object.entries(pairedMap).map(([pairId, pairList]) => {
+                                        const a1 = pairList[0];
+                                        const a2 = pairList[1] || pairList[0];
+                                        const t1Name = teachers.find(t => t.id === a1.teacherId)?.name || 'Prof 1';
+                                        const s1Name = subjects.find(s => s.id === a1.subjectId)?.name || 'Matière 1';
+                                        const t2Name = teachers.find(t => t.id === a2.teacherId)?.name || 'Prof 2';
+                                        const s2Name = subjects.find(s => s.id === a2.subjectId)?.name || 'Matière 2';
+                                        const sync = a1.syncHours || Math.min(a1.hoursPerWeek, a2.hoursPerWeek);
+
+                                        return (
+                                          <div key={pairId} className="p-2.5 rounded-xl bg-purple-950/30 border border-purple-500/30 space-y-1.5">
+                                            <div className="flex items-center justify-between">
+                                              <span className="text-[9px] font-mono font-bold text-purple-300 flex items-center gap-1">
+                                                <Sparkles className="w-3 h-3 text-purple-400" />
+                                                <span>🔗 Classe scindée ({sync}h simultanées)</span>
+                                              </span>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleRemoveAssignmentFromClassForm(a1.id || pairId)}
+                                                className="text-red-400 hover:text-red-300 p-0.5 rounded cursor-pointer"
+                                                title="Supprimer cette classe scindée"
+                                              >
+                                                <Trash className="w-3.5 h-3.5" />
+                                              </button>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                                              <div className="p-1.5 rounded-lg bg-black/20 border border-white/5">
+                                                <span className="font-bold text-indigo-300 block">{a1.groupLabel || 'Gr. A'} ({a1.hoursPerWeek}h)</span>
+                                                <span className="text-gray-300 text-[10px]">{s1Name} • {t1Name}</span>
+                                              </div>
+                                              <div className="p-1.5 rounded-lg bg-black/20 border border-white/5">
+                                                <span className="font-bold text-pink-300 block">{a2.groupLabel || 'Gr. B'} ({a2.hoursPerWeek}h)</span>
+                                                <span className="text-gray-300 text-[10px]">{s2Name} • {t2Name}</span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+
+                                      {/* Single / Standard Cards */}
+                                      {singles.map((a, i) => {
+                                        const tName = teachers.find(t => t.id === a.teacherId)?.name || 'Prof inconnu';
+                                        const sName = subjects.find(s => s.id === a.subjectId)?.name || 'Matière';
+                                        return (
+                                          <div key={a.id || i} className="flex items-center justify-between text-xs py-1.5 px-3 rounded-lg bg-white/5 border border-white/10">
+                                            <div className="flex flex-col">
+                                              <span className="text-gray-200 font-medium">
+                                                {sName} <span className="text-gray-500">avec</span> {tName}
+                                              </span>
+                                              {a.fixedDay && a.fixedStartSlot !== undefined && (
+                                                <span className="text-[9px] font-mono text-emerald-300 flex items-center gap-1 mt-0.5">
+                                                  📍 Fixé : {a.fixedDay} à {(slotLabels[a.fixedStartSlot] || '').split(' - ')[0]}
+                                                </span>
+                                              )}
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="font-mono font-bold bg-indigo-500/20 px-2 py-0.5 rounded-full text-[10px] text-indigo-300 border border-indigo-500/30">
+                                                {a.hoursPerWeek}h
+                                              </span>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleEditAssignmentInForm(a)}
+                                                className="text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 transition-all p-1 rounded cursor-pointer"
+                                                title="Modifier ce cours"
+                                              >
+                                                <Edit className="w-3.5 h-3.5" />
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleRemoveAssignmentFromClassForm(a.id || '', a.teacherId, a.subjectId)}
+                                                className="text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all p-1 rounded cursor-pointer"
+                                                title="Supprimer cette liaison"
+                                              >
+                                                <Trash className="w-3.5 h-3.5" />
+                                              </button>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })()
+                              )}
+                            </div>
+                          </div>
+
+                          {/* INTERACTIVE CLASS TIME EXCLUSION GRID */}
+                          <div className="border-t border-white/10 pt-4">
                             <label className="block text-xs uppercase text-indigo-300 font-mono tracking-wider font-bold mb-1">
-                              {"Affectation Standard (Classe Entière)"}
+                              Plages de Fermeture / Indisponibilité classe
                             </label>
-                            
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-[10px] text-gray-300 font-semibold mb-1">1. Professeur</label>
+                            <p className="text-[10px] text-gray-400 mb-3 leading-snug">
+                              {"Cliquetez sur la grille ci-dessous pour filtrer les plages où cette classe ne peut pas avoir de cours (ex: fermeture d'établissement ou ateliers)."}
+                            </p>
+
+                            <div
+                              className="grid gap-1 bg-slate-950/60 p-2.5 rounded-xl border border-white/10 select-none text-center"
+                              style={{ gridTemplateColumns: `repeat(${activeDays.length + 1}, minmax(0, 1fr))` }}
+                            >
+                              {/* Hour labels header column */}
+                              <div className="text-[9px] text-gray-500 font-mono flex items-center justify-center">Jour</div>
+                              {activeDays.map(d => (
+                                <div key={d} className="text-[9px] font-sans font-bold text-gray-300">
+                                  {d.substring(0, 3)}
+                                </div>
+                              ))}
+
+                              {/* Render slots rows */}
+                              {slotLabels.map((slotLabel, sIdx) => (
+                                <React.Fragment key={sIdx}>
+                                  <div className="text-[8px] text-gray-500 font-mono flex items-center justify-center py-0.5" title={slotLabel}>
+                                    {slotLabel.split(' - ')[0]}
+                                  </div>
+                                  {activeDays.map(day => {
+                                    const isUn = newClassUnavail.some(u => u.day === day && u.slotIndex === sIdx);
+                                    return (
+                                      <button
+                                        type="button"
+                                        key={day}
+                                        onClick={() => toggleClassFormUnavailability(day, sIdx)}
+                                        className={`w-full aspect-square text-[9px] font-bold rounded transition-all cursor-pointer ${isUn
+                                            ? 'bg-red-500/40 text-white border border-red-500/30'
+                                            : 'bg-white/5 hover:bg-white/10 text-gray-500 border border-transparent'
+                                          }`}
+                                        title={`${day} - ${slotLabel} : ${isUn ? 'Exclu' : 'Libre'}`}
+                                      >
+                                        {isUn ? 'X' : ''}
+                                      </button>
+                                    );
+                                  })}
+                                </React.Fragment>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* BUTTON COUPLING */}
+                          <div className="pt-4 flex items-center gap-2">
+                            {editingClassId && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingClassId(null);
+                                  setNewClassName('');
+                                  setClassAssignments([]);
+                                  setNewClassUnavail([]);
+                                }}
+                                className="flex-1 py-2.5 rounded-xl border border-white/10 text-xs text-gray-300 hover:bg-white/5 transition-colors cursor-pointer font-medium"
+                              >
+                                Annuler
+                              </button>
+                            )}
+                            <button
+                              type="submit"
+                              className="flex-[2] py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/25 transition-all hover:-translate-y-0.5 flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <Check className="w-4 h-4" />
+                              <span>{editingClassId ? "Appliquer Modifications" : "Enregistrer cette Classe"}</span>
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+
+                      {/* RIGHT: LIST OF CLASSES (7 COLS) */}
+                      <div className="lg:col-span-7 space-y-4">
+                        <h3 className="text-xs font-mono tracking-wider text-indigo-400 uppercase mb-4 font-bold">
+                          Classes Scolaires Enregistrées
+                        </h3>
+
+                        {classes.length === 0 ? (
+                          <div className="p-8 text-center rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl italic text-gray-400 text-sm">
+                            Aucun classe existante. Veuillez utiliser le formulaire de gauche.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {classes.map(c => {
+                              const totalHours = c.assignments.reduce((sum, a) => sum + a.hoursPerWeek, 0);
+                              const unavailCount = c.unavailability?.length || 0;
+
+                              return (
+                                <div key={c.id} className="p-5 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 hover:border-white/20 transition-all shadow-xl flex flex-col justify-between">
+                                  <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                      <h4 className="font-bold text-white text-base">{c.name}</h4>
+                                      <span className="text-[10px] font-mono bg-indigo-500/10 text-indigo-300 px-2.5 py-0.5 rounded-full border border-indigo-500/20 font-bold">
+                                        {totalHours}h/semaine
+                                      </span>
+                                    </div>
+
+                                    <div className="space-y-1.5 my-3 bg-slate-950/50 p-3 rounded-xl border border-white/10">
+                                      {c.assignments.length === 0 ? (
+                                        <p className="text-xs text-gray-500 italic">Aucun cours assigné.</p>
+                                      ) : (
+                                        c.assignments.map((a, i) => {
+                                          const t = teachers.find(tr => tr.id === a.teacherId);
+                                          const s = subjects.find(su => su.id === a.subjectId);
+                                          return (
+                                            <div key={i} className="flex items-center justify-between text-xs font-mono">
+                                              <div className="flex items-center gap-1.5 truncate">
+                                                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t?.color || '#fff' }} />
+                                                <span className="text-gray-300 truncate">{s?.name || a.subjectId}</span>
+                                                {a.group && a.group !== 'all' && (
+                                                  <span className="text-[8.5px] bg-purple-500/20 text-purple-300 px-1 py-0.2 rounded border border-purple-500/30">
+                                                    {a.groupLabel || (a.group === 'G1' ? 'Gr. A' : 'Gr. B')}
+                                                  </span>
+                                                )}
+                                                {a.fixedDay && a.fixedStartSlot !== undefined && (
+                                                  <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded border border-emerald-500/30">
+                                                    📍 {a.fixedDay} {(slotLabels[a.fixedStartSlot] || '').split(' - ')[0]}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <span className="text-gray-200 font-bold shrink-0">{a.hoursPerWeek}h</span>
+                                            </div>
+                                          );
+                                        })
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center justify-between pt-3 border-t border-white/10 mt-auto">
+                                    <span className="text-[10px] text-gray-400 font-mono font-medium">
+                                      ❌ {unavailCount} créneaux exclus
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => handleEditClassClick(c)}
+                                        className="p-1 px-2.5 text-xs bg-indigo-500/10 text-indigo-400 rounded-lg hover:bg-indigo-500/20 hover:text-indigo-300 border border-indigo-500/20 transition-all font-semibold cursor-pointer"
+                                      >
+                                        Modifier
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteClass(c.id, c.name)}
+                                        className="text-red-400 hover:text-red-300 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+                                      >
+                                        <Trash className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* BOTTOM NAVIGATION CALL-TO-ACTION (PASSAGE ÉTAPE 5) */}
+                    <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900/90 via-indigo-950/40 to-slate-900/90 backdrop-blur-xl border border-indigo-500/30 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 text-left">
+                        <div className="p-3 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
+                          <Users className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-white">Toutes vos classes sont prêtes !</h4>
+                          <p className="text-xs text-gray-400">Vous avez configuré <strong className="text-indigo-300 font-mono">{classes.length}</strong> classe(s) et leurs cours. Passez à la génération automatique des emplois du temps.</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerNotification("Étape 4 validée ! Passage à l'Étape 5 (Emplois du Temps).", "success");
+                          setActiveTab('timetable');
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="w-full sm:w-auto py-3.5 px-6 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-600 to-indigo-600 hover:from-indigo-400 hover:via-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 cursor-pointer group border border-indigo-400/30 shrink-0"
+                      >
+                        <span>👉 Passer à l'Étape 5 : Générer les Emplois du Temps</span>
+                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform animate-pulse" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 3: TEACHERS MANAGEMENT */}
+                {activeTab === 'teachers' && (
+                  <div className="space-y-6">
+
+                    {/* HEADER BANNER WITH STEP-BY-STEP BEGINNER GUIDE */}
+                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
+                      <div className={`flex items-center justify-between gap-4 flex-wrap pb-4 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                        <div className="flex items-center gap-4">
+                          <div className={`p-3 rounded-2xl border shrink-0 ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'}`}>
+                            <GraduationCap className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <h2 className={`text-lg font-bold flex items-center gap-2 flex-wrap ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span>Étape 3 : Fiches Enseignants & Disponibilités</span>
+                              <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'}`}>
+                                Professeurs & Quotas
+                              </span>
+                            </h2>
+                            <p className={`text-sm mt-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
+                              Enregistrez les professeurs, leurs matières habilitées, leur quota d'heures par semaine et leurs temps libres.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* GUIDE DÉBUTANT PAS-À-PAS */}
+                      <div className={`rounded-xl p-4 border ${isLight ? 'bg-blue-50/60 border-blue-200/80' : 'bg-slate-950/50 border-indigo-500/20'}`}>
+                        <div className={`flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider mb-2.5 ${isLight ? 'text-blue-600' : 'text-indigo-300'}`}>
+                          <Sparkles className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-indigo-400'}`} />
+                          <span className="font-bold">Guide Débutant : Ce que vous devez faire sur cette étape</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+                          <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                            <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>1</span>
+                              <span className="font-bold">Nom de l'enseignant</span>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                              Saisissez le nom (ex: M. Diongue, Mme Sow) dans le formulaire à gauche.
+                            </p>
+                          </div>
+                          <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                            <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>2</span>
+                              <span className="font-bold">Quota & Matières</span>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                              Indiquez son volume d'heures/semaine visé (ex: 18h) et cochez les matières qu'il enseigne.
+                            </p>
+                          </div>
+                          <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                            <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>3</span>
+                              <span className="font-bold">Temps libres</span>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                              Cliquez sur la grille pour griser (X) les créneaux où ce prof ne peut pas enseigner.
+                            </p>
+                          </div>
+                          <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                            <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>4</span>
+                              <span className="font-bold">Enregistrer le prof</span>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                              Cliquez sur "Ajouter l'enseignant". Dès que l'équipe est créée, passez à l'Étape 4.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* FORM + GRID */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                      {/* LEFT: FORM */}
+                      <div className="lg:col-span-5 p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl">
+                        <h3 className="text-xs font-mono tracking-wider text-indigo-400 uppercase mb-4 font-bold">
+                          {editingTeacherId ? "Modifier l'Enseignant" : "Ajouter un Enseignant"}
+                        </h3>
+
+                        <form onSubmit={handleSaveTeacher} className="space-y-4">
+                          <div>
+                            <label className="block text-xs text-gray-300 mb-1.5 font-medium">{"Nom complet de l'enseignant"}</label>
+                            <input
+                              type="text"
+                              placeholder="M. Diongue, Mme. Sow etc."
+                              value={newTeacherName}
+                              onChange={(e) => setNewTeacherName(e.target.value)}
+                              className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 transition-colors shadow-inner"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs text-gray-300 mb-1.5 font-medium">{"Quota d'heures (1 à 30h)"}</label>
+                              <input
+                                type="number"
+                                min={1}
+                                max={30}
+                                value={newTeacherQuota}
+                                onChange={(e) => setNewTeacherQuota(Number(e.target.value))}
+                                className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs text-gray-300 mb-1.5 font-medium">{"Couleur d'affichage"}</label>
+                              <div className="flex gap-2">
+                                <input
+                                  type="color"
+                                  value={newTeacherColor}
+                                  onChange={(e) => setNewTeacherColor(e.target.value)}
+                                  className="w-10 h-9 p-0 bg-transparent text-white border-0 cursor-pointer rounded-lg shrink-0"
+                                />
+                                <input
+                                  type="text"
+                                  value={newTeacherColor}
+                                  onChange={(e) => setNewTeacherColor(e.target.value)}
+                                  className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-2 text-xs focus:outline-none font-mono"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Dropdown & Tag selection for subjects taught */}
+                          <div>
+                            <label className="block text-xs text-gray-300 mb-1.5 font-medium">
+                              Matières enseignées (Liaison par Menu Déroulant)
+                            </label>
+                            {subjects.length === 0 ? (
+                              <p className="text-xs text-gray-500 italic">{"Veuillez d'abord ajouter des matières à l'Étape 1 (\"Matières\")."}</p>
+                            ) : (
+                              <div className="space-y-2">
                                 <select
-                                  value={tempTeacherId}
+                                  value=""
                                   onChange={(e) => {
-                                    setTempTeacherId(e.target.value);
-                                    const prof = teachers.find(t => t.id === e.target.value);
-                                    if (prof && prof.subjectIds.length > 0) {
-                                      setTempSubjectId(prof.subjectIds[0]);
+                                    const sid = e.target.value;
+                                    if (sid && !newTeacherSubjects.includes(sid)) {
+                                      setNewTeacherSubjects([...newTeacherSubjects, sid]);
                                     }
                                   }}
                                   className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 font-medium"
                                 >
-                                  <option value="">-- Choisir Enseignant --</option>
-                                  {teachers.map(t => (
-                                    <option key={t.id} value={t.id}>{t.name} (Quota: {t.weeklyQuota}h)</option>
+                                  <option value="">-- Sélectionner une matière dans le menu déroulant --</option>
+                                  {subjects.map(s => (
+                                    <option key={s.id} value={s.id} disabled={newTeacherSubjects.includes(s.id)}>
+                                      {s.name} {newTeacherSubjects.includes(s.id) ? '✓ (Déjà liée)' : ''}
+                                    </option>
                                   ))}
                                 </select>
-                              </div>
 
-                              <div>
-                                <label className="block text-[10px] text-gray-300 font-semibold mb-1">2. Matière</label>
-                                <select
-                                  value={tempSubjectId}
-                                  onChange={(e) => setTempSubjectId(e.target.value)}
-                                  className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 font-medium"
-                                >
-                                  <option value="">-- Choisir Matière --</option>
-                                  {tempTeacherId 
-                                    ? teachers.find(t => t.id === tempTeacherId)?.subjectIds.map(sid => (
-                                        <option key={sid} value={sid}>{subjects.find(s => s.id === sid)?.name || sid}</option>
-                                      ))
-                                    : subjects.map(s => (
-                                        <option key={s.id} value={s.id}>{s.name}</option>
-                                      ))
-                                  }
-                                </select>
-                              </div>
-                            </div>
-
-                            <div>
-                              <label className="block text-[10px] text-gray-400 mb-1">3. Volume horaire (heures / semaine)</label>
-                              <input
-                                type="number"
-                                min={1}
-                                max={15}
-                                value={tempHours}
-                                onChange={(e) => setTempHours(Number(e.target.value))}
-                                className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none"
-                              />
-                            </div>
-
-                            {/* Optional: Fix Time Slot (Specifically for EPS or User Defined) */}
-                            <div className={`p-3 rounded-xl bg-slate-950/60 border space-y-2 transition-all ${
-                              fixedSlotConflict ? 'border-rose-500/50 bg-rose-950/20' : 'border-indigo-500/20'
-                            }`}>
-                              <div className="flex items-center justify-between">
-                                <label className="text-[10px] font-bold text-indigo-300 flex items-center gap-1.5">
-                                  <Clock className="w-3.5 h-3.5 text-indigo-400" />
-                                  Horaire fixé par l'utilisateur (ex: EPS)
-                                </label>
-                                <span className="text-[9px] text-gray-400 font-mono">Optionnel</span>
-                              </div>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <label className="block text-[9px] text-gray-400 mb-1">Jour imposé</label>
-                                  <select
-                                    value={tempFixedDay}
-                                    onChange={(e) => {
-                                      setTempFixedDay(e.target.value);
-                                      if (!e.target.value) setTempFixedStartSlot('');
-                                    }}
-                                    className="w-full bg-slate-950 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500 font-medium"
-                                  >
-                                    <option value="">-- Auto (optimisé) --</option>
-                                    {activeDays.map(d => (
-                                      <option key={d} value={d}>{d}</option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block text-[9px] text-gray-400 mb-1">Heure de début</label>
-                                  <select
-                                    value={tempFixedStartSlot}
-                                    onChange={(e) => setTempFixedStartSlot(e.target.value)}
-                                    disabled={!tempFixedDay}
-                                    className="w-full bg-slate-950 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500 font-medium disabled:opacity-40"
-                                  >
-                                    <option value="">-- Choisir l'heure --</option>
-                                    {slotLabels.map((sl, idx) => (
-                                      <option key={idx} value={idx}>{sl.split(' - ')[0]}</option>
-                                    ))}
-                                  </select>
-                                </div>
-                              </div>
-                              
-                              {fixedSlotConflict && (
-                                <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-[10px] flex items-start gap-1.5">
-                                  <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
-                                  <span className="font-medium leading-tight">{fixedSlotConflict}</span>
-                                </div>
-                              )}
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={handleAddAssignmentToClassForm}
-                              disabled={!!fixedSlotConflict}
-                              className={`w-full py-2.5 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm ${
-                                fixedSlotConflict
-                                  ? 'bg-rose-500/10 border-rose-500/20 text-rose-400 cursor-not-allowed opacity-60'
-                                  : 'bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border-indigo-500/30 hover:border-indigo-500/50 shadow-indigo-500/10'
-                              }`}
-                            >
-                              <Plus className="w-4 h-4" />
-                              <span>{fixedSlotConflict ? "Créneau en conflit (Impossible de lier)" : "Lier ce cours à la classe"}</span>
-                            </button>
-                          </div>
-                        )}
-
-                        {/* MODE 2: CLASSE SCINDÉE (SOUS-GROUPES ET COURS SIMULTANÉS) */}
-                        {assignmentMode === 'divisionV1' && (
-                          <div className="space-y-4 p-4 rounded-xl bg-purple-950/20 border border-purple-500/30">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold font-mono text-purple-300 flex items-center gap-1.5">
-                                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                                Configuration Classe Scindée
-                              </span>
-                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-200 border border-purple-500/30 font-bold">
-                                Cours Parallèles
-                              </span>
-                            </div>
-
-                            <p className="text-[11px] text-gray-300 leading-relaxed">
-                              Configurez les 2 sous-groupes de la classe. Les heures synchronisées seront programmées <strong>strictement au même moment</strong> avec leurs professeurs respectifs.
-                            </p>
-
-                            {/* GROUPE 1 / A */}
-                            <div className="p-3 rounded-lg bg-slate-950/70 border border-indigo-500/20 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-mono font-bold text-indigo-400 uppercase">Sous-Groupe 1 (ex: Groupe A)</span>
-                                <input
-                                  type="text"
-                                  value={divG1Label}
-                                  onChange={(e) => setDivG1Label(e.target.value)}
-                                  placeholder="Nom du groupe (ex: Groupe A)"
-                                  className="w-28 bg-slate-900 border border-white/10 text-white rounded px-2 py-0.5 text-[10px] focus:outline-none"
-                                />
-                              </div>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <label className="block text-[9px] text-gray-400 mb-0.5">Professeur 1</label>
-                                  <select
-                                    value={divG1TeacherId}
-                                    onChange={(e) => {
-                                      setDivG1TeacherId(e.target.value);
-                                      const p = teachers.find(t => t.id === e.target.value);
-                                      if (p && p.subjectIds.length > 0) setDivG1SubjectId(p.subjectIds[0]);
-                                    }}
-                                    className="w-full bg-slate-900 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none font-medium"
-                                  >
-                                    <option value="">-- Choisir Prof --</option>
-                                    {teachers.map(t => (
-                                      <option key={t.id} value={t.id}>{t.name}</option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block text-[9px] text-gray-400 mb-0.5">Matière 1</label>
-                                  <select
-                                    value={divG1SubjectId}
-                                    onChange={(e) => setDivG1SubjectId(e.target.value)}
-                                    className="w-full bg-slate-900 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none font-medium"
-                                  >
-                                    <option value="">-- Choisir Matière --</option>
-                                    {divG1TeacherId 
-                                      ? teachers.find(t => t.id === divG1TeacherId)?.subjectIds.map(sid => (
-                                          <option key={sid} value={sid}>{subjects.find(s => s.id === sid)?.name || sid}</option>
-                                        ))
-                                      : subjects.map(s => (
-                                          <option key={s.id} value={s.id}>{s.name}</option>
-                                        ))
-                                    }
-                                  </select>
-                                </div>
-                              </div>
-                              <div>
-                                <label className="block text-[9px] text-gray-400 mb-0.5">Total heures hebdo Groupe 1</label>
-                                <input
-                                  type="number"
-                                  min={1}
-                                  max={12}
-                                  value={divG1Hours}
-                                  onChange={(e) => setDivG1Hours(Number(e.target.value))}
-                                  className="w-full bg-slate-900 border border-white/10 text-white rounded-lg px-2 py-1 text-xs focus:outline-none"
-                                />
-                              </div>
-                            </div>
-
-                            {/* GROUPE 2 / B */}
-                            <div className="p-3 rounded-lg bg-slate-950/70 border border-pink-500/20 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-mono font-bold text-pink-400 uppercase">Sous-Groupe 2 (ex: Groupe B)</span>
-                                <input
-                                  type="text"
-                                  value={divG2Label}
-                                  onChange={(e) => setDivG2Label(e.target.value)}
-                                  placeholder="Nom du groupe (ex: Groupe B)"
-                                  className="w-28 bg-slate-900 border border-white/10 text-white rounded px-2 py-0.5 text-[10px] focus:outline-none"
-                                />
-                              </div>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <label className="block text-[9px] text-gray-400 mb-0.5">Professeur 2</label>
-                                  <select
-                                    value={divG2TeacherId}
-                                    onChange={(e) => {
-                                      setDivG2TeacherId(e.target.value);
-                                      const p = teachers.find(t => t.id === e.target.value);
-                                      if (p && p.subjectIds.length > 0) setDivG2SubjectId(p.subjectIds[0]);
-                                    }}
-                                    className="w-full bg-slate-900 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none font-medium"
-                                  >
-                                    <option value="">-- Choisir Prof --</option>
-                                    {teachers.filter(t => t.id !== divG1TeacherId).map(t => (
-                                      <option key={t.id} value={t.id}>{t.name}</option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block text-[9px] text-gray-400 mb-0.5">Matière 2</label>
-                                  <select
-                                    value={divG2SubjectId}
-                                    onChange={(e) => setDivG2SubjectId(e.target.value)}
-                                    className="w-full bg-slate-900 border border-white/10 text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none font-medium"
-                                  >
-                                    <option value="">-- Choisir Matière --</option>
-                                    {divG2TeacherId 
-                                      ? teachers.find(t => t.id === divG2TeacherId)?.subjectIds.map(sid => (
-                                          <option key={sid} value={sid}>{subjects.find(s => s.id === sid)?.name || sid}</option>
-                                        ))
-                                      : subjects.map(s => (
-                                          <option key={s.id} value={s.id}>{s.name}</option>
-                                        ))
-                                    }
-                                  </select>
-                                </div>
-                              </div>
-                              <div>
-                                <label className="block text-[9px] text-gray-400 mb-0.5">Total heures hebdo Groupe 2</label>
-                                <input
-                                  type="number"
-                                  min={1}
-                                  max={12}
-                                  value={divG2Hours}
-                                  onChange={(e) => setDivG2Hours(Number(e.target.value))}
-                                  className="w-full bg-slate-900 border border-white/10 text-white rounded-lg px-2 py-1 text-xs focus:outline-none"
-                                />
-                              </div>
-                            </div>
-
-                            {/* SYNCHRONIZED HOURS CONFIG */}
-                            <div className="p-3 rounded-lg bg-purple-900/20 border border-purple-500/30 space-y-1.5">
-                              <label className="block text-[10px] font-bold text-purple-200">
-                                ⏱️ Heures à synchroniser en simultané (même heure, même jour) :
-                              </label>
-                              <div className="flex items-center gap-3">
-                                <input
-                                  type="number"
-                                  min={1}
-                                  max={Math.min(divG1Hours, divG2Hours)}
-                                  value={divSyncHours}
-                                  onChange={(e) => setDivSyncHours(Math.max(1, Math.min(Number(e.target.value), Math.min(divG1Hours, divG2Hours))))}
-                                  className="w-24 bg-slate-900 border border-white/10 text-white rounded-lg px-3 py-1.5 text-xs font-bold font-mono focus:outline-none"
-                                />
-                                <span className="text-[11px] text-gray-300">
-                                  heure(s) en parallèle (max: {Math.min(divG1Hours, divG2Hours)}h)
-                                </span>
-                              </div>
-                              <p className="text-[10px] text-purple-300/80 italic">
-                                {divG1Hours > divSyncHours || divG2Hours > divSyncHours
-                                  ? `💡 ${divSyncHours}h seront programmées au même créneau pour les deux groupes. Les heures restantes (${divG1Hours - divSyncHours > 0 ? `${divG1Hours - divSyncHours}h pour ${divG1Label}` : ''}${divG1Hours - divSyncHours > 0 && divG2Hours - divSyncHours > 0 ? ' et ' : ''}${divG2Hours - divSyncHours > 0 ? `${divG2Hours - divSyncHours}h pour ${divG2Label}` : ''}) seront planifiées de façon autonome.`
-                                  : `💡 La totalité des ${divSyncHours}h sera programmée en parfait simultané.`
-                                }
-                              </p>
-                            </div>
-
-                            {/* ACTION BUTTON */}
-                            <button
-                              type="button"
-                              onClick={handleAddDivisionV1ToClassForm}
-                              className="w-full py-2.5 text-xs font-bold rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-purple-900/30"
-                            >
-                              <Sparkles className="w-4 h-4" />
-                              <span>Lier cette classe scindée</span>
-                            </button>
-                          </div>
-                        )}
-
-                        {/* List of currently associated assignments in form */}
-                        <div className="space-y-2 bg-slate-950/40 p-3 rounded-xl border border-white/10 max-h-56 overflow-y-auto mt-4">
-                          <p className="text-[10px] font-mono uppercase text-gray-400 tracking-wider font-semibold">
-                            {"Plan d'études lié"} ({classAssignments.length} affectations)
-                          </p>
-                          {classAssignments.length === 0 ? (
-                            <p className="text-xs text-gray-500 italic">{"Aucun cours rattaché pour l'instant."}</p>
-                          ) : (
-                            (() => {
-                              // Group assignments by pairedGroupId to display paired classes clearly
-                              const pairedMap: Record<string, ClassAssignment[]> = {};
-                              const singles: ClassAssignment[] = [];
-                              classAssignments.forEach(a => {
-                                if (a.pairedGroupId) {
-                                  if (!pairedMap[a.pairedGroupId]) pairedMap[a.pairedGroupId] = [];
-                                  pairedMap[a.pairedGroupId].push(a);
-                                } else {
-                                  singles.push(a);
-                                }
-                              });
-
-                              return (
-                                <div className="space-y-2">
-                                  {/* Paired Classes Cards */}
-                                  {Object.entries(pairedMap).map(([pairId, pairList]) => {
-                                    const a1 = pairList[0];
-                                    const a2 = pairList[1] || pairList[0];
-                                    const t1Name = teachers.find(t => t.id === a1.teacherId)?.name || 'Prof 1';
-                                    const s1Name = subjects.find(s => s.id === a1.subjectId)?.name || 'Matière 1';
-                                    const t2Name = teachers.find(t => t.id === a2.teacherId)?.name || 'Prof 2';
-                                    const s2Name = subjects.find(s => s.id === a2.subjectId)?.name || 'Matière 2';
-                                    const sync = a1.syncHours || Math.min(a1.hoursPerWeek, a2.hoursPerWeek);
-
-                                    return (
-                                      <div key={pairId} className="p-2.5 rounded-xl bg-purple-950/30 border border-purple-500/30 space-y-1.5">
-                                        <div className="flex items-center justify-between">
-                                          <span className="text-[9px] font-mono font-bold text-purple-300 flex items-center gap-1">
-                                            <Sparkles className="w-3 h-3 text-purple-400" />
-                                            <span>🔗 Classe scindée ({sync}h simultanées)</span>
-                                          </span>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleRemoveAssignmentFromClassForm(a1.id || pairId)}
-                                            className="text-red-400 hover:text-red-300 p-0.5 rounded cursor-pointer"
-                                            title="Supprimer cette classe scindée"
-                                          >
-                                            <Trash className="w-3.5 h-3.5" />
-                                          </button>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-1.5 text-[11px]">
-                                          <div className="p-1.5 rounded-lg bg-black/20 border border-white/5">
-                                            <span className="font-bold text-indigo-300 block">{a1.groupLabel || 'Gr. A'} ({a1.hoursPerWeek}h)</span>
-                                            <span className="text-gray-300 text-[10px]">{s1Name} • {t1Name}</span>
-                                          </div>
-                                          <div className="p-1.5 rounded-lg bg-black/20 border border-white/5">
-                                            <span className="font-bold text-pink-300 block">{a2.groupLabel || 'Gr. B'} ({a2.hoursPerWeek}h)</span>
-                                            <span className="text-gray-300 text-[10px]">{s2Name} • {t2Name}</span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-
-                                  {/* Single / Standard Cards */}
-                                  {singles.map((a, i) => {
-                                    const tName = teachers.find(t => t.id === a.teacherId)?.name || 'Prof inconnu';
-                                    const sName = subjects.find(s => s.id === a.subjectId)?.name || 'Matière';
-                                    return (
-                                      <div key={a.id || i} className="flex items-center justify-between text-xs py-1.5 px-3 rounded-lg bg-white/5 border border-white/10">
-                                        <div className="flex flex-col">
-                                          <span className="text-gray-200 font-medium">
-                                            {sName} <span className="text-gray-500">avec</span> {tName}
-                                          </span>
-                                          {a.fixedDay && a.fixedStartSlot !== undefined && (
-                                            <span className="text-[9px] font-mono text-emerald-300 flex items-center gap-1 mt-0.5">
-                                              📍 Fixé : {a.fixedDay} à {(slotLabels[a.fixedStartSlot] || '').split(' - ')[0]}
-                                            </span>
-                                          )}
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                          <span className="font-mono font-bold bg-indigo-500/20 px-2 py-0.5 rounded-full text-[10px] text-indigo-300 border border-indigo-500/30">
-                                            {a.hoursPerWeek}h
-                                          </span>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleEditAssignmentInForm(a)}
-                                            className="text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 transition-all p-1 rounded cursor-pointer"
-                                            title="Modifier ce cours"
-                                          >
-                                            <Edit className="w-3.5 h-3.5" />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleRemoveAssignmentFromClassForm(a.id || '', a.teacherId, a.subjectId)}
-                                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all p-1 rounded cursor-pointer"
-                                            title="Supprimer cette liaison"
-                                          >
-                                            <Trash className="w-3.5 h-3.5" />
-                                          </button>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              );
-                            })()
-                          )}
-                        </div>
-                      </div>
-
-                      {/* INTERACTIVE CLASS TIME EXCLUSION GRID */}
-                      <div className="border-t border-white/10 pt-4">
-                        <label className="block text-xs uppercase text-indigo-300 font-mono tracking-wider font-bold mb-1">
-                          Plages de Fermeture / Indisponibilité classe
-                        </label>
-                        <p className="text-[10px] text-gray-400 mb-3 leading-snug">
-                          {"Cliquetez sur la grille ci-dessous pour filtrer les plages où cette classe ne peut pas avoir de cours (ex: fermeture d'établissement ou ateliers)."}
-                        </p>
-
-                        <div 
-                          className="grid gap-1 bg-slate-950/60 p-2.5 rounded-xl border border-white/10 select-none text-center"
-                          style={{ gridTemplateColumns: `repeat(${activeDays.length + 1}, minmax(0, 1fr))` }}
-                        >
-                          {/* Hour labels header column */}
-                          <div className="text-[9px] text-gray-500 font-mono flex items-center justify-center">Jour</div>
-                          {activeDays.map(d => (
-                            <div key={d} className="text-[9px] font-sans font-bold text-gray-300">
-                              {d.substring(0, 3)}
-                            </div>
-                          ))}
-
-                          {/* Render slots rows */}
-                          {slotLabels.map((slotLabel, sIdx) => (
-                            <React.Fragment key={sIdx}>
-                              <div className="text-[8px] text-gray-500 font-mono flex items-center justify-center py-0.5" title={slotLabel}>
-                                {slotLabel.split(' - ')[0]}
-                              </div>
-                              {activeDays.map(day => {
-                                const isUn = newClassUnavail.some(u => u.day === day && u.slotIndex === sIdx);
-                                return (
-                                  <button
-                                    type="button"
-                                    key={day}
-                                    onClick={() => toggleClassFormUnavailability(day, sIdx)}
-                                    className={`w-full aspect-square text-[9px] font-bold rounded transition-all cursor-pointer ${
-                                      isUn 
-                                        ? 'bg-red-500/40 text-white border border-red-500/30' 
-                                        : 'bg-white/5 hover:bg-white/10 text-gray-500 border border-transparent'
-                                    }`}
-                                    title={`${day} - ${slotLabel} : ${isUn ? 'Exclu' : 'Libre'}`}
-                                  >
-                                    {isUn ? 'X' : ''}
-                                  </button>
-                                );
-                              })}
-                            </React.Fragment>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* BUTTON COUPLING */}
-                      <div className="pt-4 flex items-center gap-2">
-                        {editingClassId && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingClassId(null);
-                              setNewClassName('');
-                              setClassAssignments([]);
-                              setNewClassUnavail([]);
-                            }}
-                            className="flex-1 py-2.5 rounded-xl border border-white/10 text-xs text-gray-300 hover:bg-white/5 transition-colors cursor-pointer font-medium"
-                          >
-                            Annuler
-                          </button>
-                        )}
-                        <button
-                          type="submit"
-                          className="flex-[2] py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/25 transition-all hover:-translate-y-0.5 flex items-center justify-center gap-1.5 cursor-pointer"
-                        >
-                          <Check className="w-4 h-4" />
-                          <span>{editingClassId ? "Appliquer Modifications" : "Enregistrer cette Classe"}</span>
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-
-                  {/* RIGHT: LIST OF CLASSES (7 COLS) */}
-                  <div className="lg:col-span-7 space-y-4">
-                    <h3 className="text-xs font-mono tracking-wider text-indigo-400 uppercase mb-4 font-bold">
-                      Classes Scolaires Enregistrées
-                    </h3>
-
-                    {classes.length === 0 ? (
-                      <div className="p-8 text-center rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl italic text-gray-400 text-sm">
-                        Aucun classe existante. Veuillez utiliser le formulaire de gauche.
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {classes.map(c => {
-                          const totalHours = c.assignments.reduce((sum, a) => sum + a.hoursPerWeek, 0);
-                          const unavailCount = c.unavailability?.length || 0;
-
-                          return (
-                            <div key={c.id} className="p-5 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 hover:border-white/20 transition-all shadow-xl flex flex-col justify-between">
-                              <div>
-                                <div className="flex items-center justify-between mb-2">
-                                  <h4 className="font-bold text-white text-base">{c.name}</h4>
-                                  <span className="text-[10px] font-mono bg-indigo-500/10 text-indigo-300 px-2.5 py-0.5 rounded-full border border-indigo-500/20 font-bold">
-                                    {totalHours}h/semaine
-                                  </span>
-                                </div>
-
-                                <div className="space-y-1.5 my-3 bg-slate-950/50 p-3 rounded-xl border border-white/10">
-                                  {c.assignments.length === 0 ? (
-                                    <p className="text-xs text-gray-500 italic">Aucun cours assigné.</p>
+                                {/* Badges for currently linked subjects */}
+                                <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto bg-slate-950/40 p-2.5 rounded-xl border border-white/10">
+                                  {newTeacherSubjects.length === 0 ? (
+                                    <p className="text-[11px] text-gray-500 italic">{"Aucune matière sélectionnée. Choisissez dans le menu déroulant ci-dessus."}</p>
                                   ) : (
-                                    c.assignments.map((a, i) => {
-                                      const t = teachers.find(tr => tr.id === a.teacherId);
-                                      const s = subjects.find(su => su.id === a.subjectId);
+                                    newTeacherSubjects.map(sid => {
+                                      const sName = subjects.find(s => s.id === sid)?.name || sid;
                                       return (
-                                        <div key={i} className="flex items-center justify-between text-xs font-mono">
-                                          <div className="flex items-center gap-1.5 truncate">
-                                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t?.color || '#fff' }} />
-                                            <span className="text-gray-300 truncate">{s?.name || a.subjectId}</span>
-                                            {a.group && a.group !== 'all' && (
-                                              <span className="text-[8.5px] bg-purple-500/20 text-purple-300 px-1 py-0.2 rounded border border-purple-500/30">
-                                                {a.groupLabel || (a.group === 'G1' ? 'Gr. A' : 'Gr. B')}
-                                              </span>
-                                            )}
-                                            {a.fixedDay && a.fixedStartSlot !== undefined && (
-                                              <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded border border-emerald-500/30">
-                                                📍 {a.fixedDay} {(slotLabels[a.fixedStartSlot] || '').split(' - ')[0]}
-                                              </span>
-                                            )}
-                                          </div>
-                                          <span className="text-gray-200 font-bold shrink-0">{a.hoursPerWeek}h</span>
-                                        </div>
+                                        <span
+                                          key={sid}
+                                          className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-600/30 border border-indigo-400/40 text-indigo-200 flex items-center gap-1.5 shadow-sm"
+                                        >
+                                          {sName}
+                                          <button
+                                            type="button"
+                                            onClick={() => setNewTeacherSubjects(newTeacherSubjects.filter(id => id !== sid))}
+                                            className="text-indigo-300 hover:text-white ml-0.5 cursor-pointer font-bold hover:scale-110 transition-transform"
+                                            title="Retirer cette matière"
+                                          >
+                                            ×
+                                          </button>
+                                        </span>
                                       );
                                     })
                                   )}
                                 </div>
                               </div>
+                            )}
+                          </div>
 
-                              <div className="flex items-center justify-between pt-3 border-t border-white/10 mt-auto">
-                                <span className="text-[10px] text-gray-400 font-mono font-medium">
-                                  ❌ {unavailCount} créneaux exclus
-                                </span>
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => handleEditClassClick(c)}
-                                    className="p-1 px-2.5 text-xs bg-indigo-500/10 text-indigo-400 rounded-lg hover:bg-indigo-500/20 hover:text-indigo-300 border border-indigo-500/20 transition-all font-semibold cursor-pointer"
-                                  >
-                                    Modifier
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteClass(c.id, c.name)}
-                                    className="text-red-400 hover:text-red-300 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
-                                  >
-                                    <Trash className="w-4 h-4" />
-                                  </button>
+                          {/* INTERACTIVE TEACHER TIME EXCLUSION GRID */}
+                          <div className="border-t border-white/10 pt-4">
+                            <label className="block text-xs uppercase text-indigo-300 font-mono tracking-wider font-bold mb-1">
+                              Temps libres & Exclusions Prof
+                            </label>
+                            <p className="text-[10px] text-gray-400 mb-3 leading-snug">
+                              {"Cliquetez pour griser (X) les plages horaires d'indisponibilité absolue de cet enseignant (ex: temps partiel ou charges extérieures)."}
+                            </p>
+
+                            <div
+                              className="grid gap-1 bg-slate-950/60 p-2.5 rounded-xl border border-white/10 select-none text-center"
+                              style={{ gridTemplateColumns: `repeat(${activeDays.length + 1}, minmax(0, 1fr))` }}
+                            >
+                              {/* Hour labels header column */}
+                              <div className="text-[9px] text-gray-500 font-mono flex items-center justify-center">Jour</div>
+                              {activeDays.map(d => (
+                                <div key={d} className="text-[9px] font-sans font-bold text-gray-300">
+                                  {d.substring(0, 3)}
                                 </div>
-                              </div>
+                              ))}
+
+                              {/* Render slots rows */}
+                              {slotLabels.map((slotLabel, sIdx) => (
+                                <React.Fragment key={sIdx}>
+                                  <div className="text-[8px] text-gray-500 font-mono flex items-center justify-center py-0.5" title={slotLabel}>
+                                    {slotLabel.split(' - ')[0]}
+                                  </div>
+                                  {activeDays.map(day => {
+                                    const isUn = newTeacherUnavail.some(u => u.day === day && u.slotIndex === sIdx);
+                                    return (
+                                      <button
+                                        type="button"
+                                        key={day}
+                                        onClick={() => toggleTeacherFormUnavailability(day, sIdx)}
+                                        className={`w-full aspect-square text-[9px] font-bold rounded transition-all cursor-pointer ${isUn
+                                            ? 'bg-red-500/40 text-white border border-red-500/30'
+                                            : 'bg-white/5 hover:bg-white/10 text-gray-500 border border-transparent'
+                                          }`}
+                                        title={`${day} - ${slotLabel} : ${isUn ? 'Exclu' : 'Libre'}`}
+                                      >
+                                        {isUn ? 'X' : ''}
+                                      </button>
+                                    );
+                                  })}
+                                </React.Fragment>
+                              ))}
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                          </div>
 
-                {/* BOTTOM NAVIGATION CALL-TO-ACTION (PASSAGE ÉTAPE 5) */}
-                <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900/90 via-indigo-950/40 to-slate-900/90 backdrop-blur-xl border border-indigo-500/30 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 text-left">
-                    <div className="p-3 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
-                      <Users className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white">Toutes vos classes sont prêtes !</h4>
-                      <p className="text-xs text-gray-400">Vous avez configuré <strong className="text-indigo-300 font-mono">{classes.length}</strong> classe(s) et leurs cours. Passez à la génération automatique des emplois du temps.</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      triggerNotification("Étape 4 validée ! Passage à l'Étape 5 (Emplois du Temps).", "success");
-                      setActiveTab('timetable');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="w-full sm:w-auto py-3.5 px-6 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-600 to-indigo-600 hover:from-indigo-400 hover:via-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 cursor-pointer group border border-indigo-400/30 shrink-0"
-                  >
-                    <span>👉 Passer à l'Étape 5 : Générer les Emplois du Temps</span>
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform animate-pulse" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 3: TEACHERS MANAGEMENT */}
-            {activeTab === 'teachers' && (
-              <div className="space-y-6">
-                
-                {/* HEADER BANNER WITH STEP-BY-STEP BEGINNER GUIDE */}
-                <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
-                  <div className={`flex items-center justify-between gap-4 flex-wrap pb-4 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
-                    <div className="flex items-center gap-4">
-                      <div className={`p-3 rounded-2xl border shrink-0 ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'}`}>
-                        <GraduationCap className="w-6 h-6" />
+                          {/* SUBMIT BUTTON */}
+                          <div className="pt-4 flex gap-2">
+                            {editingTeacherId && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingTeacherId(null);
+                                  setNewTeacherName('');
+                                  setNewTeacherSubjects([]);
+                                  setNewTeacherQuota(18);
+                                  setNewTeacherUnavail([]);
+                                }}
+                                className="flex-1 py-2.5 rounded-xl border border-white/10 text-xs text-gray-300 hover:bg-white/5 transition-colors cursor-pointer font-medium"
+                              >
+                                Annuler
+                              </button>
+                            )}
+                            <button
+                              type="submit"
+                              className="flex-[2] py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/25 transition-all hover:-translate-y-0.5 flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <Check className="w-4 h-4" />
+                              <span>{editingTeacherId ? "Mettre à jour" : "Enregistrer ce Professeur"}</span>
+                            </button>
+                          </div>
+                        </form>
                       </div>
-                      <div>
-                        <h2 className={`text-lg font-bold flex items-center gap-2 flex-wrap ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span>Étape 3 : Fiches Enseignants & Disponibilités</span>
-                          <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'}`}>
-                            Professeurs & Quotas
-                          </span>
-                        </h2>
-                        <p className={`text-sm mt-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
-                          Enregistrez les professeurs, leurs matières habilitées, leur quota d'heures par semaine et leurs temps libres.
-                        </p>
+
+                      {/* RIGHT: LIST OF TEACHERS */}
+                      <div className="lg:col-span-7 space-y-4">
+                        <h3 className="text-xs font-mono tracking-wider text-indigo-400 uppercase mb-4 font-bold">
+                          Corps Enseignant Actuel
+                        </h3>
+
+                        {teachers.length === 0 ? (
+                          <div className="p-8 text-center rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl italic text-gray-400 text-sm">
+                            Aucun enseignant créé. Veuillez saisir les informations de gauche.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {teachers.map(t => {
+                              const activeAllocatedHours = timetable.filter(e => e.teacherId === t.id).length;
+                              const mappedSubjectsList = t.subjectIds.map(sid => subjects.find(s => s.id === sid)?.name || sid).join(', ');
+
+                              return (
+                                <div key={t.id} className="p-5 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 hover:border-white/20 transition-all shadow-xl flex flex-col justify-between" style={{ borderLeft: `4px solid ${t.color}` }}>
+                                  <div>
+                                    <div className="flex items-center justify-between mb-3">
+                                      <h4 className="font-bold text-white text-base">{t.name}</h4>
+                                      <span className="text-[10px] uppercase font-mono px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-bold">
+                                        Quota : {t.weeklyQuota}h
+                                      </span>
+                                    </div>
+
+                                    <div className="space-y-2 text-xs">
+                                      <div>
+                                        <span className="text-gray-400 block text-[10px] font-mono uppercase tracking-wider font-semibold">Matières</span>
+                                        <span className="text-gray-200 font-medium">{mappedSubjectsList || 'Aucune matière liée'}</span>
+                                      </div>
+
+                                      <div className="pt-2">
+                                        <span className="text-gray-400 block text-[10px] font-mono uppercase tracking-wider mb-1 font-semibold">Charge Planifiée</span>
+                                        <div className="flex items-center gap-2">
+                                          <div className="flex-1 h-2 bg-slate-950 rounded-full overflow-hidden border border-white/5">
+                                            <div
+                                              className="h-full rounded-full transition-all duration-300"
+                                              style={{
+                                                width: `${Math.min((activeAllocatedHours / t.weeklyQuota) * 100, 100)}%`,
+                                                backgroundColor: t.color
+                                              }}
+                                            />
+                                          </div>
+                                          <span className="font-mono text-xs text-slate-300 font-bold shrink-0">
+                                            {activeAllocatedHours} / {t.weeklyQuota}h
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center justify-between pt-4 border-t border-white/10 mt-5">
+                                    <span className="text-[10px] text-gray-400 font-mono font-medium">
+                                      ❌ {t.unavailability?.length || 0} slots exclus
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => handleEditTeacherClick(t)}
+                                        className="p-1 px-2.5 text-xs bg-indigo-500/10 text-indigo-400 rounded-lg hover:bg-indigo-500/20 hover:text-indigo-300 border border-indigo-500/20 transition-all font-semibold cursor-pointer"
+                                      >
+                                        Modifier
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteTeacher(t.id, t.name)}
+                                        className="text-red-400 hover:text-red-300 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+                                      >
+                                        <Trash className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
 
-                  {/* GUIDE DÉBUTANT PAS-À-PAS */}
-                  <div className={`rounded-xl p-4 border ${isLight ? 'bg-blue-50/60 border-blue-200/80' : 'bg-slate-950/50 border-indigo-500/20'}`}>
-                    <div className={`flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider mb-2.5 ${isLight ? 'text-blue-600' : 'text-indigo-300'}`}>
-                      <Sparkles className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-indigo-400'}`} />
-                      <span className="font-bold">Guide Débutant : Ce que vous devez faire sur cette étape</span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
-                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
-                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>1</span>
-                          <span className="font-bold">Nom de l'enseignant</span>
+                    {/* BOTTOM NAVIGATION CALL-TO-ACTION (PASSAGE ÉTAPE 4) */}
+                    <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900/90 via-indigo-950/40 to-slate-900/90 backdrop-blur-xl border border-indigo-500/30 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 text-left">
+                        <div className="p-3 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
+                          <GraduationCap className="w-5 h-5" />
                         </div>
-                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Saisissez le nom (ex: M. Diongue, Mme Sow) dans le formulaire à gauche.
-                        </p>
-                      </div>
-                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
-                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>2</span>
-                          <span className="font-bold">Quota & Matières</span>
-                        </div>
-                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Indiquez son volume d'heures/semaine visé (ex: 18h) et cochez les matières qu'il enseigne.
-                        </p>
-                      </div>
-                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
-                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>3</span>
-                          <span className="font-bold">Temps libres</span>
-                        </div>
-                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Cliquez sur la grille pour griser (X) les créneaux où ce prof ne peut pas enseigner.
-                        </p>
-                      </div>
-                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
-                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>4</span>
-                          <span className="font-bold">Enregistrer le prof</span>
-                        </div>
-                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Cliquez sur "Ajouter l'enseignant". Dès que l'équipe est créée, passez à l'Étape 4.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* FORM + GRID */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  
-                  {/* LEFT: FORM */}
-                  <div className="lg:col-span-5 p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl">
-                    <h3 className="text-xs font-mono tracking-wider text-indigo-400 uppercase mb-4 font-bold">
-                      {editingTeacherId ? "Modifier l'Enseignant" : "Ajouter un Enseignant"}
-                    </h3>
-
-                    <form onSubmit={handleSaveTeacher} className="space-y-4">
-                      <div>
-                        <label className="block text-xs text-gray-300 mb-1.5 font-medium">{"Nom complet de l'enseignant"}</label>
-                        <input
-                          type="text"
-                          placeholder="M. Diongue, Mme. Sow etc."
-                          value={newTeacherName}
-                          onChange={(e) => setNewTeacherName(e.target.value)}
-                          className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 transition-colors shadow-inner"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-xs text-gray-300 mb-1.5 font-medium">{"Quota d'heures (1 à 30h)"}</label>
-                          <input
-                            type="number"
-                            min={1}
-                            max={30}
-                            value={newTeacherQuota}
-                            onChange={(e) => setNewTeacherQuota(Number(e.target.value))}
-                            className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors"
-                          />
+                          <h4 className="text-sm font-bold text-white">Corps professoral configuré</h4>
+                          <p className="text-xs text-gray-400">Vous avez enregistré <strong className="text-indigo-300 font-mono">{teachers.length}</strong> enseignant(s). Passez à la configuration des classes et affectations.</p>
                         </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerNotification("Étape 3 validée ! Passage à l'Étape 4 (Classes).", "success");
+                          setActiveTab('classes');
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="w-full sm:w-auto py-3.5 px-6 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-600 to-indigo-600 hover:from-indigo-400 hover:via-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 cursor-pointer group border border-indigo-400/30 shrink-0"
+                      >
+                        <span>👉 Passer à l'Étape 4 : Classes & Affectations</span>
+                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform animate-pulse" />
+                      </button>
+                    </div>
+                  </div>
+                )}
 
-                        <div>
-                          <label className="block text-xs text-gray-300 mb-1.5 font-medium">{"Couleur d'affichage"}</label>
-                          <div className="flex gap-2">
-                            <input
-                              type="color"
-                              value={newTeacherColor}
-                              onChange={(e) => setNewTeacherColor(e.target.value)}
-                              className="w-10 h-9 p-0 bg-transparent text-white border-0 cursor-pointer rounded-lg shrink-0"
-                            />
-                            <input
-                              type="text"
-                              value={newTeacherColor}
-                              onChange={(e) => setNewTeacherColor(e.target.value)}
-                              className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-2 text-xs focus:outline-none font-mono"
-                            />
+                {/* TAB 4: SUBJECTS MANAGEMENT */}
+                {activeTab === 'subjects' && (
+                  <div className="space-y-6">
+
+                    {/* HEADER BANNER WITH STEP-BY-STEP BEGINNER GUIDE */}
+                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
+                      <div className={`flex items-center justify-between gap-4 flex-wrap pb-4 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                        <div className="flex items-center gap-4">
+                          <div className={`p-3 rounded-2xl border shrink-0 ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'}`}>
+                            <BookOpen className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <h2 className={`text-lg font-bold flex items-center gap-2 flex-wrap ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span>Étape 2 : Référentiel des Matières d'Enseignement</span>
+                              <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'}`}>
+                                Disciplines & Couleurs
+                              </span>
+                            </h2>
+                            <p className={`text-sm mt-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
+                              Enregistrez la liste de toutes les disciplines proposées dans votre école et associez-leur des couleurs visuelles.
+                            </p>
                           </div>
                         </div>
                       </div>
 
-                      {/* Dropdown & Tag selection for subjects taught */}
-                      <div>
-                        <label className="block text-xs text-gray-300 mb-1.5 font-medium">
-                          Matières enseignées (Liaison par Menu Déroulant)
-                        </label>
-                        {subjects.length === 0 ? (
-                          <p className="text-xs text-gray-500 italic">{"Veuillez d'abord ajouter des matières à l'Étape 1 (\"Matières\")."}</p>
-                        ) : (
-                          <div className="space-y-2">
-                            <select
-                              value=""
-                              onChange={(e) => {
-                                const sid = e.target.value;
-                                if (sid && !newTeacherSubjects.includes(sid)) {
-                                  setNewTeacherSubjects([...newTeacherSubjects, sid]);
-                                }
-                              }}
-                              className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 font-medium"
-                            >
-                              <option value="">-- Sélectionner une matière dans le menu déroulant --</option>
-                              {subjects.map(s => (
-                                <option key={s.id} value={s.id} disabled={newTeacherSubjects.includes(s.id)}>
-                                  {s.name} {newTeacherSubjects.includes(s.id) ? '✓ (Déjà liée)' : ''}
-                                </option>
-                              ))}
-                            </select>
+                      {/* GUIDE DÉBUTANT PAS-À-PAS */}
+                      <div className={`rounded-xl p-4 border ${isLight ? 'bg-blue-50/60 border-blue-200/80' : 'bg-slate-950/50 border-indigo-500/20'}`}>
+                        <div className={`flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider mb-2.5 ${isLight ? 'text-blue-600' : 'text-indigo-300'}`}>
+                          <Sparkles className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-indigo-400'}`} />
+                          <span className="font-bold">Guide Débutant : Ce que vous devez faire sur cette étape</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                          <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                            <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>1</span>
+                              <span className="font-bold">Nommer la matière</span>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                              Écrivez le nom de la matière dans le formulaire de gauche (ex: Mathématiques, Français, SVT).
+                            </p>
+                          </div>
+                          <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                            <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>2</span>
+                              <span className="font-bold">Choisir une couleur</span>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                              Cliquez sur une pastille de couleur pour identifier visuellement les cours sur l'emploi du temps.
+                            </p>
+                          </div>
+                          <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
+                            <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>3</span>
+                              <span className="font-bold">Valider & Continuer</span>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
+                              Cliquez sur "Ajouter la matière". Une fois toutes vos matières saisies, passez à l'Étape 3 (Professeurs).
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
 
-                            {/* Badges for currently linked subjects */}
-                            <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto bg-slate-950/40 p-2.5 rounded-xl border border-white/10">
-                              {newTeacherSubjects.length === 0 ? (
-                                <p className="text-[11px] text-gray-500 italic">{"Aucune matière sélectionnée. Choisissez dans le menu déroulant ci-dessus."}</p>
-                              ) : (
-                                newTeacherSubjects.map(sid => {
-                                  const sName = subjects.find(s => s.id === sid)?.name || sid;
-                                  return (
-                                    <span
-                                      key={sid}
-                                      className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-600/30 border border-indigo-400/40 text-indigo-200 flex items-center gap-1.5 shadow-sm"
-                                    >
-                                      {sName}
-                                      <button
-                                        type="button"
-                                        onClick={() => setNewTeacherSubjects(newTeacherSubjects.filter(id => id !== sid))}
-                                        className="text-indigo-300 hover:text-white ml-0.5 cursor-pointer font-bold hover:scale-110 transition-transform"
-                                        title="Retirer cette matière"
-                                      >
-                                        ×
-                                      </button>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+
+                      {/* CREATE SUBJECT FORM */}
+                      <div className="md:col-span-5 p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl">
+                        <h3 className="text-xs font-mono tracking-wider text-indigo-400 uppercase mb-4 font-bold">
+                          Ajouter une Discipline
+                        </h3>
+
+                        <form onSubmit={handleAddSubject} className="space-y-4">
+                          <div>
+                            <label className="block text-xs text-gray-300 mb-1.5 font-medium">Libellé complet de la matière</label>
+                            <input
+                              type="text"
+                              placeholder="Ex: Mathématiques, Sciences Physiques"
+                              value={newSubName}
+                              onChange={(e) => setNewSubName(e.target.value)}
+                              className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 transition-colors shadow-inner"
+                            />
+                          </div>
+
+                          <button
+                            type="submit"
+                            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/25 transition-all hover:-translate-y-0.5 flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Agréger la Matière
+                          </button>
+                        </form>
+                      </div>
+
+                      {/* DISPLAY SUBJECT CARDS */}
+                      <div className="md:col-span-7 p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl">
+                        <h3 className="text-xs font-mono tracking-wider text-indigo-400 uppercase mb-4 font-bold">
+                          Disciplines Enregistrées
+                        </h3>
+
+                        {subjects.length === 0 ? (
+                          <p className="text-sm text-gray-400 italic text-center py-6">Aucune matière enregistrée.</p>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[460px] overflow-y-auto pr-1">
+                            {subjects.map(s => {
+                              const teachersQualified = teachers.filter(t => t.subjectIds.includes(s.id));
+                              return (
+                                <div key={s.id} className="p-4 rounded-xl bg-slate-950/50 border border-white/10 hover:border-white/20 transition-all flex items-center justify-between group">
+                                  <div>
+                                    <h4 className="font-bold text-white text-sm">{s.name}</h4>
+                                    <span className="text-[10px] text-gray-400 font-mono font-medium">
+                                      {teachersQualified.length} enseignant(s) rattaché(s)
                                     </span>
+                                  </div>
+
+                                  <button
+                                    onClick={() => handleDeleteSubject(s.id, s.name)}
+                                    className="text-gray-400 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+                                    title="Supprimer"
+                                  >
+                                    <Trash className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* BOTTOM NAVIGATION CALL-TO-ACTION (PASSAGE ÉTAPE 3) */}
+                    <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900/90 via-indigo-950/40 to-slate-900/90 backdrop-blur-xl border border-indigo-500/30 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 text-left">
+                        <div className="p-3 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
+                          <BookOpen className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-white">Vos matières sont enregistrées ?</h4>
+                          <p className="text-xs text-gray-400">Vous avez configuré <strong className="text-indigo-300 font-mono">{subjects.length}</strong> discipline(s). Passez à la création du corps enseignant.</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerNotification("Étape 2 validée ! Passage à l'Étape 3 (Professeurs).", "success");
+                          setActiveTab('teachers');
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="w-full sm:w-auto py-3.5 px-6 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-600 to-indigo-600 hover:from-indigo-400 hover:via-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 cursor-pointer group border border-indigo-400/30 shrink-0"
+                      >
+                        <span>👉 Passer à l'Étape 3 : Fiches Professeurs</span>
+                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform animate-pulse" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB PLANNING: MODULE PLANIFICATION & RÉPARTITION PÉDAGOGIQUE ÉQUITABLE */}
+                {activeTab === 'planning' && isMounted && (
+                  <PedagogicalPlanningTab
+                    teachers={teachers}
+                    classes={classes}
+                    subjects={subjects}
+                    onUpdateTeachers={(updated) => {
+                      setTeachers(updated);
+                      if (currentUserId) {
+                        updated.forEach((t) => dbUpdateTeacher(t.id, t));
+                      }
+                    }}
+                    onUpdateClasses={(updated) => {
+                      setClasses(updated);
+                      if (currentUserId) {
+                        updated.forEach((c) => dbUpdateClass(c.id, c));
+                      }
+                    }}
+                    isPremiumOrSchool={currentClient.planId === 'plan_premium' || currentClient.planId === 'plan_school'}
+                    onOpenUpgrade={() => setIsClientSubModalOpen(true)}
+                    isLight={isLight}
+                    schoolName={schoolName}
+                    onNavigateToTimetable={() => setActiveTab('timetable')}
+                  />
+                )}
+
+                {/* TAB 5: CHEF D'ÉTABLISSEMENT VIEW (STATS SYNTHESIS & EXECUTIVE DASHBOARD) */}
+                {activeTab === 'stats' && isMounted && (() => {
+                  const {
+                    totalPlannedHours,
+                    totalTargetHours,
+                    globalCompletionRatio,
+                    conformingTeachersCount,
+                    underloadedTeachersCount,
+                    overloadedTeachersCount,
+                    subjectHoursData,
+                    topSubject,
+                    classChartData,
+                    teacherChartData
+                  } = dashboardMetrics;
+
+                  // Color constant palette for subject breakdown
+                  const SUBJECT_COLORS = [
+                    '#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#06b6d4',
+                    '#8b5cf6', '#d946ef', '#ec4899', '#14b8a6', '#f97316'
+                  ];
+
+                  // Custom tooltip styling matching dark/light themes
+                  const CustomChartTooltip = ({ active, payload, label }: any) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className={`p-2.5 rounded-xl shadow-xl backdrop-blur-md border ${isLight ? 'bg-white/95 border-slate-200 text-slate-700' : 'bg-slate-950/95 border-white/10 text-white'
+                          }`}>
+                          <p className={`text-[11px] font-semibold mb-1 pb-1 border-b font-sans ${isLight ? 'text-slate-800 border-slate-100' : 'text-white border-white/5'
+                            }`}>{label}</p>
+                          {payload.map((item: any, index: number) => (
+                            <p key={index} className={`text-[10px] font-mono flex items-center gap-1.5 font-normal ${isLight ? 'text-slate-600' : ''
+                              }`} style={{ color: !isLight ? (item.color || item.fill || '#cbd5e1') : undefined }}>
+                              <span className="w-1.5 h-1.5 rounded-full inline-block shrink-0" style={{ backgroundColor: item.color || item.fill || '#64748b' }} />
+                              <span>{item.name} : <span className="font-normal">{item.value}h</span></span>
+                            </p>
+                          ))}
+                        </div>
+                      );
+                    }
+                    return null;
+                  };
+
+                  // Identify critical alerts
+                  const criticalAlerts: { id: string; type: 'class' | 'teacher'; message: string; severity: 'error' | 'warning' }[] = [];
+
+                  statistics.classStats.forEach(c => {
+                    const diff = c.assigned - c.targetHours;
+                    if (diff < 0) {
+                      criticalAlerts.push({
+                        id: `class-under-${c.id}`,
+                        type: 'class',
+                        message: `La classe ${c.name} est sous-planifiée : manque ${Math.abs(diff)}h de cours pour atteindre son quota réglementaire.`,
+                        severity: 'error'
+                      });
+                    } else if (diff > 0) {
+                      criticalAlerts.push({
+                        id: `class-over-${c.id}`,
+                        type: 'class',
+                        message: `La classe ${c.name} est sur-planifiée : excès de +${diff}h au-delà du volume requis.`,
+                        severity: 'warning'
+                      });
+                    }
+                  });
+
+                  statistics.teachStats.forEach(t => {
+                    const diff = t.assigned - t.weeklyQuota;
+                    if (diff < 0) {
+                      criticalAlerts.push({
+                        id: `teacher-under-${t.id}`,
+                        type: 'teacher',
+                        message: `L'enseignant ${t.name} est en sous-charge contractuelle de ${Math.abs(diff)}h (${t.assigned}h faites sur ${t.weeklyQuota}h contractées).`,
+                        severity: 'warning'
+                      });
+                    } else if (diff > 0) {
+                      criticalAlerts.push({
+                        id: `teacher-over-${t.id}`,
+                        type: 'teacher',
+                        message: `L'enseignant ${t.name} est en surcharge de +${diff}h au-dessus de son quota de ${t.weeklyQuota}h.`,
+                        severity: 'error'
+                      });
+                    }
+                  });
+
+                  // Quality Tag for Score
+                  let qualityLabel = "Excellent";
+                  let qualityBg = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+                  if (generationScore < 75) {
+                    qualityLabel = "À optimiser";
+                    qualityBg = "bg-rose-500/10 text-rose-400 border border-rose-500/20";
+                  } else if (generationScore < 90) {
+                    qualityLabel = "Très Bon";
+                    qualityBg = "bg-amber-500/10 text-amber-400 border border-amber-500/20";
+                  }
+
+                  return (
+                    <div className="space-y-6 pb-12">
+
+                      {/* DYNAMIC HEADER OVERVIEW */}
+                      <div className={`p-6 rounded-2xl backdrop-blur-xl border flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden ${isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'
+                        }`}>
+                        <div className="absolute top-0 right-0 w-80 h-40 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                        <div className="space-y-1 z-10">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] uppercase tracking-widest font-mono px-3 py-1 rounded-full font-bold ${isLight ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/25'
+                              }`}>
+                              Tableau de Bord Exécutif
+                            </span>
+                            <span className={`text-[10px] uppercase tracking-wider font-mono px-3 py-1 rounded-full font-bold ${qualityBg}`}>
+                              {qualityLabel}
+                            </span>
+                          </div>
+                          <h2 className={`text-xl font-bold tracking-tight flex items-center gap-2 mt-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                            <Award className="w-6 h-6 text-indigo-500" />
+                            <span>{"Contrôle Global du Chef d'Établissement"}</span>
+                          </h2>
+                          <p className={`text-xs leading-relaxed max-w-2xl ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
+                            {"Analysez la répartition des heures, détectez les écarts contractuels et supervisez l'avancement global du planning de vos divisions d'un seul coup d'œil."}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-3 shrink-0 z-10">
+                          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!currentPlan.features.pdfExport) {
+                                  triggerNotification("L'export PDF des rapports statistiques requiert la formule supérieure.", "error");
+                                  setIsClientSubModalOpen(true);
+                                  return;
+                                }
+                                setChefDetailModalType('weekly_load');
+                              }}
+                              className={`px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer hover:-translate-y-0.5 ${isLight
+                                  ? 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200'
+                                  : 'bg-red-950/40 hover:bg-red-900/50 text-red-300 border border-red-500/30'
+                                }`}
+                              title="Télécharger le rapport statistique complet au format PDF"
+                            >
+                              <Download className={`w-3.5 h-3.5 ${isLight ? 'text-red-600' : 'text-red-400'}`} />
+                              <span>Rapport PDF (Stats)</span>
+                              {!currentPlan.features.pdfExport && (
+                                <span className={`flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded font-mono ml-0.5 ${isLight ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                  }`}>
+                                  <Lock className="w-2.5 h-2.5" /> VIP
+                                </span>
+                              )}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!currentPlan.features.excelExport) {
+                                  triggerNotification("L'export Excel (.xlsx) des statistiques requiert la formule supérieure.", "error");
+                                  setIsClientSubModalOpen(true);
+                                  return;
+                                }
+                                setChefDetailModalType('weekly_load');
+                              }}
+                              className={`px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer hover:-translate-y-0.5 ${isLight
+                                  ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                  : 'bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border border-emerald-500/30'
+                                }`}
+                              title="Télécharger toutes les données analytiques au format Excel (.xlsx)"
+                            >
+                              <FileSpreadsheet className={`w-3.5 h-3.5 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
+                              <span>Données Excel (Stats)</span>
+                              {!currentPlan.features.excelExport && (
+                                <span className={`flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded font-mono ml-0.5 ${isLight ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                  }`}>
+                                  <Lock className="w-2.5 h-2.5" /> VIP
+                                </span>
+                              )}
+                            </button>
+                          </div>
+
+                          <div className={`p-3.5 rounded-2xl font-mono text-center shadow-lg relative min-w-[120px] ${isLight ? 'bg-indigo-50/70 border border-indigo-200' : 'bg-slate-950/70 border border-indigo-500/30'
+                            }`}>
+                            <span className={`block text-[9px] uppercase font-bold mb-0.5 tracking-wider ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>Index Qualité</span>
+                            <span className="text-2xl font-extrabold bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">
+                              {generationScore}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 4 CARDS GRID - LIGHT/DARK MODE */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* KPI 1: Violet/Indigo */}
+                        <div className="rounded-xl overflow-hidden bg-gradient-to-r from-purple-500 to-indigo-500 shadow-md p-5 text-white relative h-32 flex flex-col justify-between">
+                          <div className="absolute top-4 right-4 opacity-10">
+                            <Users className="w-16 h-16" />
+                          </div>
+                          <p className="text-sm font-medium z-10 relative !text-white">Couverture Classes</p>
+                          <h3 className="text-3xl font-bold z-10 relative !text-white">{globalCompletionRatio}%</h3>
+                          <div className="flex items-center justify-between text-[11px] z-10 relative opacity-100 !text-white mt-1 font-medium">
+                            <span>{totalPlannedHours}h planifiées</span>
+                            <span>Objectif {totalTargetHours}h</span>
+                          </div>
+                          <div className="absolute bottom-0 left-0 w-full h-1 bg-white/20">
+                            <div className="h-full bg-white/50 rounded-r-full" style={{ width: `${globalCompletionRatio}%` }} />
+                          </div>
+                        </div>
+
+                        {/* KPI 2: Bleu clair/Cyan */}
+                        <div className="rounded-xl overflow-hidden bg-gradient-to-r from-sky-400 to-blue-500 shadow-md p-5 text-white relative h-32 flex flex-col justify-between">
+                          <div className="absolute top-4 right-4 opacity-10">
+                            <CheckCircle2 className="w-16 h-16" />
+                          </div>
+                          <p className="text-sm font-medium z-10 relative !text-white">Profs Conformes</p>
+                          <h3 className="text-3xl font-bold z-10 relative !text-white">{conformingTeachersCount} / {teachers.length || 1}</h3>
+                          <div className="flex items-center justify-between text-[11px] z-10 relative opacity-100 !text-white mt-1 font-medium">
+                            <span>-{underloadedTeachersCount} ss-ch.</span>
+                            <span>+{overloadedTeachersCount} sur-ch.</span>
+                          </div>
+                          <div className="absolute bottom-0 left-0 w-full h-1 bg-white/20">
+                            <div className="h-full bg-white/50 rounded-r-full" style={{ width: `${(conformingTeachersCount / (teachers.length || 1)) * 100}%` }} />
+                          </div>
+                        </div>
+
+                        {/* KPI 3: Orange/Rouge */}
+                        <div className="rounded-xl overflow-hidden bg-gradient-to-r from-orange-400 to-red-400 shadow-md p-5 text-white relative h-32 flex flex-col justify-between">
+                          <div className="absolute top-4 right-4 opacity-10">
+                            <BookOpen className="w-16 h-16" />
+                          </div>
+                          <p className="text-sm font-medium z-10 relative !text-white">Matière Dominante</p>
+                          <h3 className="text-2xl font-bold z-10 relative truncate max-w-[150px] overflow-hidden whitespace-nowrap block !text-white" title={topSubject.name}>{topSubject.name || '-'}</h3>
+                          <div className="flex items-center justify-between text-[11px] z-10 relative opacity-100 !text-white mt-1 font-medium">
+                            <span>{topSubject.value}h hebdo</span>
+                          </div>
+                          <div className="absolute bottom-0 left-0 w-full h-1 bg-white/20">
+                            <div className="h-full bg-white/50 rounded-r-full" style={{ width: `${totalPlannedHours > 0 ? (topSubject.value / totalPlannedHours) * 100 : 0}%` }} />
+                          </div>
+                        </div>
+
+                        {/* KPI 4: Vert */}
+                        <div className="rounded-xl overflow-hidden bg-gradient-to-r from-emerald-400 to-green-500 shadow-md p-5 text-white relative h-32 flex flex-col justify-between">
+                          <div className="absolute top-4 right-4 opacity-10">
+                            <FileText className="w-16 h-16" />
+                          </div>
+                          <p className="text-sm font-medium z-10 relative !text-white">Classes Complètes</p>
+                          <h3 className="text-3xl font-bold z-10 relative !text-white">{statistics.classStats.filter(c => c.assigned === c.targetHours).length}</h3>
+                          <div className="flex items-center justify-between text-[11px] z-10 relative opacity-100 !text-white mt-1 font-medium">
+                            <span>sur {classes.length} divisions</span>
+                          </div>
+                          <div className="absolute bottom-0 left-0 w-full h-1 bg-white/20">
+                            <div className="h-full bg-white/50 rounded-r-full" style={{ width: `${(statistics.classStats.filter(c => c.assigned === c.targetHours).length / (classes.length || 1)) * 100}%` }} />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* MIDDLE SECTION: Line Chart & Donut / Bar Charts Grid */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                        {/* CHART 1: CLASS HOURS COMPARATIVE */}
+                        <div className={`p-6 rounded-2xl backdrop-blur-xl border ${isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'
+                          }`}>
+                          <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+                            <div>
+                              <h3 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                                <Building2 className="w-4.5 h-4.5 text-indigo-500" />
+                                <span>Couverture Horaire des Divisions</span>
+                              </h3>
+                              <p className={`text-xs leading-relaxed mt-0.5 ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
+                                {"Comparaison entre les heures planifiées et les volumes horaires visés par classe."}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setChefDetailModalType('classes')}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-105 active:scale-95 ${isLight
+                                    ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200'
+                                    : 'bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 hover:text-white border border-indigo-500/30'
+                                  }`}
+                                title="Ouvrir le graphique global de toutes les classes avec explications simples"
+                              >
+                                <Maximize2 className="w-3.5 h-3.5 text-indigo-500" />
+                                <span>PLUS DE DÉTAILS</span>
+                              </button>
+                              <span className={`text-[10px] font-mono px-2.5 py-1 rounded-full font-bold hidden sm:inline-block ${isLight ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                                }`}>
+                                Heures / Semaine
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="h-72 w-full">
+                            {classChartData.length === 0 ? (
+                              <div className={`h-full flex items-center justify-center text-xs italic ${isLight ? 'text-slate-400' : 'text-gray-500'}`}>
+                                Aucune donnée de classe disponible.
+                              </div>
+                            ) : (
+                              <ResponsiveContainer width="100%" height="100%">
+                                <RechartsBarChart data={classChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke={isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)'} vertical={false} />
+                                  <XAxis dataKey="name" stroke={isLight ? '#64748b' : '#64748b'} fontSize={10} tickLine={false} />
+                                  <YAxis stroke={isLight ? '#64748b' : '#64748b'} fontSize={10} tickLine={false} />
+                                  <Tooltip content={<CustomChartTooltip />} cursor={{ fill: isLight ? '#f8fafc' : 'rgba(255,255,255,0.02)' }} />
+                                  <Legend iconType="circle" wrapperStyle={{ fontSize: 10, paddingTop: 10 }} />
+                                  <Bar dataKey="Planifié" fill="#10b981" radius={[4, 4, 0, 0]} name="Volume Planifié" />
+                                  <Bar dataKey="Cible" fill="#6366f1" radius={[4, 4, 0, 0]} name="Volume Cible Visé" />
+                                </RechartsBarChart>
+                              </ResponsiveContainer>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* CHART 2: TEACHERS RESPECT CONTROLLER */}
+                        <div className={`p-6 rounded-2xl backdrop-blur-xl border ${isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'
+                          }`}>
+                          <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+                            <div>
+                              <h3 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                                <Users className="w-4.5 h-4.5 text-emerald-500" />
+                                <span>Charges Enseignants vs Contrats</span>
+                              </h3>
+                              <p className={`text-xs leading-relaxed mt-0.5 ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
+                                {"Suivi des heures de cours hebdomadaires attribuées comparées aux quotas contractuels."}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setChefDetailModalType('teachers')}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-105 active:scale-95 ${isLight
+                                    ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                    : 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 hover:text-white border border-emerald-500/30'
+                                  }`}
+                                title="Ouvrir le graphique global des enseignants avec audit et explications textuelles"
+                              >
+                                <Maximize2 className="w-3.5 h-3.5 text-emerald-500" />
+                                <span>PLUS DE DÉTAILS</span>
+                              </button>
+                              <span className={`text-[10px] font-mono px-2.5 py-1 rounded-full font-bold hidden sm:inline-block ${isLight ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                }`}>
+                                Code Couleur Dédié
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="h-72 w-full">
+                            {teacherChartData.length === 0 ? (
+                              <div className={`h-full flex items-center justify-center text-xs italic ${isLight ? 'text-slate-400' : 'text-gray-500'}`}>
+                                Aucune donnée de professeur disponible.
+                              </div>
+                            ) : (
+                              <ResponsiveContainer width="100%" height="100%">
+                                <RechartsBarChart data={teacherChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke={isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)'} vertical={false} />
+                                  <XAxis dataKey="name" stroke={isLight ? '#64748b' : '#64748b'} fontSize={10} tickLine={false} />
+                                  <YAxis stroke={isLight ? '#64748b' : '#64748b'} fontSize={10} tickLine={false} />
+                                  <Tooltip content={<CustomChartTooltip />} cursor={{ fill: isLight ? '#f8fafc' : 'rgba(255,255,255,0.02)' }} />
+                                  <Legend iconType="circle" wrapperStyle={{ fontSize: 10, paddingTop: 10 }} />
+                                  <Bar dataKey="Planifié" name="Volume Planifié" radius={[4, 4, 0, 0]}>
+                                    {teacherChartData.map((entry, index) => {
+                                      const teachColor = statistics.teachStats[index]?.color || '#10b981';
+                                      return <Cell key={`cell-teach-${index}`} fill={teachColor} />;
+                                    })}
+                                  </Bar>
+                                  <Bar dataKey="Quota" fill="#475569" opacity={0.6} radius={[4, 4, 0, 0]} name="Quota Contractuel" />
+                                </RechartsBarChart>
+                              </ResponsiveContainer>
+                            )}
+                          </div>
+                        </div>
+
+                      </div>
+
+                      {/* BOTTOM SECTIONS: REPARTITION DISCIPLINE AND CRITICAL ALERTS LIST */}
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                        {/* DISCIPLINE HOUR BREAKDOWN */}
+                        <div className={`lg:col-span-5 p-6 rounded-2xl backdrop-blur-xl border flex flex-col justify-between ${isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'
+                          }`}>
+                          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                            <div>
+                              <h3 className={`text-sm font-bold mb-1 flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                                <BookOpen className="w-4.5 h-4.5 text-amber-500" />
+                                <span>Répartition des Disciplines</span>
+                              </h3>
+                              <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
+                                {"Proportions relatives des volumes horaires dispensés par matière."}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setChefDetailModalType('subjects')}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-105 active:scale-95 shrink-0 ${isLight
+                                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200'
+                                  : 'bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 hover:text-white border border-amber-500/30'
+                                }`}
+                              title="Ouvrir le graphique global des matières avec explications détaillées"
+                            >
+                              <Maximize2 className="w-3.5 h-3.5 text-amber-500" />
+                              <span>PLUS DE DÉTAILS</span>
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center">
+                            {/* The Donut Chart */}
+                            <div className="sm:col-span-5 h-44 flex justify-center relative">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                  <Pie
+                                    data={subjectHoursData}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={45}
+                                    outerRadius={62}
+                                    paddingAngle={3}
+                                    dataKey="value"
+                                  >
+                                    {subjectHoursData.map((entry, index) => (
+                                      <Cell key={`cell-pie-${index}`} fill={SUBJECT_COLORS[index % SUBJECT_COLORS.length]} />
+                                    ))}
+                                  </Pie>
+                                  <Tooltip formatter={(value) => [`${value}h`, 'Volume Total']} />
+                                </PieChart>
+                              </ResponsiveContainer>
+                              {/* Centered Total label inside Donut */}
+                              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                <span className={`text-[10px] uppercase font-bold ${isLight ? 'text-slate-400' : 'text-gray-500'}`}>Total</span>
+                                <span className={`text-base font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>{totalPlannedHours}h</span>
+                              </div>
+                            </div>
+
+                            {/* Custom visual legend */}
+                            <div className="sm:col-span-7 space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                              {subjectHoursData.length === 0 ? (
+                                <p className={`text-xs italic ${isLight ? 'text-slate-500 font-normal' : 'text-gray-500'}`}>Aucune matière planifiée.</p>
+                              ) : (
+                                subjectHoursData.map((s, idx) => {
+                                  const percent = totalPlannedHours > 0 ? Math.round((s.value / totalPlannedHours) * 100) : 0;
+                                  return (
+                                    <div key={idx} className="flex items-center justify-between text-xs font-medium">
+                                      <div className="flex items-center gap-1.5 truncate max-w-[120px]">
+                                        <span
+                                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                                          style={{ backgroundColor: SUBJECT_COLORS[idx % SUBJECT_COLORS.length] }}
+                                        />
+                                        <span className={`truncate ${isLight ? 'text-slate-700' : 'text-gray-300'}`} title={s.name}>{s.name}</span>
+                                      </div>
+                                      <span className={`font-mono text-[10px] ${isLight ? 'text-slate-500' : 'text-gray-500'}`}>
+                                        {s.value}h ({percent}%)
+                                      </span>
+                                    </div>
                                   );
                                 })
                               )}
                             </div>
                           </div>
-                        )}
-                      </div>
+                        </div>
 
-                      {/* INTERACTIVE TEACHER TIME EXCLUSION GRID */}
-                      <div className="border-t border-white/10 pt-4">
-                        <label className="block text-xs uppercase text-indigo-300 font-mono tracking-wider font-bold mb-1">
-                          Temps libres & Exclusions Prof
-                        </label>
-                        <p className="text-[10px] text-gray-400 mb-3 leading-snug">
-                          {"Cliquetez pour griser (X) les plages horaires d'indisponibilité absolue de cet enseignant (ex: temps partiel ou charges extérieures)."}
-                        </p>
-
-                        <div 
-                          className="grid gap-1 bg-slate-950/60 p-2.5 rounded-xl border border-white/10 select-none text-center"
-                          style={{ gridTemplateColumns: `repeat(${activeDays.length + 1}, minmax(0, 1fr))` }}
-                        >
-                          {/* Hour labels header column */}
-                          <div className="text-[9px] text-gray-500 font-mono flex items-center justify-center">Jour</div>
-                          {activeDays.map(d => (
-                            <div key={d} className="text-[9px] font-sans font-bold text-gray-300">
-                              {d.substring(0, 3)}
+                        {/* SUPERVISOR AUDIT & ALERTS */}
+                        <div className={`lg:col-span-7 p-6 rounded-2xl backdrop-blur-xl border flex flex-col justify-between ${isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'
+                          }`}>
+                          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                            <div>
+                              <h3 className={`text-sm font-bold mb-1 flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                                <AlertCircle className="w-4.5 h-4.5 text-rose-500" />
+                                <span>{"Registre d'Audit & Alertes de Planification"}</span>
+                              </h3>
+                              <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
+                                {"Conflits, sous-charges ou dépassements de volumes détectés automatiquement par notre moteur."}
+                              </p>
                             </div>
-                          ))}
+                            <button
+                              type="button"
+                              onClick={() => setChefDetailModalType('weekly_load')}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-105 active:scale-95 shrink-0 ${isLight
+                                  ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                  : 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 hover:text-white border border-emerald-500/30'
+                                }`}
+                              title="Ouvrir le graphique de charge hebdomadaire par jour"
+                            >
+                              <Maximize2 className="w-3.5 h-3.5 text-emerald-500" />
+                              <span>PLUS DE DÉTAILS</span>
+                            </button>
+                          </div>
 
-                          {/* Render slots rows */}
-                          {slotLabels.map((slotLabel, sIdx) => (
-                            <React.Fragment key={sIdx}>
-                              <div className="text-[8px] text-gray-500 font-mono flex items-center justify-center py-0.5" title={slotLabel}>
-                                {slotLabel.split(' - ')[0]}
+                          <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+                            {criticalAlerts.length === 0 ? (
+                              <div className={`p-6 text-center rounded-xl font-medium flex flex-col items-center justify-center gap-1.5 h-[160px] ${isLight ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-emerald-500/5 border border-emerald-500/10 text-emerald-400'
+                                }`}>
+                                <span className={`w-8 h-8 rounded-full flex items-center justify-center animate-pulse text-lg font-bold ${isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500/15 text-emerald-400'
+                                  }`}>✓</span>
+                                <div>
+                                  <p className={`text-xs font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>Établissement 100% Conforme !</p>
+                                  <p className={`text-xs leading-relaxed mt-0.5 ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>Aucune surcharge ou anomalie de quota horaire détectée.</p>
+                                </div>
                               </div>
-                              {activeDays.map(day => {
-                                const isUn = newTeacherUnavail.some(u => u.day === day && u.slotIndex === sIdx);
-                                return (
-                                  <button
-                                    type="button"
-                                    key={day}
-                                    onClick={() => toggleTeacherFormUnavailability(day, sIdx)}
-                                    className={`w-full aspect-square text-[9px] font-bold rounded transition-all cursor-pointer ${
-                                      isUn 
-                                        ? 'bg-red-500/40 text-white border border-red-500/30' 
-                                        : 'bg-white/5 hover:bg-white/10 text-gray-500 border border-transparent'
+                            ) : (
+                              criticalAlerts.map((alert) => (
+                                <div
+                                  key={alert.id}
+                                  className={`p-3.5 rounded-xl border-l-4 flex gap-3 text-xs font-medium leading-relaxed ${alert.severity === 'error'
+                                      ? isLight
+                                        ? 'bg-rose-50 border-rose-200 border-l-rose-500 text-rose-800'
+                                        : 'bg-rose-500/10 border-rose-500/20 border-l-rose-500 text-rose-300'
+                                      : isLight
+                                        ? 'bg-amber-50 border-amber-200 border-l-amber-500 text-amber-800'
+                                        : 'bg-amber-500/10 border-amber-500/20 border-l-amber-500 text-amber-300'
                                     }`}
-                                    title={`${day} - ${slotLabel} : ${isUn ? 'Exclu' : 'Libre'}`}
-                                  >
-                                    {isUn ? 'X' : ''}
-                                  </button>
-                                );
-                              })}
-                            </React.Fragment>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* SUBMIT BUTTON */}
-                      <div className="pt-4 flex gap-2">
-                        {editingTeacherId && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingTeacherId(null);
-                              setNewTeacherName('');
-                              setNewTeacherSubjects([]);
-                              setNewTeacherQuota(18);
-                              setNewTeacherUnavail([]);
-                            }}
-                            className="flex-1 py-2.5 rounded-xl border border-white/10 text-xs text-gray-300 hover:bg-white/5 transition-colors cursor-pointer font-medium"
-                          >
-                            Annuler
-                          </button>
-                        )}
-                        <button
-                          type="submit"
-                          className="flex-[2] py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/25 transition-all hover:-translate-y-0.5 flex items-center justify-center gap-1.5 cursor-pointer"
-                        >
-                          <Check className="w-4 h-4" />
-                          <span>{editingTeacherId ? "Mettre à jour" : "Enregistrer ce Professeur"}</span>
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-
-                  {/* RIGHT: LIST OF TEACHERS */}
-                  <div className="lg:col-span-7 space-y-4">
-                    <h3 className="text-xs font-mono tracking-wider text-indigo-400 uppercase mb-4 font-bold">
-                      Corps Enseignant Actuel
-                    </h3>
-
-                    {teachers.length === 0 ? (
-                      <div className="p-8 text-center rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl italic text-gray-400 text-sm">
-                        Aucun enseignant créé. Veuillez saisir les informations de gauche.
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {teachers.map(t => {
-                          const activeAllocatedHours = timetable.filter(e => e.teacherId === t.id).length;
-                          const mappedSubjectsList = t.subjectIds.map(sid => subjects.find(s => s.id === sid)?.name || sid).join(', ');
-
-                          return (
-                            <div key={t.id} className="p-5 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 hover:border-white/20 transition-all shadow-xl flex flex-col justify-between" style={{ borderLeft: `4px solid ${t.color}` }}>
-                              <div>
-                                <div className="flex items-center justify-between mb-3">
-                                  <h4 className="font-bold text-white text-base">{t.name}</h4>
-                                  <span className="text-[10px] uppercase font-mono px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-bold">
-                                    Quota : {t.weeklyQuota}h
-                                  </span>
-                                </div>
-
-                                <div className="space-y-2 text-xs">
+                                >
+                                  <span className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${alert.severity === 'error' ? 'bg-rose-500' : 'bg-amber-500'}`} />
                                   <div>
-                                    <span className="text-gray-400 block text-[10px] font-mono uppercase tracking-wider font-semibold">Matières</span>
-                                    <span className="text-gray-200 font-medium">{mappedSubjectsList || 'Aucune matière liée'}</span>
-                                  </div>
-
-                                  <div className="pt-2">
-                                    <span className="text-gray-400 block text-[10px] font-mono uppercase tracking-wider mb-1 font-semibold">Charge Planifiée</span>
-                                    <div className="flex items-center gap-2">
-                                      <div className="flex-1 h-2 bg-slate-950 rounded-full overflow-hidden border border-white/5">
-                                        <div 
-                                          className="h-full rounded-full transition-all duration-300" 
-                                          style={{ 
-                                            width: `${Math.min((activeAllocatedHours / t.weeklyQuota) * 100, 100)}%`,
-                                            backgroundColor: t.color 
-                                          }} 
-                                        />
-                                      </div>
-                                      <span className="font-mono text-xs text-slate-300 font-bold shrink-0">
-                                        {activeAllocatedHours} / {t.weeklyQuota}h
-                                      </span>
-                                    </div>
+                                    <p className={`text-[11px] font-bold uppercase tracking-wider mb-0.5 font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                                      {alert.type === 'class' ? 'Alerte Classe' : 'Alerte Professeur'}
+                                    </p>
+                                    <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>{alert.message}</p>
                                   </div>
                                 </div>
-                              </div>
-
-                              <div className="flex items-center justify-between pt-4 border-t border-white/10 mt-5">
-                                <span className="text-[10px] text-gray-400 font-mono font-medium">
-                                  ❌ {t.unavailability?.length || 0} slots exclus
-                                </span>
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => handleEditTeacherClick(t)}
-                                    className="p-1 px-2.5 text-xs bg-indigo-500/10 text-indigo-400 rounded-lg hover:bg-indigo-500/20 hover:text-indigo-300 border border-indigo-500/20 transition-all font-semibold cursor-pointer"
-                                  >
-                                    Modifier
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteTeacher(t.id, t.name)}
-                                    className="text-red-400 hover:text-red-300 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
-                                  >
-                                    <Trash className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* BOTTOM NAVIGATION CALL-TO-ACTION (PASSAGE ÉTAPE 4) */}
-                <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900/90 via-indigo-950/40 to-slate-900/90 backdrop-blur-xl border border-indigo-500/30 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 text-left">
-                    <div className="p-3 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
-                      <GraduationCap className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white">Corps professoral configuré</h4>
-                      <p className="text-xs text-gray-400">Vous avez enregistré <strong className="text-indigo-300 font-mono">{teachers.length}</strong> enseignant(s). Passez à la configuration des classes et affectations.</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      triggerNotification("Étape 3 validée ! Passage à l'Étape 4 (Classes).", "success");
-                      setActiveTab('classes');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="w-full sm:w-auto py-3.5 px-6 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-600 to-indigo-600 hover:from-indigo-400 hover:via-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 cursor-pointer group border border-indigo-400/30 shrink-0"
-                  >
-                    <span>👉 Passer à l'Étape 4 : Classes & Affectations</span>
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform animate-pulse" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 4: SUBJECTS MANAGEMENT */}
-            {activeTab === 'subjects' && (
-              <div className="space-y-6">
-                
-                {/* HEADER BANNER WITH STEP-BY-STEP BEGINNER GUIDE */}
-                <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
-                  <div className={`flex items-center justify-between gap-4 flex-wrap pb-4 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
-                    <div className="flex items-center gap-4">
-                      <div className={`p-3 rounded-2xl border shrink-0 ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'}`}>
-                        <BookOpen className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h2 className={`text-lg font-bold flex items-center gap-2 flex-wrap ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span>Étape 2 : Référentiel des Matières d'Enseignement</span>
-                          <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${isLight ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'}`}>
-                            Disciplines & Couleurs
-                          </span>
-                        </h2>
-                        <p className={`text-sm mt-0.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
-                          Enregistrez la liste de toutes les disciplines proposées dans votre école et associez-leur des couleurs visuelles.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* GUIDE DÉBUTANT PAS-À-PAS */}
-                  <div className={`rounded-xl p-4 border ${isLight ? 'bg-blue-50/60 border-blue-200/80' : 'bg-slate-950/50 border-indigo-500/20'}`}>
-                    <div className={`flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider mb-2.5 ${isLight ? 'text-blue-600' : 'text-indigo-300'}`}>
-                      <Sparkles className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-indigo-400'}`} />
-                      <span className="font-bold">Guide Débutant : Ce que vous devez faire sur cette étape</span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
-                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>1</span>
-                          <span className="font-bold">Nommer la matière</span>
+                              ))
+                            )}
+                          </div>
                         </div>
-                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Écrivez le nom de la matière dans le formulaire de gauche (ex: Mathématiques, Français, SVT).
-                        </p>
-                      </div>
-                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
-                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>2</span>
-                          <span className="font-bold">Choisir une couleur</span>
-                        </div>
-                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Cliquez sur une pastille de couleur pour identifier visuellement les cours sur l'emploi du temps.
-                        </p>
-                      </div>
-                      <div className={`p-3.5 rounded-xl border space-y-1.5 ${isLight ? 'bg-white border-blue-100/80 shadow-xs' : 'bg-white/[0.02] border-white/5'}`}>
-                        <div className={`font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                          <span className={`w-5 h-5 rounded-full text-[11px] font-mono flex items-center justify-center font-bold ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-indigo-500/20 text-indigo-300'}`}>3</span>
-                          <span className="font-bold">Valider & Continuer</span>
-                        </div>
-                        <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>
-                          Cliquez sur "Ajouter la matière". Une fois toutes vos matières saisies, passez à l'Étape 3 (Professeurs).
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-                  
-                  {/* CREATE SUBJECT FORM */}
-                  <div className="md:col-span-5 p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl">
-                    <h3 className="text-xs font-mono tracking-wider text-indigo-400 uppercase mb-4 font-bold">
-                      Ajouter une Discipline
-                    </h3>
-
-                    <form onSubmit={handleAddSubject} className="space-y-4">
-                      <div>
-                        <label className="block text-xs text-gray-300 mb-1.5 font-medium">Libellé complet de la matière</label>
-                        <input
-                          type="text"
-                          placeholder="Ex: Mathématiques, Sciences Physiques"
-                          value={newSubName}
-                          onChange={(e) => setNewSubName(e.target.value)}
-                          className="w-full bg-slate-950/80 border border-white/10 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 transition-colors shadow-inner"
-                        />
                       </div>
 
-                      <button
-                        type="submit"
-                        className="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/25 transition-all hover:-translate-y-0.5 flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Agréger la Matière
-                      </button>
-                    </form>
-                  </div>
-
-                  {/* DISPLAY SUBJECT CARDS */}
-                  <div className="md:col-span-7 p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl">
-                    <h3 className="text-xs font-mono tracking-wider text-indigo-400 uppercase mb-4 font-bold">
-                      Disciplines Enregistrées
-                    </h3>
-
-                    {subjects.length === 0 ? (
-                      <p className="text-sm text-gray-400 italic text-center py-6">Aucune matière enregistrée.</p>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[460px] overflow-y-auto pr-1">
-                        {subjects.map(s => {
-                          const teachersQualified = teachers.filter(t => t.subjectIds.includes(s.id));
-                          return (
-                            <div key={s.id} className="p-4 rounded-xl bg-slate-950/50 border border-white/10 hover:border-white/20 transition-all flex items-center justify-between group">
-                              <div>
-                                <h4 className="font-bold text-white text-sm">{s.name}</h4>
-                                <span className="text-[10px] text-gray-400 font-mono font-medium">
-                                  {teachersQualified.length} enseignant(s) rattaché(s)
-                                </span>
-                              </div>
-
-                              <button
-                                onClick={() => handleDeleteSubject(s.id, s.name)}
-                                className="text-gray-400 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
-                                title="Supprimer"
-                              >
-                                <Trash className="w-4 h-4" />
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* BOTTOM NAVIGATION CALL-TO-ACTION (PASSAGE ÉTAPE 3) */}
-                <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900/90 via-indigo-950/40 to-slate-900/90 backdrop-blur-xl border border-indigo-500/30 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 text-left">
-                    <div className="p-3 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
-                      <BookOpen className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white">Vos matières sont enregistrées ?</h4>
-                      <p className="text-xs text-gray-400">Vous avez configuré <strong className="text-indigo-300 font-mono">{subjects.length}</strong> discipline(s). Passez à la création du corps enseignant.</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      triggerNotification("Étape 2 validée ! Passage à l'Étape 3 (Professeurs).", "success");
-                      setActiveTab('teachers');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="w-full sm:w-auto py-3.5 px-6 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-600 to-indigo-600 hover:from-indigo-400 hover:via-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 cursor-pointer group border border-indigo-400/30 shrink-0"
-                  >
-                    <span>👉 Passer à l'Étape 3 : Fiches Professeurs</span>
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform animate-pulse" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 5: CHEF D'ÉTABLISSEMENT VIEW (STATS SYNTHESIS & EXECUTIVE DASHBOARD) */}
-            {activeTab === 'stats' && isMounted && (() => {
-              const {
-                totalPlannedHours,
-                totalTargetHours,
-                globalCompletionRatio,
-                conformingTeachersCount,
-                underloadedTeachersCount,
-                overloadedTeachersCount,
-                subjectHoursData,
-                topSubject,
-                classChartData,
-                teacherChartData
-              } = dashboardMetrics;
-
-              // Color constant palette for subject breakdown
-              const SUBJECT_COLORS = [
-                '#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#06b6d4', 
-                '#8b5cf6', '#d946ef', '#ec4899', '#14b8a6', '#f97316'
-              ];
-
-              // Custom tooltip styling matching dark/light themes
-              const CustomChartTooltip = ({ active, payload, label }: any) => {
-                if (active && payload && payload.length) {
-                  return (
-                    <div className={`p-2.5 rounded-xl shadow-xl backdrop-blur-md border ${
-                      isLight ? 'bg-white/95 border-slate-200 text-slate-700' : 'bg-slate-950/95 border-white/10 text-white'
-                    }`}>
-                      <p className={`text-[11px] font-semibold mb-1 pb-1 border-b font-sans ${
-                        isLight ? 'text-slate-800 border-slate-100' : 'text-white border-white/5'
-                      }`}>{label}</p>
-                      {payload.map((item: any, index: number) => (
-                        <p key={index} className={`text-[10px] font-mono flex items-center gap-1.5 font-normal ${
-                          isLight ? 'text-slate-600' : ''
-                        }`} style={{ color: !isLight ? (item.color || item.fill || '#cbd5e1') : undefined }}>
-                          <span className="w-1.5 h-1.5 rounded-full inline-block shrink-0" style={{ backgroundColor: item.color || item.fill || '#64748b' }} />
-                          <span>{item.name} : <span className="font-normal">{item.value}h</span></span>
-                        </p>
-                      ))}
                     </div>
                   );
-                }
-                return null;
-              };
+                })()}
 
-              // Identify critical alerts
-              const criticalAlerts: { id: string; type: 'class' | 'teacher'; message: string; severity: 'error' | 'warning' }[] = [];
+                {/* TAB 6: AI GEMINI COMPANION ADVISING DOCK */}
+                {activeTab === 'ai' && (
+                  <div className="space-y-6">
 
-              statistics.classStats.forEach(c => {
-                const diff = c.assigned - c.targetHours;
-                if (diff < 0) {
-                  criticalAlerts.push({
-                    id: `class-under-${c.id}`,
-                    type: 'class',
-                    message: `La classe ${c.name} est sous-planifiée : manque ${Math.abs(diff)}h de cours pour atteindre son quota réglementaire.`,
-                    severity: 'error'
-                  });
-                } else if (diff > 0) {
-                  criticalAlerts.push({
-                    id: `class-over-${c.id}`,
-                    type: 'class',
-                    message: `La classe ${c.name} est sur-planifiée : excès de +${diff}h au-delà du volume requis.`,
-                    severity: 'warning'
-                  });
-                }
-              });
-
-              statistics.teachStats.forEach(t => {
-                const diff = t.assigned - t.weeklyQuota;
-                if (diff < 0) {
-                  criticalAlerts.push({
-                    id: `teacher-under-${t.id}`,
-                    type: 'teacher',
-                    message: `L'enseignant ${t.name} est en sous-charge contractuelle de ${Math.abs(diff)}h (${t.assigned}h faites sur ${t.weeklyQuota}h contractées).`,
-                    severity: 'warning'
-                  });
-                } else if (diff > 0) {
-                  criticalAlerts.push({
-                    id: `teacher-over-${t.id}`,
-                    type: 'teacher',
-                    message: `L'enseignant ${t.name} est en surcharge de +${diff}h au-dessus de son quota de ${t.weeklyQuota}h.`,
-                    severity: 'error'
-                  });
-                }
-              });
-
-              // Quality Tag for Score
-              let qualityLabel = "Excellent";
-              let qualityBg = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
-              if (generationScore < 75) {
-                qualityLabel = "À optimiser";
-                qualityBg = "bg-rose-500/10 text-rose-400 border border-rose-500/20";
-              } else if (generationScore < 90) {
-                qualityLabel = "Très Bon";
-                qualityBg = "bg-amber-500/10 text-amber-400 border border-amber-500/20";
-              }
-
-              return (
-                <div className="space-y-6 pb-12">
-                  
-                  {/* DYNAMIC HEADER OVERVIEW */}
-                  <div className={`p-6 rounded-2xl backdrop-blur-xl border flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden ${
-                    isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'
-                  }`}>
-                    <div className="absolute top-0 right-0 w-80 h-40 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-                    
-                    <div className="space-y-1 z-10">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[10px] uppercase tracking-widest font-mono px-3 py-1 rounded-full font-bold ${
-                          isLight ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/25'
-                        }`}>
-                          Tableau de Bord Exécutif
-                        </span>
-                        <span className={`text-[10px] uppercase tracking-wider font-mono px-3 py-1 rounded-full font-bold ${qualityBg}`}>
-                          {qualityLabel}
-                        </span>
-                      </div>
-                      <h2 className={`text-xl font-bold tracking-tight flex items-center gap-2 mt-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                        <Award className="w-6 h-6 text-indigo-500" />
-                        <span>{"Contrôle Global du Chef d'Établissement"}</span>
-                      </h2>
-                      <p className={`text-xs leading-relaxed max-w-2xl ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
-                        {"Analysez la répartition des heures, détectez les écarts contractuels et supervisez l'avancement global du planning de vos divisions d'un seul coup d'œil."}
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3 shrink-0 z-10">
-                      <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!currentPlan.features.pdfExport) {
-                              triggerNotification("L'export PDF des rapports statistiques requiert la formule supérieure.", "error");
-                              setIsClientSubModalOpen(true);
-                              return;
-                            }
-                            setChefDetailModalType('weekly_load');
-                          }}
-                          className={`px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer hover:-translate-y-0.5 ${
-                            isLight 
-                              ? 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200' 
-                              : 'bg-red-950/40 hover:bg-red-900/50 text-red-300 border border-red-500/30'
-                          }`}
-                          title="Télécharger le rapport statistique complet au format PDF"
-                        >
-                          <Download className={`w-3.5 h-3.5 ${isLight ? 'text-red-600' : 'text-red-400'}`} />
-                          <span>Rapport PDF (Stats)</span>
-                          {!currentPlan.features.pdfExport && (
-                            <span className={`flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded font-mono ml-0.5 ${
-                              isLight ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                            }`}>
-                              <Lock className="w-2.5 h-2.5" /> VIP
-                            </span>
-                          )}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!currentPlan.features.excelExport) {
-                              triggerNotification("L'export Excel (.xlsx) des statistiques requiert la formule supérieure.", "error");
-                              setIsClientSubModalOpen(true);
-                              return;
-                            }
-                            setChefDetailModalType('weekly_load');
-                          }}
-                          className={`px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer hover:-translate-y-0.5 ${
-                            isLight 
-                              ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                              : 'bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border border-emerald-500/30'
-                          }`}
-                          title="Télécharger toutes les données analytiques au format Excel (.xlsx)"
-                        >
-                          <FileSpreadsheet className={`w-3.5 h-3.5 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
-                          <span>Données Excel (Stats)</span>
-                          {!currentPlan.features.excelExport && (
-                            <span className={`flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded font-mono ml-0.5 ${
-                              isLight ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                            }`}>
-                              <Lock className="w-2.5 h-2.5" /> VIP
-                            </span>
-                          )}
-                        </button>
-                      </div>
-
-                      <div className={`p-3.5 rounded-2xl font-mono text-center shadow-lg relative min-w-[120px] ${
-                        isLight ? 'bg-indigo-50/70 border border-indigo-200' : 'bg-slate-950/70 border border-indigo-500/30'
-                      }`}>
-                        <span className={`block text-[9px] uppercase font-bold mb-0.5 tracking-wider ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>Index Qualité</span>
-                        <span className="text-2xl font-extrabold bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">
-                          {generationScore}%
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 4 CARDS GRID - LIGHT/DARK MODE */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* KPI 1: Violet/Indigo */}
-                    <div className="rounded-xl overflow-hidden bg-gradient-to-r from-purple-500 to-indigo-500 shadow-md p-5 text-white relative h-32 flex flex-col justify-between">
-                      <div className="absolute top-4 right-4 opacity-10">
-                         <Users className="w-16 h-16" />
-                      </div>
-                      <p className="text-sm font-medium z-10 relative !text-white">Couverture Classes</p>
-                      <h3 className="text-3xl font-bold z-10 relative !text-white">{globalCompletionRatio}%</h3>
-                      <div className="flex items-center justify-between text-[11px] z-10 relative opacity-100 !text-white mt-1 font-medium">
-                        <span>{totalPlannedHours}h planifiées</span>
-                        <span>Objectif {totalTargetHours}h</span>
-                      </div>
-                      <div className="absolute bottom-0 left-0 w-full h-1 bg-white/20">
-                         <div className="h-full bg-white/50 rounded-r-full" style={{ width: `${globalCompletionRatio}%` }} />
-                      </div>
-                    </div>
-
-                    {/* KPI 2: Bleu clair/Cyan */}
-                    <div className="rounded-xl overflow-hidden bg-gradient-to-r from-sky-400 to-blue-500 shadow-md p-5 text-white relative h-32 flex flex-col justify-between">
-                      <div className="absolute top-4 right-4 opacity-10">
-                         <CheckCircle2 className="w-16 h-16" />
-                      </div>
-                      <p className="text-sm font-medium z-10 relative !text-white">Profs Conformes</p>
-                      <h3 className="text-3xl font-bold z-10 relative !text-white">{conformingTeachersCount} / {teachers.length || 1}</h3>
-                      <div className="flex items-center justify-between text-[11px] z-10 relative opacity-100 !text-white mt-1 font-medium">
-                        <span>-{underloadedTeachersCount} ss-ch.</span>
-                        <span>+{overloadedTeachersCount} sur-ch.</span>
-                      </div>
-                      <div className="absolute bottom-0 left-0 w-full h-1 bg-white/20">
-                         <div className="h-full bg-white/50 rounded-r-full" style={{ width: `${(conformingTeachersCount / (teachers.length || 1)) * 100}%` }} />
-                      </div>
-                    </div>
-
-                    {/* KPI 3: Orange/Rouge */}
-                    <div className="rounded-xl overflow-hidden bg-gradient-to-r from-orange-400 to-red-400 shadow-md p-5 text-white relative h-32 flex flex-col justify-between">
-                      <div className="absolute top-4 right-4 opacity-10">
-                         <BookOpen className="w-16 h-16" />
-                      </div>
-                      <p className="text-sm font-medium z-10 relative !text-white">Matière Dominante</p>
-                      <h3 className="text-2xl font-bold z-10 relative truncate max-w-[150px] overflow-hidden whitespace-nowrap block !text-white" title={topSubject.name}>{topSubject.name || '-'}</h3>
-                      <div className="flex items-center justify-between text-[11px] z-10 relative opacity-100 !text-white mt-1 font-medium">
-                        <span>{topSubject.value}h hebdo</span>
-                      </div>
-                      <div className="absolute bottom-0 left-0 w-full h-1 bg-white/20">
-                         <div className="h-full bg-white/50 rounded-r-full" style={{ width: `${totalPlannedHours > 0 ? (topSubject.value / totalPlannedHours) * 100 : 0}%` }} />
-                      </div>
-                    </div>
-
-                    {/* KPI 4: Vert */}
-                    <div className="rounded-xl overflow-hidden bg-gradient-to-r from-emerald-400 to-green-500 shadow-md p-5 text-white relative h-32 flex flex-col justify-between">
-                      <div className="absolute top-4 right-4 opacity-10">
-                         <FileText className="w-16 h-16" />
-                      </div>
-                      <p className="text-sm font-medium z-10 relative !text-white">Classes Complètes</p>
-                      <h3 className="text-3xl font-bold z-10 relative !text-white">{statistics.classStats.filter(c => c.assigned === c.targetHours).length}</h3>
-                      <div className="flex items-center justify-between text-[11px] z-10 relative opacity-100 !text-white mt-1 font-medium">
-                        <span>sur {classes.length} divisions</span>
-                      </div>
-                      <div className="absolute bottom-0 left-0 w-full h-1 bg-white/20">
-                         <div className="h-full bg-white/50 rounded-r-full" style={{ width: `${(statistics.classStats.filter(c => c.assigned === c.targetHours).length / (classes.length || 1)) * 100}%` }} />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* MIDDLE SECTION: Line Chart & Donut / Bar Charts Grid */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    
-                    {/* CHART 1: CLASS HOURS COMPARATIVE */}
-                    <div className={`p-6 rounded-2xl backdrop-blur-xl border ${
-                      isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'
-                    }`}>
-                      <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+                    {/* LOADER / ACTION REASONING SUMMARY */}
+                    {isExecutingAi && (
+                      <div className="p-5 rounded-2xl bg-indigo-950/30 border border-indigo-500/20 text-white flex items-center gap-4 animate-pulse">
+                        <RefreshCw className="w-5 h-5 text-indigo-400 animate-spin shrink-0" />
                         <div>
-                          <h3 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                            <Building2 className="w-4.5 h-4.5 text-indigo-500" />
-                            <span>Couverture Horaire des Divisions</span>
-                          </h3>
-                          <p className={`text-xs leading-relaxed mt-0.5 ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
-                            {"Comparaison entre les heures planifiées et les volumes horaires visés par classe."}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setChefDetailModalType('classes')}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-105 active:scale-95 ${
-                              isLight 
-                                ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200' 
-                                : 'bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 hover:text-white border border-indigo-500/30'
-                            }`}
-                            title="Ouvrir le graphique global de toutes les classes avec explications simples"
-                          >
-                            <Maximize2 className="w-3.5 h-3.5 text-indigo-500" />
-                            <span>PLUS DE DÉTAILS</span>
-                          </button>
-                          <span className={`text-[10px] font-mono px-2.5 py-1 rounded-full font-bold hidden sm:inline-block ${
-                            isLight ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-                          }`}>
-                            Heures / Semaine
-                          </span>
+                          <h4 className="font-bold text-sm text-indigo-300">{"L'Agent IA est à l'œuvre..."}</h4>
+                          <p className="text-xs text-gray-400 mt-0.5">{"Re-calcul et relocalisation des cours dans l'emploi du temps."}</p>
                         </div>
                       </div>
-
-                      <div className="h-72 w-full">
-                        {classChartData.length === 0 ? (
-                          <div className={`h-full flex items-center justify-center text-xs italic ${isLight ? 'text-slate-400' : 'text-gray-500'}`}>
-                            Aucune donnée de classe disponible.
-                          </div>
-                        ) : (
-                          <ResponsiveContainer width="100%" height="100%">
-                            <RechartsBarChart data={classChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke={isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)'} vertical={false} />
-                              <XAxis dataKey="name" stroke={isLight ? '#64748b' : '#64748b'} fontSize={10} tickLine={false} />
-                              <YAxis stroke={isLight ? '#64748b' : '#64748b'} fontSize={10} tickLine={false} />
-                              <Tooltip content={<CustomChartTooltip />} cursor={{ fill: isLight ? '#f8fafc' : 'rgba(255,255,255,0.02)' }} />
-                              <Legend iconType="circle" wrapperStyle={{ fontSize: 10, paddingTop: 10 }} />
-                              <Bar dataKey="Planifié" fill="#10b981" radius={[4, 4, 0, 0]} name="Volume Planifié" />
-                              <Bar dataKey="Cible" fill="#6366f1" radius={[4, 4, 0, 0]} name="Volume Cible Visé" />
-                            </RechartsBarChart>
-                          </ResponsiveContainer>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* CHART 2: TEACHERS RESPECT CONTROLLER */}
-                    <div className={`p-6 rounded-2xl backdrop-blur-xl border ${
-                      isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'
-                    }`}>
-                      <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
-                        <div>
-                          <h3 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                            <Users className="w-4.5 h-4.5 text-emerald-500" />
-                            <span>Charges Enseignants vs Contrats</span>
-                          </h3>
-                          <p className={`text-xs leading-relaxed mt-0.5 ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
-                            {"Suivi des heures de cours hebdomadaires attribuées comparées aux quotas contractuels."}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setChefDetailModalType('teachers')}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-105 active:scale-95 ${
-                              isLight 
-                                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                                : 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 hover:text-white border border-emerald-500/30'
-                            }`}
-                            title="Ouvrir le graphique global des enseignants avec audit et explications textuelles"
-                          >
-                            <Maximize2 className="w-3.5 h-3.5 text-emerald-500" />
-                            <span>PLUS DE DÉTAILS</span>
-                          </button>
-                          <span className={`text-[10px] font-mono px-2.5 py-1 rounded-full font-bold hidden sm:inline-block ${
-                            isLight ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                          }`}>
-                            Code Couleur Dédié
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="h-72 w-full">
-                        {teacherChartData.length === 0 ? (
-                          <div className={`h-full flex items-center justify-center text-xs italic ${isLight ? 'text-slate-400' : 'text-gray-500'}`}>
-                            Aucune donnée de professeur disponible.
-                          </div>
-                        ) : (
-                          <ResponsiveContainer width="100%" height="100%">
-                            <RechartsBarChart data={teacherChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke={isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)'} vertical={false} />
-                              <XAxis dataKey="name" stroke={isLight ? '#64748b' : '#64748b'} fontSize={10} tickLine={false} />
-                              <YAxis stroke={isLight ? '#64748b' : '#64748b'} fontSize={10} tickLine={false} />
-                              <Tooltip content={<CustomChartTooltip />} cursor={{ fill: isLight ? '#f8fafc' : 'rgba(255,255,255,0.02)' }} />
-                              <Legend iconType="circle" wrapperStyle={{ fontSize: 10, paddingTop: 10 }} />
-                              <Bar dataKey="Planifié" name="Volume Planifié" radius={[4, 4, 0, 0]}>
-                                {teacherChartData.map((entry, index) => {
-                                  const teachColor = statistics.teachStats[index]?.color || '#10b981';
-                                  return <Cell key={`cell-teach-${index}`} fill={teachColor} />;
-                                })}
-                              </Bar>
-                              <Bar dataKey="Quota" fill="#475569" opacity={0.6} radius={[4, 4, 0, 0]} name="Quota Contractuel" />
-                            </RechartsBarChart>
-                          </ResponsiveContainer>
-                        )}
-                      </div>
-                    </div>
-
-                  </div>
-
-                  {/* BOTTOM SECTIONS: REPARTITION DISCIPLINE AND CRITICAL ALERTS LIST */}
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                    
-                    {/* DISCIPLINE HOUR BREAKDOWN */}
-                    <div className={`lg:col-span-5 p-6 rounded-2xl backdrop-blur-xl border flex flex-col justify-between ${
-                      isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'
-                    }`}>
-                      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-                        <div>
-                          <h3 className={`text-sm font-bold mb-1 flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                            <BookOpen className="w-4.5 h-4.5 text-amber-500" />
-                            <span>Répartition des Disciplines</span>
-                          </h3>
-                          <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
-                            {"Proportions relatives des volumes horaires dispensés par matière."}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setChefDetailModalType('subjects')}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-105 active:scale-95 shrink-0 ${
-                            isLight 
-                              ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200' 
-                              : 'bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 hover:text-white border border-amber-500/30'
-                          }`}
-                          title="Ouvrir le graphique global des matières avec explications détaillées"
-                        >
-                          <Maximize2 className="w-3.5 h-3.5 text-amber-500" />
-                          <span>PLUS DE DÉTAILS</span>
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center">
-                        {/* The Donut Chart */}
-                        <div className="sm:col-span-5 h-44 flex justify-center relative">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                              <Pie
-                                data={subjectHoursData}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={45}
-                                outerRadius={62}
-                                paddingAngle={3}
-                                dataKey="value"
-                              >
-                                {subjectHoursData.map((entry, index) => (
-                                  <Cell key={`cell-pie-${index}`} fill={SUBJECT_COLORS[index % SUBJECT_COLORS.length]} />
-                                ))}
-                              </Pie>
-                              <Tooltip formatter={(value) => [`${value}h`, 'Volume Total']} />
-                            </PieChart>
-                          </ResponsiveContainer>
-                          {/* Centered Total label inside Donut */}
-                          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                            <span className={`text-[10px] uppercase font-bold ${isLight ? 'text-slate-400' : 'text-gray-500'}`}>Total</span>
-                            <span className={`text-base font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>{totalPlannedHours}h</span>
-                          </div>
-                        </div>
-
-                        {/* Custom visual legend */}
-                        <div className="sm:col-span-7 space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
-                          {subjectHoursData.length === 0 ? (
-                            <p className={`text-xs italic ${isLight ? 'text-slate-500 font-normal' : 'text-gray-500'}`}>Aucune matière planifiée.</p>
-                          ) : (
-                            subjectHoursData.map((s, idx) => {
-                              const percent = totalPlannedHours > 0 ? Math.round((s.value / totalPlannedHours) * 100) : 0;
-                              return (
-                                <div key={idx} className="flex items-center justify-between text-xs font-medium">
-                                  <div className="flex items-center gap-1.5 truncate max-w-[120px]">
-                                    <span 
-                                      className="w-2.5 h-2.5 rounded-full shrink-0" 
-                                      style={{ backgroundColor: SUBJECT_COLORS[idx % SUBJECT_COLORS.length] }} 
-                                    />
-                                    <span className={`truncate ${isLight ? 'text-slate-700' : 'text-gray-300'}`} title={s.name}>{s.name}</span>
-                                  </div>
-                                  <span className={`font-mono text-[10px] ${isLight ? 'text-slate-500' : 'text-gray-500'}`}>
-                                    {s.value}h ({percent}%)
-                                  </span>
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* SUPERVISOR AUDIT & ALERTS */}
-                    <div className={`lg:col-span-7 p-6 rounded-2xl backdrop-blur-xl border flex flex-col justify-between ${
-                      isLight ? 'bg-white/90 border-slate-200 shadow-sm text-slate-900' : 'bg-slate-900/50 border-white/10 shadow-xl text-white'
-                    }`}>
-                      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-                        <div>
-                          <h3 className={`text-sm font-bold mb-1 flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                            <AlertCircle className="w-4.5 h-4.5 text-rose-500" />
-                            <span>{"Registre d'Audit & Alertes de Planification"}</span>
-                          </h3>
-                          <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
-                            {"Conflits, sous-charges ou dépassements de volumes détectés automatiquement par notre moteur."}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setChefDetailModalType('weekly_load')}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-105 active:scale-95 shrink-0 ${
-                            isLight 
-                              ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                              : 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 hover:text-white border border-emerald-500/30'
-                          }`}
-                          title="Ouvrir le graphique de charge hebdomadaire par jour"
-                        >
-                          <Maximize2 className="w-3.5 h-3.5 text-emerald-500" />
-                          <span>PLUS DE DÉTAILS</span>
-                        </button>
-                      </div>
-
-                      <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
-                        {criticalAlerts.length === 0 ? (
-                          <div className={`p-6 text-center rounded-xl font-medium flex flex-col items-center justify-center gap-1.5 h-[160px] ${
-                            isLight ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-emerald-500/5 border border-emerald-500/10 text-emerald-400'
-                          }`}>
-                            <span className={`w-8 h-8 rounded-full flex items-center justify-center animate-pulse text-lg font-bold ${
-                              isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500/15 text-emerald-400'
-                            }`}>✓</span>
-                            <div>
-                              <p className={`text-xs font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>Établissement 100% Conforme !</p>
-                              <p className={`text-xs leading-relaxed mt-0.5 ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>Aucune surcharge ou anomalie de quota horaire détectée.</p>
-                            </div>
-                          </div>
-                        ) : (
-                          criticalAlerts.map((alert) => (
-                            <div 
-                              key={alert.id} 
-                              className={`p-3.5 rounded-xl border-l-4 flex gap-3 text-xs font-medium leading-relaxed ${
-                                alert.severity === 'error' 
-                                  ? isLight 
-                                    ? 'bg-rose-50 border-rose-200 border-l-rose-500 text-rose-800' 
-                                    : 'bg-rose-500/10 border-rose-500/20 border-l-rose-500 text-rose-300' 
-                                  : isLight 
-                                    ? 'bg-amber-50 border-amber-200 border-l-amber-500 text-amber-800' 
-                                    : 'bg-amber-500/10 border-amber-500/20 border-l-amber-500 text-amber-300'
-                              }`}
-                            >
-                              <span className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${alert.severity === 'error' ? 'bg-rose-500' : 'bg-amber-500'}`} />
-                              <div>
-                                <p className={`text-[11px] font-bold uppercase tracking-wider mb-0.5 font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                                  {alert.type === 'class' ? 'Alerte Classe' : 'Alerte Professeur'}
-                                </p>
-                                <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-300'}`}>{alert.message}</p>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-
-                  </div>
-
-                </div>
-              );
-            })()}
-
-            {/* TAB 6: AI GEMINI COMPANION ADVISING DOCK */}
-            {activeTab === 'ai' && (
-              <div className="space-y-6">
-                
-                {/* LOADER / ACTION REASONING SUMMARY */}
-                {isExecutingAi && (
-                  <div className="p-5 rounded-2xl bg-indigo-950/30 border border-indigo-500/20 text-white flex items-center gap-4 animate-pulse">
-                    <RefreshCw className="w-5 h-5 text-indigo-400 animate-spin shrink-0" />
-                    <div>
-                      <h4 className="font-bold text-sm text-indigo-300">{"L'Agent IA est à l'œuvre..."}</h4>
-                      <p className="text-xs text-gray-400 mt-0.5">{"Re-calcul et relocalisation des cours dans l'emploi du temps."}</p>
-                    </div>
-                  </div>
-                )}
-
-                {aiExecutionReasoning && !isExecutingAi && (
-                  <div className="p-5 rounded-2xl bg-emerald-950/20 border border-emerald-500/20 text-white space-y-2">
-                    <div className="font-bold text-sm text-emerald-400 flex items-center gap-1.5 font-mono uppercase tracking-wider">
-                      <Check className="w-4 h-4" /> {"Rapport d'ajustement de l'Agent IA :"}
-                    </div>
-                    <p className="text-xs text-gray-300 font-mono whitespace-pre-wrap leading-relaxed">
-                      {aiExecutionReasoning}
-                    </p>
-                    <button 
-                      onClick={() => setAiExecutionReasoning('')}
-                      className="text-[10px] text-emerald-400 hover:text-emerald-300 underline cursor-pointer mt-2 block"
-                    >
-                      {"Fermer ce rapport d'exécution"}
-                    </button>
-                  </div>
-                )}
-
-                {/* GEMINI PRESENTATION HEADER */}
-                <div className="p-6 rounded-2xl bg-gradient-to-r from-emerald-950/20 to-teal-950/20 border border-emerald-500/10 shadow-glass flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                  <div className="space-y-1">
-                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 text-emerald-400 animate-pulse" />
-                      {"Assistant IA de Suggestions & Diagnostics"}
-                    </h2>
-                    <p className="text-sm text-emerald-200/80 leading-relaxed max-w-xl">
-                      {"Utilisez notre intégration exclusive de l'IA de pointe Gemini (`gemini-3.5-flash`) pour obtenir des optimisations stratégiques de votre d'emploi du temps, désaturer l'occupation des professeurs et éliminer les trous inutiles dans le planning."}
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={handleQueryAiSuggestions}
-                    disabled={isLoadingAi || isExecutingAi}
-                    className={`px-5 py-3 rounded-xl font-semibold text-sm shadow-lg transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
-                      !currentPlan.features.geminiAI 
-                        ? 'bg-slate-800 text-gray-500 border border-slate-700 cursor-not-allowed shadow-none'
-                        : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-emerald-950/50 hover:-translate-y-0.5 disabled:opacity-50'
-                    }`}
-                  >
-                    {!currentPlan.features.geminiAI ? (
-                      <>
-                        <Lock className="w-5 h-5 text-gray-500" />
-                        <span>Assistant Verrouillé (Upgrade requis)</span>
-                      </>
-                    ) : (
-                      <>
-                        {isLoadingAi ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-                        <span>{isLoadingAi ? "Assistant en cours de réflexion..." : "Interroger l'Assistant Directeur"}</span>
-                      </>
                     )}
-                  </button>
-                </div>
 
-                {/* RESULT BOX */}
-                <div className="p-6 rounded-2xl bg-slate-900/40 border border-white/5 shadow-glass leading-relaxed text-sm font-sans">
-                  {aiSuggestions ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2 border-b border-white/5 pb-3 font-mono text-xs uppercase text-emerald-400 tracking-wider">
-                        <Sparkles className="w-4 h-4" /> {"Diagnostic Généré par l'Intelligence Artificielle :"}
-                      </div>
-                      <div className="prose prose-invert max-w-none text-gray-300 whitespace-pre-wrap leading-relaxed">
-                        {aiSuggestions}
-                      </div>
-
-                      {!isLoadingAi && (
-                        <div className="pt-4 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3 bg-emerald-500/5 p-3.5 rounded-xl border border-emerald-500/10">
-                          <div className="text-xs text-emerald-300 font-medium leading-relaxed">
-                            💡 {"Voulez-vous que l'Agent IA réorganise intelligemment l'emploi du temps pour appliquer ces suggestions ?"}
-                          </div>
-                          <div className="flex gap-2 shrink-0">
-                            <button
-                              onClick={() => setAiSuggestions('')}
-                              className="px-3.5 py-1.5 rounded-lg border border-white/10 hover:bg-slate-800 text-gray-400 text-xs font-semibold cursor-pointer"
-                              disabled={isExecutingAi}
-                            >
-                              {"Ignorer"}
-                            </button>
-                            <button
-                              onClick={() => handleExecuteAi('apply-suggestions')}
-                              disabled={isExecutingAi}
-                              className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
-                            >
-                              {isExecutingAi ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                              <span>{"Appliquer par l'Agent"}</span>
-                            </button>
-                          </div>
+                    {aiExecutionReasoning && !isExecutingAi && (
+                      <div className="p-5 rounded-2xl bg-emerald-950/20 border border-emerald-500/20 text-white space-y-2">
+                        <div className="font-bold text-sm text-emerald-400 flex items-center gap-1.5 font-mono uppercase tracking-wider">
+                          <Check className="w-4 h-4" /> {"Rapport d'ajustement de l'Agent IA :"}
                         </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="py-12 text-center max-w-md mx-auto">
-                      <Sparkles className="w-10 h-10 text-emerald-500 mx-auto opacity-40 mb-3 animate-bounce" />
-                      <h4 className="text-white font-bold mb-1">{"Aucune suggestion active"}</h4>
-                      <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
-                        {"Cliquez sur le bouton ci-dessus pour lancer une analyse approfondie de l'emploi du temps actuel par Gemini."}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* CHIRURGICAL PROBLEM WRITER */}
-                <div className={`p-6 rounded-2xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-gradient-to-br from-slate-900/50 to-indigo-950/15 border-white/5 shadow-glass'}`}>
-                  <div>
-                    <h3 className={`text-md font-bold flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                      <MessageSquare className="w-4.5 h-4.5 text-indigo-500" />
-                      {"Soumettre une contrainte complexe ou un problème spécifique"}
-                    </h3>
-                    <p className={`text-xs leading-relaxed mt-1 ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
-                      {"Précisez une contrainte humaine compliquée ou un conflit que vous n'arrivez pas à résoudre civilement. L'Agent IA étudiera le planning et relocalisera activement les cours."}
-                    </p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <textarea
-                      value={problemQuery}
-                      onChange={(e) => setProblemQuery(e.target.value)}
-                      placeholder={
-                        !currentPlan.features.geminiAI 
-                          ? "Fonctionnalité d'analyse de contraintes IA verrouillée. Veuillez passer au plan Premium ou School."
-                          : 'Exemple : "M. Diongue ne doit absolument pas travailler le vendredi après-midi, déplacez toutes ses sessions du vendredi vers des créneaux libres des autres jours sans enfreindre les autres contraintes."'
-                      }
-                      rows={3}
-                      className="w-full bg-slate-900/20 bg-slate-950/45 border border-white/10 rounded-xl p-3.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors resize-none leading-relaxed"
-                      disabled={isAnalyzingProblem || isExecutingAi || !currentPlan.features.geminiAI}
-                    />
-
-                    <div className="flex justify-end gap-3">
-                      {problemQuery && (
+                        <p className="text-xs text-gray-300 font-mono whitespace-pre-wrap leading-relaxed">
+                          {aiExecutionReasoning}
+                        </p>
                         <button
-                          onClick={() => { setProblemQuery(''); setProblemAnalysis(''); }}
-                          className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-gray-300 text-xs font-semibold hover:-translate-y-0.5 transition-all cursor-pointer"
-                          disabled={isAnalyzingProblem || isExecutingAi}
+                          onClick={() => setAiExecutionReasoning('')}
+                          className="text-[10px] text-emerald-400 hover:text-emerald-300 underline cursor-pointer mt-2 block"
                         >
-                          {"Effacer tout"}
+                          {"Fermer ce rapport d'exécution"}
                         </button>
-                      )}
+                      </div>
+                    )}
+
+                    {/* GEMINI PRESENTATION HEADER */}
+                    <div className="p-6 rounded-2xl bg-gradient-to-r from-emerald-950/20 to-teal-950/20 border border-emerald-500/10 shadow-glass flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                      <div className="space-y-1">
+                        <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                          <Sparkles className="w-5 h-5 text-emerald-400 animate-pulse" />
+                          {"Assistant IA de Suggestions & Diagnostics"}
+                        </h2>
+                        <p className="text-sm text-emerald-200/80 leading-relaxed max-w-xl">
+                          {"Utilisez notre intégration exclusive de l'IA de pointe Gemini (`gemini-3.5-flash`) pour obtenir des optimisations stratégiques de votre d'emploi du temps, désaturer l'occupation des professeurs et éliminer les trous inutiles dans le planning."}
+                        </p>
+                      </div>
+
                       <button
-                        onClick={handleAnalyzeProblem}
-                        disabled={isAnalyzingProblem || isExecutingAi || (!problemQuery.trim() && currentPlan.features.geminiAI)}
-                        className={`px-5 py-2.5 rounded-xl text-xs font-semibold tracking-wide shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-2 cursor-pointer ${
-                          !currentPlan.features.geminiAI 
+                        onClick={handleQueryAiSuggestions}
+                        disabled={isLoadingAi || isExecutingAi}
+                        className={`px-5 py-3 rounded-xl font-semibold text-sm shadow-lg transition-all flex items-center gap-2 cursor-pointer shrink-0 ${!currentPlan.features.geminiAI
                             ? 'bg-slate-800 text-gray-500 border border-slate-700 cursor-not-allowed shadow-none'
-                            : 'bg-indigo-600 hover:bg-indigo-500 text-white'
-                        }`}
+                            : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-emerald-950/50 hover:-translate-y-0.5 disabled:opacity-50'
+                          }`}
                       >
                         {!currentPlan.features.geminiAI ? (
                           <>
-                            <Lock className="w-4 h-4 text-gray-500" />
-                            <span>Résolution IA verrouillée (Upgrade requis)</span>
+                            <Lock className="w-5 h-5 text-gray-500" />
+                            <span>Assistant Verrouillé (Upgrade requis)</span>
                           </>
                         ) : (
                           <>
-                            {isAnalyzingProblem ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                            <span>{isAnalyzingProblem ? "Analyse de la faisabilité..." : "Diagnostiquer & Suggérer une solution"}</span>
+                            {isLoadingAi ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+                            <span>{isLoadingAi ? "Assistant en cours de réflexion..." : "Interroger l'Assistant Directeur"}</span>
                           </>
                         )}
                       </button>
                     </div>
-                  </div>
 
-                  {/* SPECIFIC PROBLEM ANALYSIS DISCUSSION */}
-                  {problemAnalysis && (
-                    <div className="mt-4 p-5 rounded-xl bg-indigo-950/15 border border-indigo-500/10 space-y-4">
-                      <div className="flex items-center gap-2 border-b border-indigo-500/10 pb-2.5 font-mono text-[11px] uppercase text-indigo-400 tracking-wider">
-                        <MessageSquare className="w-4 h-4" /> {"Rapport d'Évaluation & Stratégie d'Adaptation :"}
-                      </div>
-                      <div className="prose prose-invert max-w-none text-gray-300 text-sm whitespace-pre-wrap leading-relaxed">
-                        {problemAnalysis}
-                      </div>
+                    {/* RESULT BOX */}
+                    <div className="p-6 rounded-2xl bg-slate-900/40 border border-white/5 shadow-glass leading-relaxed text-sm font-sans">
+                      {aiSuggestions ? (
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2 border-b border-white/5 pb-3 font-mono text-xs uppercase text-emerald-400 tracking-wider">
+                            <Sparkles className="w-4 h-4" /> {"Diagnostic Généré par l'Intelligence Artificielle :"}
+                          </div>
+                          <div className="prose prose-invert max-w-none text-gray-300 whitespace-pre-wrap leading-relaxed">
+                            {aiSuggestions}
+                          </div>
 
-                      {!isAnalyzingProblem && !problemAnalysis.toLowerCase().includes("erreur") && (
-                        <div className="pt-3.5 border-t border-indigo-500/10 flex flex-col sm:flex-row items-center justify-between bg-indigo-500/5 p-3.5 rounded-lg gap-3">
-                          <div className="text-xs text-indigo-300 font-medium">
-                            🚨 {"Voulez-vous déléguer la mise en œuvre et faire appliquer cette solution par l'Agent IA ?"}
-                          </div>
-                          <div className="flex gap-2 shrink-0">
-                            <button
-                              onClick={() => setProblemAnalysis('')}
-                              className="px-3.5 py-1.5 rounded-lg border border-white/10 hover:bg-slate-800 text-gray-400 text-xs font-semibold cursor-pointer"
-                              disabled={isExecutingAi}
-                            >
-                              {"Ignorer"}
-                            </button>
-                            <button
-                              onClick={() => handleExecuteAi('solve-problem')}
-                              disabled={isExecutingAi}
-                              className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
-                            >
-                              {isExecutingAi ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                              <span>{"Faire appliquer par l'Agent"}</span>
-                            </button>
-                          </div>
+                          {!isLoadingAi && (
+                            <div className="pt-4 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3 bg-emerald-500/5 p-3.5 rounded-xl border border-emerald-500/10">
+                              <div className="text-xs text-emerald-300 font-medium leading-relaxed">
+                                💡 {"Voulez-vous que l'Agent IA réorganise intelligemment l'emploi du temps pour appliquer ces suggestions ?"}
+                              </div>
+                              <div className="flex gap-2 shrink-0">
+                                <button
+                                  onClick={() => setAiSuggestions('')}
+                                  className="px-3.5 py-1.5 rounded-lg border border-white/10 hover:bg-slate-800 text-gray-400 text-xs font-semibold cursor-pointer"
+                                  disabled={isExecutingAi}
+                                >
+                                  {"Ignorer"}
+                                </button>
+                                <button
+                                  onClick={() => handleExecuteAi('apply-suggestions')}
+                                  disabled={isExecutingAi}
+                                  className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+                                >
+                                  {isExecutingAi ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                                  <span>{"Appliquer par l'Agent"}</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="py-12 text-center max-w-md mx-auto">
+                          <Sparkles className="w-10 h-10 text-emerald-500 mx-auto opacity-40 mb-3 animate-bounce" />
+                          <h4 className="text-white font-bold mb-1">{"Aucune suggestion active"}</h4>
+                          <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
+                            {"Cliquez sur le bouton ci-dessus pour lancer une analyse approfondie de l'emploi du temps actuel par Gemini."}
+                          </p>
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
-              </div>
-            )}
 
-            {/* TAB 7: PARAMÈTRES & CONFIGURATION */}
-            {activeTab === 'settings' && (
-              <div className="space-y-6">
-                
-                {/* SETTINGS BANNER HEADER */}
-                <div className={`p-6 rounded-2xl backdrop-blur-xl border flex items-center gap-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
-                  <div className={`p-3 rounded-2xl border shrink-0 ${isLight ? 'bg-purple-50 border-purple-200 text-purple-600' : 'bg-purple-500/10 border-purple-500/20 text-purple-400'}`}>
-                    <Settings className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h2 className={`text-lg font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                      {"Paramètres Généraux & Configuration d'Établissement"}
-                    </h2>
-                    <p className={`text-xs leading-relaxed mt-0.5 ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
-                      {"Personnalisez l'identité de votre établissement, l'apparence visuelle, vos clés d'abonnement SaaS, et gérez vos sauvegardes de données."}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  
-                  {/* LEFT COLUMN: SCHOOL IDENTITY & THEME (7 COLS) */}
-                  <div className="lg:col-span-7 space-y-6">
-                    
-                    {/* SECTION 1: ÉTABLISSEMENT METADATA */}
-                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-5 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
-                      <div className={`flex items-center gap-2 pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
-                        <Building2 className="w-5 h-5 text-indigo-500" />
-                        <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                          {"1. Identité de l'Établissement"}
+                    {/* CHIRURGICAL PROBLEM WRITER */}
+                    <div className={`p-6 rounded-2xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-gradient-to-br from-slate-900/50 to-indigo-950/15 border-white/5 shadow-glass'}`}>
+                      <div>
+                        <h3 className={`text-md font-bold flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                          <MessageSquare className="w-4.5 h-4.5 text-indigo-500" />
+                          {"Soumettre une contrainte complexe ou un problème spécifique"}
                         </h3>
+                        <p className={`text-xs leading-relaxed mt-1 ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
+                          {"Précisez une contrainte humaine compliquée ou un conflit que vous n'arrivez pas à résoudre civilement. L'Agent IA étudiera le planning et relocalisera activement les cours."}
+                        </p>
                       </div>
 
-                      <div className="space-y-4">
-                        <div>
-                          <label className={`block text-xs font-medium mb-1.5 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
-                            {"Nom de l'établissement d'enseignement"}
-                          </label>
-                          <input
-                            type="text"
-                            value={schoolName}
-                            onChange={(e) => setSchoolName(e.target.value)}
-                            placeholder="Ex: Lycée Excellence Diongue, Collège IziSchool"
-                            className={`w-full rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-colors shadow-inner border ${
-                              isLight 
-                                ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-500' 
-                                : 'bg-slate-950/80 border-white/10 text-white focus:border-indigo-500'
-                            }`}
-                          />
-                        </div>
+                      <div className="space-y-3">
+                        <textarea
+                          value={problemQuery}
+                          onChange={(e) => setProblemQuery(e.target.value)}
+                          placeholder={
+                            !currentPlan.features.geminiAI
+                              ? "Fonctionnalité d'analyse de contraintes IA verrouillée. Veuillez passer au plan Premium ou School."
+                              : 'Exemple : "M. Diongue ne doit absolument pas travailler le vendredi après-midi, déplacez toutes ses sessions du vendredi vers des créneaux libres des autres jours sans enfreindre les autres contraintes."'
+                          }
+                          rows={3}
+                          className="w-full bg-slate-900/20 bg-slate-950/45 border border-white/10 rounded-xl p-3.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors resize-none leading-relaxed"
+                          disabled={isAnalyzingProblem || isExecutingAi || !currentPlan.features.geminiAI}
+                        />
 
-                        <div>
-                          <label className={`block text-xs font-medium mb-1.5 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
-                            {"Devise / Slogan institutionnel"}
-                          </label>
-                          <input
-                            type="text"
-                            value={schoolSlogan}
-                            onChange={(e) => setSchoolSlogan(e.target.value)}
-                            placeholder="Ex: Discipline - Travail - Succès"
-                            className={`w-full rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-colors shadow-inner border ${
-                              isLight 
-                                ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-500' 
-                                : 'bg-slate-950/80 border-white/10 text-white focus:border-indigo-500'
-                            }`}
-                          />
-                        </div>
-
-                        <div>
-                          <label className={`block text-xs font-medium mb-1.5 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
-                            {"Type d'embleme / Logo"}
-                          </label>
-                          <div className="flex gap-3 mb-3">
+                        <div className="flex justify-end gap-3">
+                          {problemQuery && (
                             <button
-                              type="button"
-                              onClick={() => setSchoolLogoType('icon')}
-                              className={`flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition-all ${
-                                schoolLogoType === 'icon'
-                                  ? isLight ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-indigo-500/20 border-indigo-500 text-white'
-                                  : isLight ? 'bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-900' : 'bg-slate-950/50 border-white/10 text-gray-400 hover:text-white'
-                              }`}
+                              onClick={() => { setProblemQuery(''); setProblemAnalysis(''); }}
+                              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-gray-300 text-xs font-semibold hover:-translate-y-0.5 transition-all cursor-pointer"
+                              disabled={isAnalyzingProblem || isExecutingAi}
                             >
-                              {"Icône Vectorielle"}
+                              {"Effacer tout"}
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (!currentPlan.features.customBranding) {
-                                  triggerNotification("L'importation de logo personnalisé par URL est disponible avec le Plan School.", "error");
-                                  setIsClientSubModalOpen(true);
-                                  return;
-                                }
-                                setSchoolLogoType('url');
-                              }}
-                              className={`flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                                schoolLogoType === 'url'
-                                  ? isLight ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-indigo-500/20 border-indigo-500 text-white'
-                                  : isLight ? 'bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-900' : 'bg-slate-950/50 border-white/10 text-gray-400 hover:text-white'
-                              }`}
-                            >
-                              {!currentPlan.features.customBranding && <Lock className="w-3 h-3 text-amber-500" />}
-                              {"URL d'image externe"}
-                            </button>
-                          </div>
-
-                          {schoolLogoType === 'icon' ? (
-                            <div className="grid grid-cols-5 gap-2">
-                              {[
-                                { name: 'GraduationCap', label: 'Cap' },
-                                { name: 'Building2', label: 'Lycée' },
-                                { name: 'BookOpen', label: 'Savoir' },
-                                { name: 'Award', label: 'Excellence' },
-                                { name: 'Shield', label: 'Blason' }
-                              ].map((ic) => (
-                                <button
-                                  key={ic.name}
-                                  type="button"
-                                  onClick={() => setSchoolLogoIcon(ic.name)}
-                                  className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${
-                                    schoolLogoIcon === ic.name
-                                      ? 'bg-indigo-600 text-white border-indigo-400 shadow-md'
-                                      : isLight ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100' : 'bg-slate-950/40 border-white/10 text-gray-400 hover:bg-white/5'
-                                  }`}
-                                >
-                                  {ic.name === 'GraduationCap' && <GraduationCap className="w-5 h-5" />}
-                                  {ic.name === 'Building2' && <Building2 className="w-5 h-5" />}
-                                  {ic.name === 'BookOpen' && <BookOpen className="w-5 h-5" />}
-                                  {ic.name === 'Award' && <Award className="w-5 h-5" />}
-                                  {ic.name === 'Shield' && <Shield className="w-5 h-5" />}
-                                  <span className="text-[10px] font-mono">{ic.label}</span>
-                                </button>
-                              ))}
-                            </div>
-                          ) : (
-                            <input
-                              type="text"
-                              value={schoolLogo}
-                              onChange={(e) => setSchoolLogo(e.target.value)}
-                              placeholder="https://domaine.com/logo.png"
-                              className={`w-full rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-colors shadow-inner font-mono text-xs border ${
-                                isLight 
-                                  ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-500' 
-                                  : 'bg-slate-950/80 border-white/10 text-white focus:border-indigo-500'
-                              }`}
-                            />
                           )}
-                        </div>
-
-                        <div className="pt-2">
                           <button
-                            type="button"
-                            onClick={() => showNotification("Informations de l'établissement sauvegardées avec succès !", "success")}
-                            className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                            onClick={handleAnalyzeProblem}
+                            disabled={isAnalyzingProblem || isExecutingAi || (!problemQuery.trim() && currentPlan.features.geminiAI)}
+                            className={`px-5 py-2.5 rounded-xl text-xs font-semibold tracking-wide shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-2 cursor-pointer ${!currentPlan.features.geminiAI
+                                ? 'bg-slate-800 text-gray-500 border border-slate-700 cursor-not-allowed shadow-none'
+                                : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                              }`}
                           >
-                            <Check className="w-4 h-4" />
-                            <span>Enregistrer les En-têtes Officiels</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* SECTION 2: THEME & APPARENCE */}
-                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
-                      <div className={`flex items-center gap-2 pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
-                        <SlidersHorizontal className="w-5 h-5 text-indigo-500" />
-                        <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                          {"2. Apparence Visuelle & Thème"}
-                        </h3>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <button
-                          type="button"
-                          onClick={() => setTheme('dark')}
-                          className={`p-4 rounded-xl border flex items-center gap-3 transition-all cursor-pointer ${
-                            theme === 'dark'
-                              ? 'bg-slate-950 border-indigo-500 text-white ring-2 ring-indigo-500/50'
-                              : isLight ? 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100' : 'bg-slate-950/40 border-white/10 text-gray-400 hover:bg-slate-950'
-                          }`}
-                        >
-                          <div className="p-2.5 rounded-lg bg-indigo-500/20 text-indigo-400">
-                            <Moon className="w-5 h-5" />
-                          </div>
-                          <div className="text-left">
-                            <div className={`text-xs font-bold ${theme === 'dark' ? 'text-white' : isLight ? 'text-slate-800' : 'text-white'}`}>{"Thème Sombre (Night)"}</div>
-                            <div className="text-[10px] text-gray-400">{"Mode professionnel haute lisibilité"}</div>
-                          </div>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setTheme('light')}
-                          className={`p-4 rounded-xl border flex items-center gap-3 transition-all cursor-pointer ${
-                            theme === 'light'
-                              ? 'bg-white border-indigo-500 text-slate-900 ring-2 ring-indigo-500/50 shadow-sm'
-                              : 'bg-slate-950/40 border-white/10 text-gray-400 hover:bg-white/10'
-                          }`}
-                        >
-                          <div className="p-2.5 rounded-lg bg-amber-500/20 text-amber-500">
-                            <Sun className="w-5 h-5" />
-                          </div>
-                          <div className="text-left">
-                            <div className={`text-xs font-bold ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{"Thème Clair (Day)"}</div>
-                            <div className="text-[10px] text-gray-400">{"Fond lumineux haute clarté"}</div>
-                          </div>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* SECTION 5: SÉCURITÉ & MODIFICATION DU MOT DE PASSE */}
-                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
-                      <div className={`flex items-center gap-2 pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
-                        <KeyRound className="w-5 h-5 text-emerald-500" />
-                        <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                          {"5. Sécurité & Mot de Passe"}
-                        </h3>
-                      </div>
-
-                      <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
-                        {"Modifiez le mot de passe de votre compte utilisateur établissement. Le nouveau mot de passe sera immédiatement actif pour vos prochaines connexions."}
-                      </p>
-
-                      <form onSubmit={handleUpdateUserPassword} className="space-y-4 pt-1">
-                        {passwordUpdateError && (
-                          <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
-                            <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
-                            <span>{passwordUpdateError}</span>
-                          </div>
-                        )}
-
-                        {passwordUpdateSuccess && (
-                          <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
-                            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-                            <span>{passwordUpdateSuccess}</span>
-                          </div>
-                        )}
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div>
-                            <label className={`block text-xs font-medium mb-1.5 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
-                              Nouveau mot de passe *
-                            </label>
-                            <div className="relative">
-                              <input
-                                type={showNewPassword ? 'text' : 'password'}
-                                required
-                                minLength={6}
-                                value={newPasswordInput}
-                                onChange={(e) => setNewPasswordInput(e.target.value)}
-                                placeholder="Au moins 6 caractères"
-                                className={`w-full rounded-xl pl-3.5 pr-10 py-2.5 text-xs focus:outline-none transition-colors shadow-inner border ${
-                                  isLight 
-                                    ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-emerald-500' 
-                                    : 'bg-slate-950/80 border-white/10 text-white focus:border-emerald-500'
-                                }`}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setShowNewPassword(!showNewPassword)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
-                                title={showNewPassword ? 'Masquer' : 'Afficher'}
-                              >
-                                {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                              </button>
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className={`block text-xs font-medium mb-1.5 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
-                              Confirmer le mot de passe *
-                            </label>
-                            <div className="relative">
-                              <input
-                                type={showConfirmPassword ? 'text' : 'password'}
-                                required
-                                minLength={6}
-                                value={confirmPasswordInput}
-                                onChange={(e) => setConfirmPasswordInput(e.target.value)}
-                                placeholder="Retapez le mot de passe"
-                                className={`w-full rounded-xl pl-3.5 pr-10 py-2.5 text-xs focus:outline-none transition-colors shadow-inner border ${
-                                  isLight 
-                                    ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-emerald-500' 
-                                    : 'bg-slate-950/80 border-white/10 text-white focus:border-emerald-500'
-                                }`}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
-                                title={showConfirmPassword ? 'Masquer' : 'Afficher'}
-                              >
-                                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="pt-1">
-                          <button
-                            type="submit"
-                            disabled={isUpdatingPassword || !newPasswordInput}
-                            className={`w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                              isUpdatingPassword || !newPasswordInput ? 'opacity-60 cursor-not-allowed' : ''
-                            }`}
-                          >
-                            {isUpdatingPassword ? (
+                            {!currentPlan.features.geminiAI ? (
                               <>
-                                <RefreshCw className="w-4 h-4 animate-spin" />
-                                <span>Mise à jour en cours...</span>
+                                <Lock className="w-4 h-4 text-gray-500" />
+                                <span>Résolution IA verrouillée (Upgrade requis)</span>
                               </>
                             ) : (
                               <>
-                                <ShieldCheck className="w-4 h-4" />
-                                <span>Mettre à jour mon mot de passe</span>
+                                {isAnalyzingProblem ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                                <span>{isAnalyzingProblem ? "Analyse de la faisabilité..." : "Diagnostiquer & Suggérer une solution"}</span>
                               </>
                             )}
                           </button>
                         </div>
-                      </form>
+                      </div>
+
+                      {/* SPECIFIC PROBLEM ANALYSIS DISCUSSION */}
+                      {problemAnalysis && (
+                        <div className="mt-4 p-5 rounded-xl bg-indigo-950/15 border border-indigo-500/10 space-y-4">
+                          <div className="flex items-center gap-2 border-b border-indigo-500/10 pb-2.5 font-mono text-[11px] uppercase text-indigo-400 tracking-wider">
+                            <MessageSquare className="w-4 h-4" /> {"Rapport d'Évaluation & Stratégie d'Adaptation :"}
+                          </div>
+                          <div className="prose prose-invert max-w-none text-gray-300 text-sm whitespace-pre-wrap leading-relaxed">
+                            {problemAnalysis}
+                          </div>
+
+                          {!isAnalyzingProblem && !problemAnalysis.toLowerCase().includes("erreur") && (
+                            <div className="pt-3.5 border-t border-indigo-500/10 flex flex-col sm:flex-row items-center justify-between bg-indigo-500/5 p-3.5 rounded-lg gap-3">
+                              <div className="text-xs text-indigo-300 font-medium">
+                                🚨 {"Voulez-vous déléguer la mise en œuvre et faire appliquer cette solution par l'Agent IA ?"}
+                              </div>
+                              <div className="flex gap-2 shrink-0">
+                                <button
+                                  onClick={() => setProblemAnalysis('')}
+                                  className="px-3.5 py-1.5 rounded-lg border border-white/10 hover:bg-slate-800 text-gray-400 text-xs font-semibold cursor-pointer"
+                                  disabled={isExecutingAi}
+                                >
+                                  {"Ignorer"}
+                                </button>
+                                <button
+                                  onClick={() => handleExecuteAi('solve-problem')}
+                                  disabled={isExecutingAi}
+                                  className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+                                >
+                                  {isExecutingAi ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                                  <span>{"Faire appliquer par l'Agent"}</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 7: PARAMÈTRES & CONFIGURATION */}
+                {activeTab === 'settings' && (
+                  <div className="space-y-6">
+
+                    {/* SETTINGS BANNER HEADER */}
+                    <div className={`p-6 rounded-2xl backdrop-blur-xl border flex items-center gap-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
+                      <div className={`p-3 rounded-2xl border shrink-0 ${isLight ? 'bg-purple-50 border-purple-200 text-purple-600' : 'bg-purple-500/10 border-purple-500/20 text-purple-400'}`}>
+                        <Settings className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h2 className={`text-lg font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                          {"Paramètres Généraux & Configuration d'Établissement"}
+                        </h2>
+                        <p className={`text-xs leading-relaxed mt-0.5 ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
+                          {"Personnalisez l'identité de votre établissement, l'apparence visuelle, vos clés d'abonnement SaaS, et gérez vos sauvegardes de données."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                      {/* LEFT COLUMN: SCHOOL IDENTITY & THEME (7 COLS) */}
+                      <div className="lg:col-span-7 space-y-6">
+
+                        {/* SECTION 1: ÉTABLISSEMENT METADATA */}
+                        <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-5 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
+                          <div className={`flex items-center gap-2 pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                            <Building2 className="w-5 h-5 text-indigo-500" />
+                            <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                              {"1. Identité de l'Établissement"}
+                            </h3>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div>
+                              <label className={`block text-xs font-medium mb-1.5 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
+                                {"Nom de l'établissement d'enseignement"}
+                              </label>
+                              <input
+                                type="text"
+                                value={schoolName}
+                                onChange={(e) => setSchoolName(e.target.value)}
+                                placeholder="Ex: Lycée Excellence Diongue, Collège IziSchool"
+                                className={`w-full rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-colors shadow-inner border ${isLight
+                                    ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-500'
+                                    : 'bg-slate-950/80 border-white/10 text-white focus:border-indigo-500'
+                                  }`}
+                              />
+                            </div>
+
+                            <div>
+                              <label className={`block text-xs font-medium mb-1.5 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
+                                {"Devise / Slogan institutionnel"}
+                              </label>
+                              <input
+                                type="text"
+                                value={schoolSlogan}
+                                onChange={(e) => setSchoolSlogan(e.target.value)}
+                                placeholder="Ex: Discipline - Travail - Succès"
+                                className={`w-full rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-colors shadow-inner border ${isLight
+                                    ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-500'
+                                    : 'bg-slate-950/80 border-white/10 text-white focus:border-indigo-500'
+                                  }`}
+                              />
+                            </div>
+
+                            <div>
+                              <label className={`block text-xs font-medium mb-1.5 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
+                                {"Type d'embleme / Logo"}
+                              </label>
+                              <div className="flex gap-3 mb-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setSchoolLogoType('icon')}
+                                  className={`flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition-all ${schoolLogoType === 'icon'
+                                      ? isLight ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-indigo-500/20 border-indigo-500 text-white'
+                                      : isLight ? 'bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-900' : 'bg-slate-950/50 border-white/10 text-gray-400 hover:text-white'
+                                    }`}
+                                >
+                                  {"Icône Vectorielle"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (!currentPlan.features.customBranding) {
+                                      triggerNotification("L'importation de logo personnalisé par URL est disponible avec le Plan School.", "error");
+                                      setIsClientSubModalOpen(true);
+                                      return;
+                                    }
+                                    setSchoolLogoType('url');
+                                  }}
+                                  className={`flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${schoolLogoType === 'url'
+                                      ? isLight ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-indigo-500/20 border-indigo-500 text-white'
+                                      : isLight ? 'bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-900' : 'bg-slate-950/50 border-white/10 text-gray-400 hover:text-white'
+                                    }`}
+                                >
+                                  {!currentPlan.features.customBranding && <Lock className="w-3 h-3 text-amber-500" />}
+                                  {"URL d'image externe"}
+                                </button>
+                              </div>
+
+                              {schoolLogoType === 'icon' ? (
+                                <div className="grid grid-cols-5 gap-2">
+                                  {[
+                                    { name: 'GraduationCap', label: 'Cap' },
+                                    { name: 'Building2', label: 'Lycée' },
+                                    { name: 'BookOpen', label: 'Savoir' },
+                                    { name: 'Award', label: 'Excellence' },
+                                    { name: 'Shield', label: 'Blason' }
+                                  ].map((ic) => (
+                                    <button
+                                      key={ic.name}
+                                      type="button"
+                                      onClick={() => setSchoolLogoIcon(ic.name)}
+                                      className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${schoolLogoIcon === ic.name
+                                          ? 'bg-indigo-600 text-white border-indigo-400 shadow-md'
+                                          : isLight ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100' : 'bg-slate-950/40 border-white/10 text-gray-400 hover:bg-white/5'
+                                        }`}
+                                    >
+                                      {ic.name === 'GraduationCap' && <GraduationCap className="w-5 h-5" />}
+                                      {ic.name === 'Building2' && <Building2 className="w-5 h-5" />}
+                                      {ic.name === 'BookOpen' && <BookOpen className="w-5 h-5" />}
+                                      {ic.name === 'Award' && <Award className="w-5 h-5" />}
+                                      {ic.name === 'Shield' && <Shield className="w-5 h-5" />}
+                                      <span className="text-[10px] font-mono">{ic.label}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={schoolLogo}
+                                  onChange={(e) => setSchoolLogo(e.target.value)}
+                                  placeholder="https://domaine.com/logo.png"
+                                  className={`w-full rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-colors shadow-inner font-mono text-xs border ${isLight
+                                      ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-500'
+                                      : 'bg-slate-950/80 border-white/10 text-white focus:border-indigo-500'
+                                    }`}
+                                />
+                              )}
+                            </div>
+
+                            <div className="pt-2">
+                              <button
+                                type="button"
+                                onClick={() => showNotification("Informations de l'établissement sauvegardées avec succès !", "success")}
+                                className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                              >
+                                <Check className="w-4 h-4" />
+                                <span>Enregistrer les En-têtes Officiels</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* SECTION 2: THEME & APPARENCE */}
+                        <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
+                          <div className={`flex items-center gap-2 pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                            <SlidersHorizontal className="w-5 h-5 text-indigo-500" />
+                            <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                              {"2. Apparence Visuelle & Thème"}
+                            </h3>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <button
+                              type="button"
+                              onClick={() => setTheme('dark')}
+                              className={`p-4 rounded-xl border flex items-center gap-3 transition-all cursor-pointer ${theme === 'dark'
+                                  ? 'bg-slate-950 border-indigo-500 text-white ring-2 ring-indigo-500/50'
+                                  : isLight ? 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100' : 'bg-slate-950/40 border-white/10 text-gray-400 hover:bg-slate-950'
+                                }`}
+                            >
+                              <div className="p-2.5 rounded-lg bg-indigo-500/20 text-indigo-400">
+                                <Moon className="w-5 h-5" />
+                              </div>
+                              <div className="text-left">
+                                <div className={`text-xs font-bold ${theme === 'dark' ? 'text-white' : isLight ? 'text-slate-800' : 'text-white'}`}>{"Thème Sombre (Night)"}</div>
+                                <div className="text-[10px] text-gray-400">{"Mode professionnel haute lisibilité"}</div>
+                              </div>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setTheme('light')}
+                              className={`p-4 rounded-xl border flex items-center gap-3 transition-all cursor-pointer ${theme === 'light'
+                                  ? 'bg-white border-indigo-500 text-slate-900 ring-2 ring-indigo-500/50 shadow-sm'
+                                  : 'bg-slate-950/40 border-white/10 text-gray-400 hover:bg-white/10'
+                                }`}
+                            >
+                              <div className="p-2.5 rounded-lg bg-amber-500/20 text-amber-500">
+                                <Sun className="w-5 h-5" />
+                              </div>
+                              <div className="text-left">
+                                <div className={`text-xs font-bold ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{"Thème Clair (Day)"}</div>
+                                <div className="text-[10px] text-gray-400">{"Fond lumineux haute clarté"}</div>
+                              </div>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* SECTION 5: SÉCURITÉ & MODIFICATION DU MOT DE PASSE */}
+                        <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
+                          <div className={`flex items-center gap-2 pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                            <KeyRound className="w-5 h-5 text-emerald-500" />
+                            <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                              {"5. Sécurité & Mot de Passe"}
+                            </h3>
+                          </div>
+
+                          <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
+                            {"Modifiez le mot de passe de votre compte utilisateur établissement. Le nouveau mot de passe sera immédiatement actif pour vos prochaines connexions."}
+                          </p>
+
+                          <form onSubmit={handleUpdateUserPassword} className="space-y-4 pt-1">
+                            {passwordUpdateError && (
+                              <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
+                                <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                                <span>{passwordUpdateError}</span>
+                              </div>
+                            )}
+
+                            {passwordUpdateSuccess && (
+                              <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                                <span>{passwordUpdateSuccess}</span>
+                              </div>
+                            )}
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div>
+                                <label className={`block text-xs font-medium mb-1.5 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
+                                  Nouveau mot de passe *
+                                </label>
+                                <div className="relative">
+                                  <input
+                                    type={showNewPassword ? 'text' : 'password'}
+                                    required
+                                    minLength={6}
+                                    value={newPasswordInput}
+                                    onChange={(e) => setNewPasswordInput(e.target.value)}
+                                    placeholder="Au moins 6 caractères"
+                                    className={`w-full rounded-xl pl-3.5 pr-10 py-2.5 text-xs focus:outline-none transition-colors shadow-inner border ${isLight
+                                        ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-emerald-500'
+                                        : 'bg-slate-950/80 border-white/10 text-white focus:border-emerald-500'
+                                      }`}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowNewPassword(!showNewPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
+                                    title={showNewPassword ? 'Masquer' : 'Afficher'}
+                                  >
+                                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className={`block text-xs font-medium mb-1.5 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
+                                  Confirmer le mot de passe *
+                                </label>
+                                <div className="relative">
+                                  <input
+                                    type={showConfirmPassword ? 'text' : 'password'}
+                                    required
+                                    minLength={6}
+                                    value={confirmPasswordInput}
+                                    onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                                    placeholder="Retapez le mot de passe"
+                                    className={`w-full rounded-xl pl-3.5 pr-10 py-2.5 text-xs focus:outline-none transition-colors shadow-inner border ${isLight
+                                        ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-emerald-500'
+                                        : 'bg-slate-950/80 border-white/10 text-white focus:border-emerald-500'
+                                      }`}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
+                                    title={showConfirmPassword ? 'Masquer' : 'Afficher'}
+                                  >
+                                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="pt-1">
+                              <button
+                                type="submit"
+                                disabled={isUpdatingPassword || !newPasswordInput}
+                                className={`w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer ${isUpdatingPassword || !newPasswordInput ? 'opacity-60 cursor-not-allowed' : ''
+                                  }`}
+                              >
+                                {isUpdatingPassword ? (
+                                  <>
+                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                    <span>Mise à jour en cours...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <ShieldCheck className="w-4 h-4" />
+                                    <span>Mettre à jour mon mot de passe</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+
+                      </div>
+
+                      {/* RIGHT COLUMN: ABONNEMENT & BACKUP (5 COLS) */}
+                      <div className="lg:col-span-5 space-y-6">
+
+                        {/* SECTION 3: ABONNEMENT & LICENCE SAAS */}
+                        <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
+                          <div className={`flex items-center justify-between pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                            <div className="flex items-center gap-2">
+                              <Shield className="w-5 h-5 text-indigo-500" />
+                              <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                                {"3. Abonnement & Licences"}
+                              </h3>
+                            </div>
+                            <span className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border uppercase ${isLight ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                              }`}>
+                              {currentClient.status === 'active' ? 'Actif' : 'Essai'}
+                            </span>
+                          </div>
+
+                          <div className={`p-4 rounded-xl border space-y-3 ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-white/10'}`}>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className={`${isLight ? 'text-slate-500' : 'text-gray-400'}`}>Offre actuelle :</span>
+                              <span className="font-bold text-indigo-600 font-mono text-sm">
+                                {saasPlans.find(p => p.id === currentClient.planId)?.name || 'Plan Découverte'}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className={`${isLight ? 'text-slate-500' : 'text-gray-400'}`}>{"Échéance d'abonnement :"}</span>
+                              <span className={`font-medium font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                                {currentClient.subscriptionEndDate || 'Non définie'}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className={`${isLight ? 'text-slate-500' : 'text-gray-400'}`}>{"Paiement / Mode :"}</span>
+                              <span className={`font-medium ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
+                                {currentClient.paymentMethod || 'Licence établissement'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="pt-2">
+                            <button
+                              type="button"
+                              onClick={() => setIsClientSubModalOpen(true)}
+                              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                              <CreditCard className="w-4 h-4" />
+                              <span>{"Gérer l'Abonnement / Activer Clé"}</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* SECTION 4: SAUVEGARDE & RESTAURATION */}
+                        <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
+                          <div className={`flex items-center gap-2 pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
+                            <FileSpreadsheet className="w-5 h-5 text-indigo-500" />
+                            <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                              {"4. Sauvegarde & Restauration"}
+                            </h3>
+                          </div>
+
+                          <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
+                            {"Exportez l'intégralité de la base de données de l'établissement (matières, profs, classes, emploi du temps) au format JSON sécurisé pour archivage ou migration."}
+                          </p>
+
+                          <div className="space-y-2.5 pt-1">
+                            <button
+                              type="button"
+                              onClick={handleExportBackup}
+                              className={`w-full py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${isLight
+                                  ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+                                  : 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border-emerald-500/30'
+                                }`}
+                            >
+                              <Download className="w-4 h-4" />
+                              <span>Exporter Sauvegarde (.json)</span>
+                            </button>
+
+                            <label className="w-full py-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer text-center">
+                              <RefreshCw className="w-4 h-4" />
+                              <span>Restauration depuis JSON</span>
+                              <input
+                                type="file"
+                                accept=".json"
+                                onChange={handleImportBackup}
+                                className="hidden"
+                              />
+                            </label>
+
+                            <div className="pt-4 border-t border-white/10">
+                              <button
+                                type="button"
+                                onClick={handleResetData}
+                                className="w-full py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                              >
+                                <Trash className="w-4 h-4" />
+                                <span>Réinitialiser aux données démo par défaut</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+
                     </div>
 
                   </div>
+                )}
 
-                  {/* RIGHT COLUMN: ABONNEMENT & BACKUP (5 COLS) */}
-                  <div className="lg:col-span-5 space-y-6">
-                    
-                    {/* SECTION 3: ABONNEMENT & LICENCE SAAS */}
-                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
-                      <div className={`flex items-center justify-between pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
-                        <div className="flex items-center gap-2">
-                          <Shield className="w-5 h-5 text-indigo-500" />
-                          <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                            {"3. Abonnement & Licences"}
-                          </h3>
-                        </div>
-                        <span className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border uppercase ${
-                          isLight ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        }`}>
-                          {currentClient.status === 'active' ? 'Actif' : 'Essai'}
-                        </span>
-                      </div>
-
-                      <div className={`p-4 rounded-xl border space-y-3 ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-white/10'}`}>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className={`${isLight ? 'text-slate-500' : 'text-gray-400'}`}>Offre actuelle :</span>
-                          <span className="font-bold text-indigo-600 font-mono text-sm">
-                            {saasPlans.find(p => p.id === currentClient.planId)?.name || 'Plan Découverte'}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className={`${isLight ? 'text-slate-500' : 'text-gray-400'}`}>{"Échéance d'abonnement :"}</span>
-                          <span className={`font-medium font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                            {currentClient.subscriptionEndDate || 'Non définie'}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className={`${isLight ? 'text-slate-500' : 'text-gray-400'}`}>{"Paiement / Mode :"}</span>
-                          <span className={`font-medium ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
-                            {currentClient.paymentMethod || 'Licence établissement'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="pt-2">
-                        <button
-                          type="button"
-                          onClick={() => setIsClientSubModalOpen(true)}
-                          className="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                        >
-                          <CreditCard className="w-4 h-4" />
-                          <span>{"Gérer l'Abonnement / Activer Clé"}</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* SECTION 4: SAUVEGARDE & RESTAURATION */}
-                    <div className={`p-6 rounded-2xl backdrop-blur-xl border space-y-4 ${isLight ? 'bg-white/90 border-slate-200 shadow-sm' : 'bg-slate-900/50 border-white/10 shadow-xl'}`}>
-                      <div className={`flex items-center gap-2 pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/10'}`}>
-                        <FileSpreadsheet className="w-5 h-5 text-indigo-500" />
-                        <h3 className={`text-sm font-bold uppercase tracking-wider font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                          {"4. Sauvegarde & Restauration"}
-                        </h3>
-                      </div>
-
-                      <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
-                        {"Exportez l'intégralité de la base de données de l'établissement (matières, profs, classes, emploi du temps) au format JSON sécurisé pour archivage ou migration."}
-                      </p>
-
-                      <div className="space-y-2.5 pt-1">
-                        <button
-                          type="button"
-                          onClick={handleExportBackup}
-                          className={`w-full py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                            isLight 
-                              ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200' 
-                              : 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border-emerald-500/30'
-                          }`}
-                        >
-                          <Download className="w-4 h-4" />
-                          <span>Exporter Sauvegarde (.json)</span>
-                        </button>
-
-                        <label className="w-full py-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer text-center">
-                          <RefreshCw className="w-4 h-4" />
-                          <span>Restauration depuis JSON</span>
-                          <input
-                            type="file"
-                            accept=".json"
-                            onChange={handleImportBackup}
-                            className="hidden"
-                          />
-                        </label>
-
-                        <div className="pt-4 border-t border-white/10">
-                          <button
-                            type="button"
-                            onClick={handleResetData}
-                            className="w-full py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
-                          >
-                            <Trash className="w-4 h-4" />
-                            <span>Réinitialiser aux données démo par défaut</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                  </div>
-
-                </div>
-
-              </div>
-            )}
-
-          </main>
-        </div>
-        </div>
+              </main>
+            </div>
+          </div>
         )}
 
         {/* --- CLIENT SUBSCRIPTION MODAL --- */}

@@ -66,6 +66,7 @@ export default function ChefAnalyticsDetailModal({
   const isLight = theme === 'light';
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'optimal' | 'under' | 'over'>('all');
+  const [exportColorMode, setExportColorMode] = useState<'color' | 'bw'>('color');
   const [isUpgradePromptOpen, setIsUpgradePromptOpen] = useState(false);
   const [exportSuccessMsg, setExportSuccessMsg] = useState<string | null>(null);
 
@@ -249,7 +250,126 @@ export default function ChefAnalyticsDetailModal({
     });
   }, [classStats, searchTerm]);
 
-  // --- FONCTION EXPORT PDF SOIGNÉE & ACADÉMIQUE ---
+  // --- INTERPRÉTATION STATISTIQUE & DIAGNOSTIC DE DIRECTION ---
+  const getChefInterpretation = useMemo(() => {
+    if (chartType === 'teachers') {
+      const totalContract = safeTeachers.reduce((acc, t) => acc + Number(t?.weeklyQuota || 18), 0);
+      const totalAssigned = teacherStats.reduce((acc, t) => acc + (t?.assignedHours || 0), 0);
+      const netDiff = totalAssigned - totalContract;
+      const optimalCount = teacherStats.filter((t) => t?.status === 'optimal').length;
+      const underCount = teacherStats.filter((t) => t?.status === 'under').length;
+      const overCount = teacherStats.filter((t) => t?.status === 'over').length;
+      const underHours = teacherStats.filter((t) => t?.status === 'under').reduce((acc, t) => acc + Math.abs(t.diff), 0);
+      const overHours = teacherStats.filter((t) => t?.status === 'over').reduce((acc, t) => acc + t.diff, 0);
+      const complianceRate = safeTeachers.length > 0 ? Math.round((optimalCount / safeTeachers.length) * 100) : 0;
+
+      return {
+        title: "Audit Stratégique des Quotas & Charges Enseignants",
+        summary: `L'établissement compte ${safeTeachers.length} enseignants totalisant un volume contractuel de ${totalContract}h/semaine contre ${totalAssigned}h effectivement affectées (${netDiff >= 0 ? `+${netDiff}h en sur-service global` : `${netDiff}h en sous-service global`}). Le taux de conformité statutaire exacte est de ${complianceRate}% (${optimalCount} conformes, ${underCount} sous-chargés, ${overCount} en dépassement).`,
+        kpis: [
+          { label: "Corps Enseignant", value: `${safeTeachers.length}`, hint: "Total professeurs", status: 'neutral' },
+          { label: "Quota Contractuel", value: `${totalContract}h`, hint: "Obligation hebdo", status: 'neutral' },
+          { label: "Heures Affectées", value: `${totalAssigned}h`, hint: netDiff >= 0 ? `+${netDiff}h HSA` : `${netDiff}h déficit`, status: netDiff === 0 ? 'good' : netDiff > 0 ? 'warn' : 'bad' },
+          { label: "Taux Conformité", value: `${complianceRate}%`, hint: `${optimalCount}/${safeTeachers.length} au quota`, status: complianceRate >= 80 ? 'good' : 'warn' }
+        ],
+        highlights: [
+          `Conformité : ${optimalCount} / ${safeTeachers.length} enseignants respectent rigoureusement leur quota réglementaire (${complianceRate}% de l'équipe).`,
+          underCount > 0 ? `Sous-service : ${underCount} enseignant(s) ont un déficit cumulé de ${underHours}h/semaine à réallouer ou mutualiser.` : "Conformité totale : aucun enseignant n'est en sous-service.",
+          overCount > 0 ? `Surcharge / Heures Sup. : ${overCount} enseignant(s) cumulent ${overHours}h supplémentaires nécessitant un arbitrage (HSA).` : "Aucune surcharge d'heures constatée."
+        ],
+        recommendations: [
+          "Rééquilibrer en priorité les affectations des enseignants en sous-service avant toute ouverture de vacations externes.",
+          "Auditer l'étalement des créneaux des enseignants en surcharge (+h) pour prévenir la fatigue et les risques de chevauchement."
+        ]
+      };
+    }
+
+    if (chartType === 'classes') {
+      const totalClasses = safeClasses.length;
+      const totalAssignedHours = classStats.reduce((acc, c) => acc + (c?.totalAssignedHours || 0), 0);
+      const totalCapacity = classStats.reduce((acc, c) => acc + (c?.weeklyMaxSlots || 0), 0);
+      const globalFillRate = totalCapacity > 0 ? Math.round((totalAssignedHours / totalCapacity) * 100) : 0;
+      const optimalClassesCount = classStats.filter((c) => c?.fillRate >= 90 && c?.fillRate <= 105).length;
+      const underClassesCount = classStats.filter((c) => c?.fillRate < 90).length;
+      const overClassesCount = classStats.filter((c) => c?.fillRate > 105).length;
+
+      return {
+        title: "Diagnostic de Remplissage & Volumes Horaires des Divisions",
+        summary: `Sur ${totalClasses} classes actives, le volume horaire programmé s'élève à ${totalAssignedHours}h sur un potentiel d'accueil de ${totalCapacity}h, soit un taux d'occupation global de ${globalFillRate}%. ${optimalClassesCount} division(s) affichent une grille pédagogique équilibrée.`,
+        kpis: [
+          { label: "Divisions / Classes", value: `${totalClasses}`, hint: "Structures actives", status: 'neutral' },
+          { label: "Heures Planifiées", value: `${totalAssignedHours}h`, hint: `Sur ${totalCapacity}h max`, status: 'neutral' },
+          { label: "Taux Remplissage", value: `${globalFillRate}%`, hint: "Occupation globale", status: globalFillRate >= 85 ? 'good' : 'warn' },
+          { label: "Grilles Équilibrées", value: `${optimalClassesCount}`, hint: `Sur ${totalClasses} classes`, status: optimalClassesCount === totalClasses ? 'good' : 'warn' }
+        ],
+        highlights: [
+          `Taux d'occupation moyen : ${globalFillRate}% de la capacité totale de l'établissement exploitée.`,
+          underClassesCount > 0 ? `${underClassesCount} division(s) présentent des créneaux libres (<90%) disponibles pour du soutien.` : "Toutes les divisions disposent d'un volume horaire complet.",
+          `Moyenne hebdomadaire de ${totalClasses > 0 ? (totalAssignedHours / totalClasses).toFixed(1) : 0}h de cours effectifs par classe.`
+        ],
+        recommendations: [
+          "Vérifier la complétude des maquettes pédagogiques sur les divisions affichant un volume d'heures inférieur aux seuils officiels.",
+          "Valoriser les créneaux libres identifiés pour organiser les séances de devoirs surveillés ou activités de remédiation."
+        ]
+      };
+    }
+
+    if (chartType === 'subjects') {
+      const totalSubjHours = subjectStats.reduce((acc, s) => acc + (s?.totalHours || 0), 0);
+      const sortedByHours = [...subjectStats].sort((a, b) => (b?.totalHours || 0) - (a?.totalHours || 0));
+      const topSubject = sortedByHours[0];
+      const activeSubjectsCount = subjectStats.filter((s) => (s?.totalHours || 0) > 0).length;
+
+      return {
+        title: "Cartographie et Équilibre des Pôles Disciplinaires",
+        summary: `L'offre d'enseignement regroupe ${safeSubjects.length} disciplines dont ${activeSubjectsCount} actives, représentant une masse de ${totalSubjHours}h/semaine. La discipline dominante est "${topSubject?.name || 'Matière'}" avec ${topSubject?.totalHours || 0}h (${topSubject?.percentage || 0}% de l'ensemble).`,
+        kpis: [
+          { label: "Disciplines Actives", value: `${activeSubjectsCount}`, hint: `Sur ${safeSubjects.length} matières`, status: 'neutral' },
+          { label: "Masse Globale", value: `${totalSubjHours}h`, hint: "Total heures/sem", status: 'neutral' },
+          { label: "Discipline Clé", value: `${(topSubject?.name || '-').substring(0, 14)}`, hint: `${topSubject?.totalHours || 0}h (${topSubject?.percentage || 0}%)`, status: 'good' },
+          { label: "Moyenne / Matière", value: `${activeSubjectsCount > 0 ? (totalSubjHours / activeSubjectsCount).toFixed(1) : 0}h`, hint: "Volume moyen hebdo", status: 'neutral' }
+        ],
+        highlights: [
+          `Discipline dominante : "${topSubject?.name || '-'}" totalise ${topSubject?.totalHours || 0}h/semaine dispensées dans ${topSubject?.classesCount || 0} classes.`,
+          `Diversité pédagogique : ${activeSubjectsCount} matières disposent d'au moins un enseignant titulaire attitré.`,
+          `Équilibre : les 3 disciplines majeures concentrent ${(sortedByHours.slice(0, 3).reduce((acc, s) => acc + (s?.percentage || 0), 0))}% de l'offre globale.`
+        ],
+        recommendations: [
+          "Harmoniser la concertation d'équipe sur les disciplines à fort volume d'enseignement pour assurer la cohérence des progressions.",
+          "Veiller à une alternance équilibrée entre matières scientifiques, littéraires et artistiques sur la semaine des élèves."
+        ]
+      };
+    }
+
+    // Default: weekly_load
+    const totalWeekSlots = dailyStats.reduce((acc, d) => acc + (d?.slotsCount || 0), 0);
+    const sortedDays = [...dailyStats].sort((a, b) => (b?.slotsCount || 0) - (a?.slotsCount || 0));
+    const busiestDay = sortedDays[0];
+    const lightestDay = sortedDays[sortedDays.length - 1];
+    const avgSlotsPerDay = safeActiveDays.length > 0 ? (totalWeekSlots / safeActiveDays.length).toFixed(1) : '0';
+
+    return {
+      title: "Rythme Hebdomadaire & Gestion des Flux Établissement",
+      summary: `L'établissement programme ${totalWeekSlots} séances réparties sur ${safeActiveDays.length} jours d'ouverture (moyenne : ${avgSlotsPerDay} cours/jour). La journée la plus dense est le ${busiestDay?.day || 'Lundi'} (${busiestDay?.slotsCount || 0} cours) et la plus allégée est le ${lightestDay?.day || 'Vendredi'} (${lightestDay?.slotsCount || 0} cours).`,
+      kpis: [
+        { label: "Séances / Semaine", value: `${totalWeekSlots}`, hint: "Total cours planifiés", status: 'neutral' },
+        { label: "Moyenne / Jour", value: `${avgSlotsPerDay}`, hint: "Séances quotidiennes", status: 'neutral' },
+        { label: "Jour de Pointe", value: `${busiestDay?.day || '-'}`, hint: `${busiestDay?.slotsCount || 0} cours`, status: 'warn' },
+        { label: "Jour le plus Allégé", value: `${lightestDay?.day || '-'}`, hint: `${lightestDay?.slotsCount || 0} cours`, status: 'good' }
+      ],
+      highlights: [
+        `Journée la plus sollicitée : ${busiestDay?.day || '-'} avec ${busiestDay?.slotsCount || 0} cours simultanés.`,
+        `Journée de respiration : ${lightestDay?.day || '-'} avec ${lightestDay?.slotsCount || 0} séances planifiées.`,
+        `Différentiel de flux : écart de ${Math.max(0, (busiestDay?.slotsCount || 0) - (lightestDay?.slotsCount || 0))} séances entre le jour le plus chargé et le plus calme.`
+      ],
+      recommendations: [
+        "Lisser les séances de la journée de pointe pour éviter l'engorgement des infrastructures partagées (laboratoires, cantine, gymnase).",
+        "Préserver la régularité des fins de semaine pour favoriser le travail personnel et la récupération des élèves."
+      ]
+    };
+  }, [chartType, safeTeachers, safeClasses, safeSubjects, teacherStats, classStats, subjectStats, dailyStats, safeActiveDays]);
+
+  // --- EXPORT PDF STRICTEMENT OPTIMISÉ FORMAT A4 (1 PAGE UNIQUE) ---
   const handleExportPDF = () => {
     if (!isPremiumOrSchool) {
       setIsUpgradePromptOpen(true);
@@ -257,230 +377,728 @@ export default function ChefAnalyticsDetailModal({
     }
 
     try {
+      // Dimensions A4 : 210 x 297 mm
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const now = new Date().toLocaleDateString('fr-FR', {
+      const isBW = exportColorMode === 'bw';
+      const now = new Date();
+      const formattedDateTime = now.toLocaleDateString('fr-FR', {
         day: '2-digit',
         month: 'long',
         year: 'numeric'
-      });
+      }) + ' à ' + now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
-      // 1. EN-TÊTE COMPACT ET ÉPURÉ
-      doc.setTextColor(15, 23, 42);
+      const interp = getChefInterpretation;
+
+      // Palette dynamique selon le mode (Couleur vs Noir & Blanc)
+      const colPrimary = isBW ? [15, 23, 42] : [79, 70, 229]; // #4f46e5
+      const colDark = isBW ? [0, 0, 0] : [15, 23, 42];
+      const colMuted = isBW ? [71, 85, 105] : [100, 116, 139];
+      const colCardBg = isBW ? [248, 250, 252] : [245, 247, 255];
+      const colCardBorder = isBW ? [203, 213, 225] : [199, 210, 254];
+      const colBoxBg = isBW ? [248, 250, 252] : [245, 243, 255];
+      const colBoxBorder = isBW ? [15, 23, 42] : [99, 102, 241];
+      const colHeaderTableBg = isBW ? [15, 23, 42] : [30, 41, 59];
+
+      // 1. BANDEAU D'EN-TÊTE SUPÉRIEUR (Y: 10 - 24 mm)
+      doc.setFillColor(colPrimary[0], colPrimary[1], colPrimary[2]);
+      doc.rect(14, 10, 3, 13, 'F'); // Petit accent vertical gauche
+
+      doc.setTextColor(colDark[0], colDark[1], colDark[2]);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(13);
-      doc.text(schoolName.toUpperCase(), 14, 14);
-
-      let reportTitle = "Audit des Quotas & Charges Enseignants";
-      if (chartType === 'classes') reportTitle = "Volumes Horaires & Remplissage des Classes";
-      else if (chartType === 'subjects') reportTitle = "Répartition Pédagogique des Disciplines";
-      else if (chartType === 'weekly_load') reportTitle = "Charge Hebdomadaire par Journée";
+      doc.text(schoolName.toUpperCase(), 19, 15);
 
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10.5);
-      doc.setTextColor(71, 85, 105);
-      doc.text(`Rapport : ${reportTitle}  •  Édité le ${now}`, 14, 20);
+      doc.setFontSize(9);
+      doc.setTextColor(colMuted[0], colMuted[1], colMuted[2]);
+      doc.text(interp.title, 19, 20.5);
 
       doc.setDrawColor(226, 232, 240);
-      doc.setLineWidth(0.4);
-      doc.line(14, 24, 196, 24);
+      doc.setLineWidth(0.3);
+      doc.line(14, 25, 196, 25);
 
-      let currentY = 32;
-
-      // 2. CORPS ET TABLEAU SELON LE TYPE DE GRAPHIQUE
-      if (chartType === 'teachers') {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10.5);
-        doc.setTextColor(15, 23, 42);
-        doc.text(`Synthèse Générale : ${safeTeachers.length} Enseignants  |  Quota Total : ${totalContractHours}h/sem  |  Heures Affectées : ${totalAssignedHoursAll}h`, 14, currentY);
-        currentY += 5.5;
+      // 2. BLOCS KPI SYNTHÉTIQUES (Y: 27 - 39 mm, 4 Cartes)
+      const kpiCards = interp.kpis || [];
+      const cardWidth = 43.5;
+      const cardGap = 2.5;
+      kpiCards.slice(0, 4).forEach((kpi, idx) => {
+        const cardX = 14 + idx * (cardWidth + cardGap);
+        doc.setFillColor(colCardBg[0], colCardBg[1], colCardBg[2]);
+        doc.setDrawColor(colCardBorder[0], colCardBorder[1], colCardBorder[2]);
+        doc.setLineWidth(0.25);
+        doc.roundedRect(cardX, 27, cardWidth, 12, 1.5, 1.5, 'FD');
 
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9.5);
-        doc.setTextColor(100, 116, 139);
-        doc.text(`Conformité contractuelle : ${optimalTeachersCount} profs au quota exact  •  ${underTeachersCount} sous-chargé(s)  •  ${overTeachersCount} en surcharge`, 14, currentY);
-        currentY += 8;
+        doc.setFontSize(6.5);
+        doc.setTextColor(colMuted[0], colMuted[1], colMuted[2]);
+        doc.text((kpi.label || '').toUpperCase(), cardX + 3, 31);
 
-        doc.setFillColor(30, 41, 59);
-        doc.roundedRect(14, currentY, 182, 8, 1, 1, 'F');
-        doc.setTextColor(255, 255, 255);
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.text("ENSEIGNANT", 18, currentY + 5.5);
-        doc.text("DISCIPLINE(S)", 70, currentY + 5.5);
-        doc.text("QUOTA", 125, currentY + 5.5);
-        doc.text("AFFECTÉ", 145, currentY + 5.5);
-        doc.text("STATUT", 168, currentY + 5.5);
-        currentY += 10;
+        doc.setFontSize(10);
+        if (isBW) {
+          doc.setTextColor(0, 0, 0);
+        } else {
+          if (kpi.status === 'good') doc.setTextColor(16, 185, 129);
+          else if (kpi.status === 'warn') doc.setTextColor(217, 119, 6);
+          else if (kpi.status === 'bad') doc.setTextColor(225, 29, 72);
+          else doc.setTextColor(79, 70, 229);
+        }
+        doc.text(kpi.value || '-', cardX + 3, 35.5);
 
-        teacherStats.forEach((t, i) => {
-          if (currentY > 275) {
-            doc.addPage();
-            currentY = 20;
-          }
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6);
+        doc.setTextColor(colMuted[0], colMuted[1], colMuted[2]);
+        doc.text(kpi.hint || '', cardX + 3, 38);
+      });
 
-          if (i % 2 === 1) {
-            doc.setFillColor(248, 250, 252);
-            doc.rect(14, currentY - 3.5, 182, 7, 'F');
-          }
+      // 3. GRAPHIQUE STATISTIQUE VECTORIEL INTÉGRÉ (Y: 41 - 83 mm, Hauteur 42mm)
+      doc.setFillColor(isBW ? 255 : 252, isBW ? 255 : 253, isBW ? 255 : 255);
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.25);
+      doc.roundedRect(14, 41, 182, 42, 2, 2, 'FD');
 
+      // En-tête du graphique
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(colDark[0], colDark[1], colDark[2]);
+      doc.text("APERÇU STATISTIQUE VISUEL", 18, 46);
+
+      // Légende en haut à droite du graphique
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.5);
+      if (chartType === 'teachers') {
+        doc.setFillColor(isBW ? 203 : 199, isBW ? 213 : 210, isBW ? 225 : 254);
+        doc.rect(130, 43.5, 4, 2.5, 'F');
+        doc.setTextColor(colMuted[0], colMuted[1], colMuted[2]);
+        doc.text("Quota Contractuel", 136, 45.5);
+
+        doc.setFillColor(colPrimary[0], colPrimary[1], colPrimary[2]);
+        doc.rect(165, 43.5, 4, 2.5, 'F');
+        doc.text("Heures Affectées", 171, 45.5);
+      } else if (chartType === 'classes') {
+        doc.setFillColor(isBW ? 15 : 16, isBW ? 23 : 185, isBW ? 42 : 129);
+        doc.rect(145, 43.5, 4, 2.5, 'F');
+        doc.setTextColor(colMuted[0], colMuted[1], colMuted[2]);
+        doc.text("Taux de Remplissage (%)", 151, 45.5);
+      } else if (chartType === 'subjects') {
+        doc.setFillColor(colPrimary[0], colPrimary[1], colPrimary[2]);
+        doc.rect(145, 43.5, 4, 2.5, 'F');
+        doc.setTextColor(colMuted[0], colMuted[1], colMuted[2]);
+        doc.text("Poids Pédagogique (%)", 151, 45.5);
+      } else {
+        doc.setFillColor(isBW ? 15 : 16, isBW ? 23 : 185, isBW ? 42 : 129);
+        doc.rect(145, 43.5, 4, 2.5, 'F');
+        doc.setTextColor(colMuted[0], colMuted[1], colMuted[2]);
+        doc.text("Créneaux occupés / jour", 151, 45.5);
+      }
+
+      // Rendu des barres selon le type de graphique
+      if (chartType === 'teachers') {
+        const topTeachers = teacherStats.slice(0, 6);
+        const barMaxVal = Math.max(25, ...topTeachers.map(t => Math.max(t.quota, t.assignedHours)));
+        const maxBarW = 95;
+
+        topTeachers.forEach((t, i) => {
+          const barY = 50 + i * 5.2;
           doc.setFont('helvetica', 'bold');
-          doc.setFontSize(8.5);
-          doc.setTextColor(30, 41, 59);
-          doc.text((t.name || '').substring(0, 26), 18, currentY + 1.5);
+          doc.setFontSize(6.5);
+          doc.setTextColor(colDark[0], colDark[1], colDark[2]);
+          doc.text((t.name || '').substring(0, 18), 18, barY + 2.5);
 
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(100, 116, 139);
-          doc.text((t.subjectsTaught || '-').substring(0, 30), 70, currentY + 1.5);
+          // Barre Quota
+          const quotaW = (t.quota / barMaxVal) * maxBarW;
+          doc.setFillColor(isBW ? 226 : 224, isBW ? 232 : 231, isBW ? 240 : 255);
+          doc.rect(58, barY, quotaW, 2, 'F');
 
-          doc.text(`${t.quota}h`, 128, currentY + 1.5);
-          doc.setFont('helvetica', 'bold');
-          doc.setTextColor(15, 23, 42);
-          doc.text(`${t.assignedHours}h`, 148, currentY + 1.5);
-
-          if (t.status === 'optimal') {
-            doc.setTextColor(16, 185, 129);
-            doc.text("✓ Conforme", 168, currentY + 1.5);
-          } else if (t.status === 'under') {
-            doc.setTextColor(217, 119, 6);
-            doc.text(`-${Math.abs(t.diff)}h`, 168, currentY + 1.5);
+          // Barre Affecté
+          const assignW = (t.assignedHours / barMaxVal) * maxBarW;
+          if (isBW) {
+            doc.setFillColor(15, 23, 42);
           } else {
-            doc.setTextColor(225, 29, 72);
-            doc.text(`+${t.diff}h`, 168, currentY + 1.5);
+            if (t.status === 'optimal') doc.setFillColor(16, 185, 129);
+            else if (t.status === 'under') doc.setFillColor(245, 158, 11);
+            else doc.setFillColor(225, 29, 72);
           }
+          doc.rect(58, barY + 2.2, assignW, 2, 'F');
 
-          currentY += 7;
+          // Texte chiffres
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(6);
+          doc.setTextColor(colMuted[0], colMuted[1], colMuted[2]);
+          doc.text(`${t.assignedHours}h / ${t.quota}h (${t.percent}%)`, 160, barY + 2.8);
         });
 
       } else if (chartType === 'classes') {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10.5);
-        doc.setTextColor(15, 23, 42);
-        doc.text(`Synthèse des Divisions : ${safeClasses.length} Classes actives dans l'établissement`, 14, currentY);
-        currentY += 8;
+        const topClasses = classStats.slice(0, 6);
+        const maxBarW = 100;
 
-        doc.setFillColor(30, 41, 59);
-        doc.roundedRect(14, currentY, 182, 8, 1, 1, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.text("CLASSE / DIVISION", 18, currentY + 5.5);
-        doc.text("DISCIPLINES ATTRIBUÉES", 70, currentY + 5.5);
-        doc.text("HEURES PLANIFIÉES", 140, currentY + 5.5);
-        doc.text("TAUX REMPLISSAGE", 170, currentY + 5.5);
-        currentY += 10;
+        topClasses.forEach((c, i) => {
+          const barY = 50 + i * 5.2;
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(6.5);
+          doc.setTextColor(colDark[0], colDark[1], colDark[2]);
+          doc.text((c.name || '').substring(0, 18), 18, barY + 2.5);
 
-        classStats.forEach((c, i) => {
-          if (currentY > 275) {
-            doc.addPage();
-            currentY = 20;
+          // Barre de fond
+          doc.setFillColor(241, 245, 249);
+          doc.roundedRect(58, barY, maxBarW, 3.5, 0.8, 0.8, 'F');
+
+          // Barre de remplissage
+          const fillW = Math.min(maxBarW, (c.fillRate / 100) * maxBarW);
+          if (isBW) {
+            doc.setFillColor(30, 41, 59);
+          } else {
+            doc.setFillColor(c.fillRate >= 95 ? 16 : 79, c.fillRate >= 95 ? 185 : 70, c.fillRate >= 95 ? 129 : 229);
           }
-
-          if (i % 2 === 1) {
-            doc.setFillColor(248, 250, 252);
-            doc.rect(14, currentY - 3.5, 182, 7, 'F');
+          if (fillW > 0) {
+            doc.roundedRect(58, barY, fillW, 3.5, 0.8, 0.8, 'F');
           }
 
           doc.setFont('helvetica', 'bold');
-          doc.setFontSize(8.5);
-          doc.setTextColor(30, 41, 59);
-          doc.text((c.name || '').substring(0, 26), 18, currentY + 1.5);
-
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(100, 116, 139);
-          doc.text(`${c.subjectCount} matières affectées`, 70, currentY + 1.5);
-
-          doc.setFont('helvetica', 'bold');
-          doc.setTextColor(15, 23, 42);
-          doc.text(`${c.totalAssignedHours}h / ${c.weeklyMaxSlots}h`, 140, currentY + 1.5);
-
-          doc.setTextColor(c.fillRate >= 100 ? 16 : 79, c.fillRate >= 100 ? 185 : 70, c.fillRate >= 100 ? 129 : 229);
-          doc.text(`${c.fillRate}%`, 175, currentY + 1.5);
-
-          currentY += 7;
+          doc.setFontSize(6.5);
+          doc.setTextColor(colDark[0], colDark[1], colDark[2]);
+          doc.text(`${c.fillRate}% (${c.totalAssignedHours}h)`, 164, barY + 2.7);
         });
 
       } else if (chartType === 'subjects') {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10.5);
-        doc.setTextColor(15, 23, 42);
-        doc.text(`Répertoire Disciplinaire : ${safeSubjects.length} Matières répertoriées`, 14, currentY);
-        currentY += 8;
+        const topSubjs = subjectStats.slice(0, 6);
+        const maxBarW = 100;
 
-        doc.setFillColor(30, 41, 59);
-        doc.roundedRect(14, currentY, 182, 8, 1, 1, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.text("MATIÈRE", 18, currentY + 5.5);
-        doc.text("VOLUME HEBDOMADAIRE", 75, currentY + 5.5);
-        doc.text("CLASSES DESSERVIES", 130, currentY + 5.5);
-        doc.text("POIDS %", 175, currentY + 5.5);
-        currentY += 10;
+        topSubjs.forEach((s, i) => {
+          const barY = 50 + i * 5.2;
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(6.5);
+          doc.setTextColor(colDark[0], colDark[1], colDark[2]);
+          doc.text((s.name || '').substring(0, 18), 18, barY + 2.5);
 
-        subjectStats.forEach((s, i) => {
-          if (currentY > 275) {
-            doc.addPage();
-            currentY = 20;
-          }
+          // Barre de fond
+          doc.setFillColor(241, 245, 249);
+          doc.roundedRect(58, barY, maxBarW, 3.5, 0.8, 0.8, 'F');
 
-          if (i % 2 === 1) {
-            doc.setFillColor(248, 250, 252);
-            doc.rect(14, currentY - 3.5, 182, 7, 'F');
+          const fillW = Math.min(maxBarW, (s.percentage / 100) * maxBarW * 2.5); // Échelle visuelle amplifiée
+          doc.setFillColor(isBW ? 30 : 139, isBW ? 41 : 92, isBW ? 59 : 246);
+          if (fillW > 0) {
+            doc.roundedRect(58, barY, fillW, 3.5, 0.8, 0.8, 'F');
           }
 
           doc.setFont('helvetica', 'bold');
-          doc.setFontSize(8.5);
-          doc.setTextColor(30, 41, 59);
-          doc.text((s.name || '').substring(0, 28), 18, currentY + 1.5);
-
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(100, 116, 139);
-          doc.text(`${s.totalHours}h / semaine`, 75, currentY + 1.5);
-          doc.text(`${s.classesCount} division(s)`, 130, currentY + 1.5);
-
-          doc.setFont('helvetica', 'bold');
-          doc.setTextColor(147, 51, 234);
-          doc.text(`${s.percentage}%`, 175, currentY + 1.5);
-
-          currentY += 7;
+          doc.setFontSize(6.5);
+          doc.setTextColor(colDark[0], colDark[1], colDark[2]);
+          doc.text(`${s.percentage}% (${s.totalHours}h)`, 164, barY + 2.7);
         });
 
       } else {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10.5);
-        doc.setTextColor(15, 23, 42);
-        doc.text(`Charge Hebdomadaire : ${safeActiveDays.length} Jours d'ouverture`, 14, currentY);
-        currentY += 8;
+        // weekly_load
+        const days = dailyStats;
+        const maxSlots = Math.max(1, ...days.map(d => d.slotsCount));
+        const colWidth = 22;
+        const startX = 24;
 
-        dailyStats.forEach((d) => {
+        days.forEach((d, i) => {
+          const dayX = startX + i * (colWidth + 4);
+          const barHeight = Math.max(2, (d.slotsCount / maxSlots) * 22);
+          const barY = 74 - barHeight;
+
+          doc.setFillColor(isBW ? 30 : 16, isBW ? 41 : 185, isBW ? 59 : 129);
+          doc.roundedRect(dayX, barY, colWidth, barHeight, 1, 1, 'F');
+
           doc.setFont('helvetica', 'bold');
-          doc.setFontSize(9);
-          doc.setTextColor(30, 41, 59);
-          doc.text(`${d.day} : ${d.slotsCount} créneaux occupés`, 18, currentY);
-          currentY += 7;
+          doc.setFontSize(6.5);
+          doc.setTextColor(colDark[0], colDark[1], colDark[2]);
+          doc.text(`${d.slotsCount}h`, dayX + colWidth / 2, barY - 1.5, { align: 'center' });
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(6.5);
+          doc.setTextColor(colMuted[0], colMuted[1], colMuted[2]);
+          doc.text(d.day.substring(0, 3), dayX + colWidth / 2, 78, { align: 'center' });
         });
       }
 
-      // 3. PIED DE PAGE DISCRET
-      const totalPages = doc.getNumberOfPages();
-      for (let p = 1; p <= totalPages; p++) {
-        doc.setPage(p);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
-        doc.setTextColor(148, 163, 184);
-        doc.text(`Document administratif officiel • Direction ${schoolName} • Page ${p}/${totalPages}`, 14, 288);
+      // 4. TABLEAU DE DONNÉES SYNTHÉTIQUE (Y: 86 - 206 mm, compacté pour A4 unique)
+      doc.setFillColor(colHeaderTableBg[0], colHeaderTableBg[1], colHeaderTableBg[2]);
+      doc.roundedRect(14, 86, 182, 6.5, 1, 1, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+
+      let currentY = 91;
+
+      let tableEndY = currentY;
+
+      if (chartType === 'teachers') {
+        doc.text("ENSEIGNANT", 18, currentY);
+        doc.text("DISCIPLINE(S)", 68, currentY);
+        doc.text("QUOTA", 125, currentY);
+        doc.text("AFFECTÉ", 145, currentY);
+        doc.text("STATUT / ÉCART", 168, currentY);
+        currentY += 4.5;
+
+        // Limiter à max 16 lignes pour tenir rigoureusement sur A4
+        const displayItems = teacherStats.slice(0, 16);
+        displayItems.forEach((t, i) => {
+          const rowY = currentY + i * 5.8;
+          if (i % 2 === 1) {
+            doc.setFillColor(248, 250, 252);
+            doc.rect(14, rowY - 2.8, 182, 5.8, 'F');
+          }
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(7);
+          doc.setTextColor(colDark[0], colDark[1], colDark[2]);
+          doc.text((t.name || '').substring(0, 24), 18, rowY + 1.2);
+
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(colMuted[0], colMuted[1], colMuted[2]);
+          doc.text((t.subjectsTaught || '-').substring(0, 28), 68, rowY + 1.2);
+
+          doc.text(`${t.quota}h`, 128, rowY + 1.2);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(colDark[0], colDark[1], colDark[2]);
+          doc.text(`${t.assignedHours}h`, 148, rowY + 1.2);
+
+          if (isBW) {
+            if (t.status === 'optimal') doc.text("[Conforme]", 168, rowY + 1.2);
+            else if (t.status === 'under') doc.text(`[- ${Math.abs(t.diff)}h]`, 168, rowY + 1.2);
+            else doc.text(`[+ ${t.diff}h Surcharge]`, 168, rowY + 1.2);
+          } else {
+            if (t.status === 'optimal') {
+              doc.setTextColor(16, 185, 129);
+              doc.text("Conforme (OK)", 168, rowY + 1.2);
+            } else if (t.status === 'under') {
+              doc.setTextColor(217, 119, 6);
+              doc.text(`-${Math.abs(t.diff)}h (Déficit)`, 168, rowY + 1.2);
+            } else {
+              doc.setTextColor(225, 29, 72);
+              doc.text(`+${t.diff}h (HSA)`, 168, rowY + 1.2);
+            }
+          }
+        });
+        tableEndY = currentY + displayItems.length * 5.8;
+
+      } else if (chartType === 'classes') {
+        doc.text("CLASSE / DIVISION", 18, currentY);
+        doc.text("DISCIPLINES ATTRIBUÉES", 70, currentY);
+        doc.text("HEURES PLANIFIÉES", 136, currentY);
+        doc.text("REMPLISSAGE", 170, currentY);
+        currentY += 4.5;
+
+        const displayItems = classStats.slice(0, 16);
+        displayItems.forEach((c, i) => {
+          const rowY = currentY + i * 5.8;
+          if (i % 2 === 1) {
+            doc.setFillColor(248, 250, 252);
+            doc.rect(14, rowY - 2.8, 182, 5.8, 'F');
+          }
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(7);
+          doc.setTextColor(colDark[0], colDark[1], colDark[2]);
+          doc.text((c.name || '').substring(0, 24), 18, rowY + 1.2);
+
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(colMuted[0], colMuted[1], colMuted[2]);
+          doc.text(`${c.subjectCount} matières répertoriées`, 70, rowY + 1.2);
+
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(colDark[0], colDark[1], colDark[2]);
+          doc.text(`${c.totalAssignedHours}h / ${c.weeklyMaxSlots}h`, 136, rowY + 1.2);
+
+          if (isBW) {
+            doc.text(`${c.fillRate}%`, 172, rowY + 1.2);
+          } else {
+            doc.setTextColor(c.fillRate >= 95 ? 16 : 79, c.fillRate >= 95 ? 185 : 70, c.fillRate >= 95 ? 129 : 229);
+            doc.text(`${c.fillRate}%`, 172, rowY + 1.2);
+          }
+        });
+        tableEndY = currentY + displayItems.length * 5.8;
+
+      } else if (chartType === 'subjects') {
+        doc.text("MATIÈRE / DISCIPLINE", 18, currentY);
+        doc.text("VOLUME HEBDO GLOBAL", 75, currentY);
+        doc.text("DIVISIONS DESSERVIES", 132, currentY);
+        doc.text("POIDS %", 172, currentY);
+        currentY += 4.5;
+
+        const displayItems = subjectStats.slice(0, 16);
+        displayItems.forEach((s, i) => {
+          const rowY = currentY + i * 5.8;
+          if (i % 2 === 1) {
+            doc.setFillColor(248, 250, 252);
+            doc.rect(14, rowY - 2.8, 182, 5.8, 'F');
+          }
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(7);
+          doc.setTextColor(colDark[0], colDark[1], colDark[2]);
+          doc.text((s.name || '').substring(0, 26), 18, rowY + 1.2);
+
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(colMuted[0], colMuted[1], colMuted[2]);
+          doc.text(`${s.totalHours}h / semaine`, 75, rowY + 1.2);
+          doc.text(`${s.classesCount} division(s)`, 132, rowY + 1.2);
+
+          doc.setFont('helvetica', 'bold');
+          if (isBW) {
+            doc.setTextColor(colDark[0], colDark[1], colDark[2]);
+          } else {
+            doc.setTextColor(139, 92, 246);
+          }
+          doc.text(`${s.percentage}%`, 172, rowY + 1.2);
+        });
+        tableEndY = currentY + displayItems.length * 5.8;
+
+      } else {
+        // weekly_load
+        doc.text("JOUR D'OUVERTURE", 18, currentY);
+        doc.text("SÉANCES PLANIFIÉES", 75, currentY);
+        doc.text("CAPACITÉ THÉORIQUE ÉTABLISSEMENT", 125, currentY);
+        doc.text("TAUX OCCUPATION", 170, currentY);
+        currentY += 4.5;
+
+        dailyStats.forEach((d, i) => {
+          const rowY = currentY + i * 6.5;
+          if (i % 2 === 1) {
+            doc.setFillColor(248, 250, 252);
+            doc.rect(14, rowY - 2.8, 182, 6.5, 'F');
+          }
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(7.5);
+          doc.setTextColor(colDark[0], colDark[1], colDark[2]);
+          doc.text(d.day, 18, rowY + 1.5);
+
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(colMuted[0], colMuted[1], colMuted[2]);
+          doc.text(`${d.slotsCount} créneaux de cours`, 75, rowY + 1.5);
+          doc.text(`${d.capacity} créneaux potentiels`, 125, rowY + 1.5);
+
+          const occ = d.capacity > 0 ? Math.round((d.slotsCount / d.capacity) * 100) : 0;
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(colDark[0], colDark[1], colDark[2]);
+          doc.text(`${occ}%`, 172, rowY + 1.5);
+        });
+        tableEndY = currentY + dailyStats.length * 6.5;
       }
 
-      const fileName = `Rapport_Analytique_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}_${chartType}.pdf`;
+      // 5. ENCADRÉ EXÉCUTIF POSITIONNÉ DYNAMIQUEMENT (ÉVITE TOUT GRAND ESPACE BLANC)
+      const diagBoxStartY = Math.min(218, tableEndY + 5);
+
+      // Calcul préalable de la hauteur requise pour le texte
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.2);
+      const splitSummary = doc.splitTextToSize(interp.summary, 168);
+
+      const splitHls = (interp.highlights || []).slice(0, 2).map((hl) => {
+        const cleanHl = (hl || '').replace(/[\u2022\u2192\u2794\u2713]/g, '-');
+        return doc.splitTextToSize(`- ${cleanHl}`, 168);
+      });
+
+      const splitRecs = (interp.recommendations || []).slice(0, 2).map((rec) => {
+        const cleanRec = (rec || '').replace(/[\u2022\u2192\u2794\u2713]/g, '>');
+        return doc.splitTextToSize(`> ${cleanRec}`, 168);
+      });
+
+      let totalContentHeight = 6 + (splitSummary.length * 3.4) + 4.2;
+      splitHls.forEach(h => { totalContentHeight += h.length * 3.3 + 0.6; });
+      totalContentHeight += 4.2;
+      splitRecs.forEach(r => { totalContentHeight += r.length * 3.3 + 0.6; });
+      totalContentHeight += 6;
+
+      const maxAllowedHeight = 281 - diagBoxStartY;
+      const diagBoxHeight = Math.min(maxAllowedHeight, Math.max(50, totalContentHeight));
+
+      doc.setFillColor(colBoxBg[0], colBoxBg[1], colBoxBg[2]);
+      doc.setDrawColor(colBoxBorder[0], colBoxBorder[1], colBoxBorder[2]);
+      doc.setLineWidth(0.35);
+      doc.roundedRect(14, diagBoxStartY, 182, diagBoxHeight, 2, 2, 'FD');
+
+      // Bordure latérale accentuée gauche
+      doc.setFillColor(colBoxBorder[0], colBoxBorder[1], colBoxBorder[2]);
+      doc.roundedRect(14, diagBoxStartY, 3, diagBoxHeight, 1, 1, 'F');
+
+      let diagY = diagBoxStartY + 5.5;
+
+      // Titre de l'encadré
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(colDark[0], colDark[1], colDark[2]);
+      doc.text("DIAGNOSTIC STRATÉGIQUE & INTERPRÉTATION DE LA DIRECTION", 21, diagY);
+      diagY += 4.5;
+
+      // Synthèse rédigée
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.2);
+      doc.setTextColor(colDark[0], colDark[1], colDark[2]);
+      doc.text(splitSummary, 21, diagY);
+      diagY += splitSummary.length * 3.4 + 2.5;
+
+      // Constats majeurs
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(colDark[0], colDark[1], colDark[2]);
+      doc.text("CONSTATS MAJEURS :", 21, diagY);
+      diagY += 3.8;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(colMuted[0], colMuted[1], colMuted[2]);
+      splitHls.forEach((splitHl) => {
+        doc.text(splitHl, 21, diagY);
+        diagY += splitHl.length * 3.3 + 0.6;
+      });
+
+      diagY += 1.5;
+
+      // Recommandations & actions prioritaires
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(colDark[0], colDark[1], colDark[2]);
+      doc.text("PRÉCONISATIONS & ACTIONS PRIORITAIRES :", 21, diagY);
+      diagY += 3.8;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(colDark[0], colDark[1], colDark[2]);
+      splitRecs.forEach((splitRec) => {
+        doc.text(splitRec, 21, diagY);
+        diagY += splitRec.length * 3.3 + 0.6;
+      });
+
+      // 6. PIED DE PAGE STRICTEMENT A4 (Y: 286 mm)
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.8);
+      doc.setTextColor(148, 163, 184);
+      doc.text(`Généré par Planora. www.planora.com  •  Direction ${schoolName}`, 14, 286);
+      doc.text(`Édité le ${formattedDateTime}  •  Page 1/1`, 196, 286, { align: 'right' });
+
+      const fileName = `Rapport_Analytique_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}_${chartType}_${exportColorMode}.pdf`;
       doc.save(fileName);
-      setExportSuccessMsg("Rapport PDF généré et téléchargé avec succès !");
+      setExportSuccessMsg(`Rapport PDF (${exportColorMode === 'bw' ? 'Noir & Blanc' : 'Couleur'}) téléchargé en format A4 strict !`);
       setTimeout(() => setExportSuccessMsg(null), 4000);
     } catch (e) {
       console.error("Erreur export PDF :", e);
     }
   };
 
-  // --- FONCTION EXPORT EXCEL (.XLSX) ---
+  // --- EXPORT WORD FORMATÉ & ENRICHI (.DOC) ---
+  const handleExportWord = () => {
+    if (!isPremiumOrSchool) {
+      setIsUpgradePromptOpen(true);
+      return;
+    }
+
+    try {
+      const isBW = exportColorMode === 'bw';
+      const interp = getChefInterpretation;
+      const now = new Date();
+      const formattedDateTime = now.toLocaleDateString('fr-FR', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric'
+      }) + ' à ' + now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+      const themeColors = isBW
+        ? { primary: '#0f172a', bg: '#f8fafc', border: '#cbd5e1', accent: '#334155', text: '#000000', muted: '#475569' }
+        : { primary: '#4f46e5', bg: '#f5f3ff', border: '#c7d2fe', accent: '#6366f1', text: '#0f172a', muted: '#475569' };
+
+      // Construction du tableau de données en HTML Word
+      let tableRowsHtml = '';
+      if (chartType === 'teachers') {
+        tableRowsHtml = `
+          <thead>
+            <tr style="background-color: ${themeColors.primary}; color: #ffffff; text-align: left;">
+              <th style="padding: 6px 10px; font-size: 11px;">Enseignant</th>
+              <th style="padding: 6px 10px; font-size: 11px;">Disciplines</th>
+              <th style="padding: 6px 10px; font-size: 11px; text-align: center;">Quota</th>
+              <th style="padding: 6px 10px; font-size: 11px; text-align: center;">Affecté</th>
+              <th style="padding: 6px 10px; font-size: 11px; text-align: center;">Jauge</th>
+              <th style="padding: 6px 10px; font-size: 11px; text-align: center;">Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${teacherStats.map((t, idx) => `
+              <tr style="background-color: ${idx % 2 === 1 ? '#f8fafc' : '#ffffff'}; border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 6px 10px; font-weight: bold; color: ${themeColors.text}; font-size: 10px;">${t.name}</td>
+                <td style="padding: 6px 10px; color: ${themeColors.muted}; font-size: 10px;">${t.subjectsTaught}</td>
+                <td style="padding: 6px 10px; text-align: center; font-size: 10px;">${t.quota}h</td>
+                <td style="padding: 6px 10px; text-align: center; font-weight: bold; font-size: 10px;">${t.assignedHours}h</td>
+                <td style="padding: 6px 10px; text-align: center; font-size: 10px;">
+                  <div style="background: #e2e8f0; width: 60px; height: 8px; border-radius: 4px; display: inline-block; overflow: hidden;">
+                    <div style="background: ${isBW ? '#0f172a' : (t.status === 'optimal' ? '#10b981' : t.status === 'under' ? '#f59e0b' : '#e11d48')}; width: ${Math.min(100, t.percent)}%; height: 100%;"></div>
+                  </div>
+                  <span style="font-size: 9px; margin-left: 4px;">${t.percent}%</span>
+                </td>
+                <td style="padding: 6px 10px; text-align: center; font-size: 10px; font-weight: bold; color: ${isBW ? '#0f172a' : (t.status === 'optimal' ? '#059669' : t.status === 'under' ? '#d97706' : '#e11d48')};">
+                  ${t.status === 'optimal' ? '✓ Conforme' : t.status === 'under' ? `-${Math.abs(t.diff)}h` : `+${t.diff}h`}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        `;
+      } else if (chartType === 'classes') {
+        tableRowsHtml = `
+          <thead>
+            <tr style="background-color: ${themeColors.primary}; color: #ffffff; text-align: left;">
+              <th style="padding: 6px 10px; font-size: 11px;">Division / Classe</th>
+              <th style="padding: 6px 10px; font-size: 11px;">Matières</th>
+              <th style="padding: 6px 10px; font-size: 11px; text-align: center;">Heures Planifiées</th>
+              <th style="padding: 6px 10px; font-size: 11px; text-align: center;">Capacité</th>
+              <th style="padding: 6px 10px; font-size: 11px; text-align: center;">Remplissage</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${classStats.map((c, idx) => `
+              <tr style="background-color: ${idx % 2 === 1 ? '#f8fafc' : '#ffffff'}; border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 6px 10px; font-weight: bold; color: ${themeColors.text}; font-size: 10px;">${c.name}</td>
+                <td style="padding: 6px 10px; color: ${themeColors.muted}; font-size: 10px;">${c.subjectCount} matières</td>
+                <td style="padding: 6px 10px; text-align: center; font-weight: bold; font-size: 10px;">${c.totalAssignedHours}h</td>
+                <td style="padding: 6px 10px; text-align: center; font-size: 10px;">${c.weeklyMaxSlots}h</td>
+                <td style="padding: 6px 10px; text-align: center; font-size: 10px; font-weight: bold; color: ${isBW ? '#0f172a' : (c.fillRate >= 90 ? '#059669' : '#d97706')};">
+                  ${c.fillRate}%
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        `;
+      } else if (chartType === 'subjects') {
+        tableRowsHtml = `
+          <thead>
+            <tr style="background-color: ${themeColors.primary}; color: #ffffff; text-align: left;">
+              <th style="padding: 6px 10px; font-size: 11px;">Discipline</th>
+              <th style="padding: 6px 10px; font-size: 11px; text-align: center;">Volume Hebdo</th>
+              <th style="padding: 6px 10px; font-size: 11px; text-align: center;">Divisions Desservies</th>
+              <th style="padding: 6px 10px; font-size: 11px; text-align: center;">Poids %</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${subjectStats.map((s, idx) => `
+              <tr style="background-color: ${idx % 2 === 1 ? '#f8fafc' : '#ffffff'}; border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 6px 10px; font-weight: bold; color: ${themeColors.text}; font-size: 10px;">${s.name}</td>
+                <td style="padding: 6px 10px; text-align: center; font-weight: bold; font-size: 10px;">${s.totalHours}h/sem</td>
+                <td style="padding: 6px 10px; text-align: center; font-size: 10px;">${s.classesCount} division(s)</td>
+                <td style="padding: 6px 10px; text-align: center; font-size: 10px; font-weight: bold; color: ${themeColors.primary};">
+                  ${s.percentage}%
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        `;
+      } else {
+        tableRowsHtml = `
+          <thead>
+            <tr style="background-color: ${themeColors.primary}; color: #ffffff; text-align: left;">
+              <th style="padding: 6px 10px; font-size: 11px;">Jour</th>
+              <th style="padding: 6px 10px; font-size: 11px; text-align: center;">Créneaux Occupés</th>
+              <th style="padding: 6px 10px; font-size: 11px; text-align: center;">Capacité Établissement</th>
+              <th style="padding: 6px 10px; font-size: 11px; text-align: center;">Taux d'Occupation</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${dailyStats.map((d, idx) => `
+              <tr style="background-color: ${idx % 2 === 1 ? '#f8fafc' : '#ffffff'}; border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 6px 10px; font-weight: bold; color: ${themeColors.text}; font-size: 10px;">${d.day}</td>
+                <td style="padding: 6px 10px; text-align: center; font-weight: bold; font-size: 10px;">${d.slotsCount} cours</td>
+                <td style="padding: 6px 10px; text-align: center; font-size: 10px;">${d.capacity} créneaux</td>
+                <td style="padding: 6px 10px; text-align: center; font-size: 10px; font-weight: bold; color: ${themeColors.primary};">
+                  ${d.capacity > 0 ? Math.round((d.slotsCount / d.capacity) * 100) : 0}%
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        `;
+      }
+
+      const wordHtmlContent = `
+        <!DOCTYPE html>
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head>
+          <meta charset='utf-8'>
+          <title>${interp.title}</title>
+          <style>
+            @page Section1 {
+              size: 210mm 297mm;
+              margin: 15mm 15mm 15mm 15mm;
+              mso-header-margin: 35.4pt;
+              mso-footer-margin: 35.4pt;
+              mso-paper-source: 0;
+            }
+            div.Section1 { page: Section1; }
+            body { font-family: 'Segoe UI', Calibri, Arial, sans-serif; color: ${themeColors.text}; background: #ffffff; }
+            h1 { font-size: 18px; color: ${themeColors.primary}; margin: 0 0 4px 0; font-weight: bold; }
+            h2 { font-size: 13px; color: ${themeColors.muted}; margin: 0 0 16px 0; font-weight: normal; }
+            .kpi-grid { display: table; width: 100%; margin-bottom: 16px; border-collapse: separate; border-spacing: 8px 0; }
+            .kpi-cell { display: table-cell; width: 25%; background-color: ${themeColors.bg}; border: 1px solid ${themeColors.border}; padding: 8px 10px; border-radius: 6px; }
+            .kpi-label { font-size: 9px; color: ${themeColors.muted}; text-transform: uppercase; font-weight: bold; margin-bottom: 2px; }
+            .kpi-value { font-size: 15px; color: ${themeColors.primary}; font-weight: bold; margin-bottom: 2px; }
+            .kpi-hint { font-size: 8.5px; color: ${themeColors.muted}; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+            .diagnostic-box { background-color: ${themeColors.bg}; border-left: 4px solid ${themeColors.primary}; border: 1px solid ${themeColors.border}; border-left-width: 4px; padding: 12px 14px; border-radius: 6px; margin-top: 14px; }
+            .diag-title { font-size: 12px; font-weight: bold; color: ${themeColors.primary}; margin-bottom: 6px; }
+            .diag-text { font-size: 10px; line-height: 1.5; color: ${themeColors.text}; margin-bottom: 8px; }
+            .diag-sub { font-size: 10.5px; font-weight: bold; color: ${themeColors.text}; margin-top: 8px; margin-bottom: 4px; }
+            .diag-list { margin: 0; padding-left: 16px; font-size: 9.5px; line-height: 1.5; color: ${themeColors.text}; }
+            .footer { margin-top: 16px; font-size: 8.5px; color: ${themeColors.muted}; border-top: 1px solid #e2e8f0; padding-top: 6px; display: table; width: 100%; }
+          </style>
+        </head>
+        <body>
+          <div class="Section1">
+            <h1>${schoolName.toUpperCase()}</h1>
+            <h2>${interp.title}</h2>
+
+            <div class="kpi-grid">
+              ${(interp.kpis || []).map(kpi => `
+                <div class="kpi-cell">
+                  <div class="kpi-label">${kpi.label}</div>
+                  <div class="kpi-value">${kpi.value}</div>
+                  <div class="kpi-hint">${kpi.hint}</div>
+                </div>
+              `).join('')}
+            </div>
+
+            <table>
+              ${tableRowsHtml}
+            </table>
+
+            <div class="diagnostic-box">
+              <div class="diag-title">DIAGNOSTIC STRATÉGIQUE & INTERPRÉTATION DE LA DIRECTION</div>
+              <div class="diag-text">${interp.summary}</div>
+
+              <div class="diag-sub">Points Clés Observés :</div>
+              <ul class="diag-list">
+                ${(interp.highlights || []).map(hl => `<li>${hl}</li>`).join('')}
+              </ul>
+
+              <div class="diag-sub">Recommandations & Actions Décisionnelles :</div>
+              <ul class="diag-list">
+                ${(interp.recommendations || []).map(rec => `<li><strong>➜</strong> ${rec}</li>`).join('')}
+              </ul>
+            </div>
+
+            <div class="footer">
+              <div style="display: table-cell; text-align: left;">Généré par Planora. www.planora.com  •  Direction ${schoolName}</div>
+              <div style="display: table-cell; text-align: right;">Édité le ${formattedDateTime}  •  Page 1/1</div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob([wordHtmlContent], { type: 'application/msword;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `Rapport_Analytique_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}_${chartType}_${exportColorMode}.doc`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setExportSuccessMsg(`Rapport Word (.doc) généré et téléchargé avec succès (${exportColorMode === 'bw' ? 'Noir & Blanc' : 'Couleur'}) !`);
+      setTimeout(() => setExportSuccessMsg(null), 4000);
+    } catch (e) {
+      console.error("Erreur export Word :", e);
+    }
+  };
+
+  // --- EXPORT EXCEL OPTIMISÉ AVEC BARRES GRAPHIQUES ET INTERPRÉTATION (.XLSX) ---
   const handleExportExcel = () => {
     if (!isPremiumOrSchool) {
       setIsUpgradePromptOpen(true);
@@ -488,8 +1106,28 @@ export default function ChefAnalyticsDetailModal({
     }
 
     try {
+      const isBW = exportColorMode === 'bw';
+      const interp = getChefInterpretation;
+      const now = new Date();
+      const formattedDateTime = now.toLocaleDateString('fr-FR', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric'
+      }) + ' à ' + now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
       let dataToExport: any[] = [];
       let sheetName = 'Statistiques';
+
+      // Générateur de jauge visuelle textuelle pour Excel
+      const makeExcelProgressBar = (percent: number) => {
+        const p = Math.max(0, Math.min(100, percent));
+        const filled = Math.round(p / 10);
+        const empty = 10 - filled;
+        if (isBW) {
+          return `${'█'.repeat(filled)}${'░'.repeat(empty)} ${p}%`;
+        }
+        return `${'🟩'.repeat(filled)}${'⬜'.repeat(empty)} ${p}%`;
+      };
 
       if (chartType === 'teachers') {
         sheetName = 'Enseignants_Quotas';
@@ -499,9 +1137,9 @@ export default function ChefAnalyticsDetailModal({
           'Disciplines Enseignées': t.subjectsTaught,
           'Quota Hebdo Contractuel (h)': t.quota,
           'Heures Affectées Réelles (h)': t.assignedHours,
-          'Écart (Différence)': t.diff,
-          'Taux Réalisation (%)': `${t.percent}%`,
-          'Statut Quota': t.status === 'optimal' ? 'Conforme' : t.status === 'under' ? 'Sous-chargé' : 'Surcharge'
+          'Écart / Solde': t.diff >= 0 ? `+${t.diff}` : `${t.diff}`,
+          'Jauge Réalisation': makeExcelProgressBar(t.percent),
+          'Statut Quota': t.status === 'optimal' ? 'Conforme (100%)' : t.status === 'under' ? `Sous-service (-${Math.abs(t.diff)}h)` : `Surcharge (+${t.diff}h HSA)`
         }));
       } else if (chartType === 'classes') {
         sheetName = 'Classes_Remplissage';
@@ -512,6 +1150,7 @@ export default function ChefAnalyticsDetailModal({
           'Heures Planifiées (h)': c.totalAssignedHours,
           'Capacité Hebdomadaire (h)': c.weeklyMaxSlots,
           'Heures Libres': c.freeSlots,
+          'Jauge Remplissage': makeExcelProgressBar(c.fillRate),
           'Taux Remplissage (%)': `${c.fillRate}%`
         }));
       } else if (chartType === 'subjects') {
@@ -522,6 +1161,7 @@ export default function ChefAnalyticsDetailModal({
           'Volume Global (h/sem)': s.totalHours,
           'Nombre de Classes Desservies': s.classesCount,
           'Nombre Enseignants': s.teachersCount,
+          'Jauge Répartition': makeExcelProgressBar(s.percentage),
           'Poids Pédagogique (%)': `${s.percentage}%`
         }));
       } else {
@@ -529,18 +1169,43 @@ export default function ChefAnalyticsDetailModal({
         dataToExport = dailyStats.map((d) => ({
           'Jour': d.day,
           'Créneaux Occupés': d.slotsCount,
-          'Capacité Théorique': d.capacity
+          'Capacité Théorique': d.capacity,
+          'Jauge Charge': makeExcelProgressBar(d.capacity > 0 ? Math.round((d.slotsCount / d.capacity) * 100) : 0)
         }));
       }
 
+      // Création de la feuille principale avec les données
       const ws = XLSX.utils.json_to_sheet(dataToExport);
+
+      // Création de la feuille de synthèse et d'interprétation pour le chef
+      const summaryRows = [
+        { 'AUDIT ANALYTIQUE DE LA DIRECTION': interp.title.toUpperCase(), 'VALEUR': '' },
+        { 'AUDIT ANALYTIQUE DE LA DIRECTION': `Établissement : ${schoolName}`, 'VALEUR': '' },
+        { 'AUDIT ANALYTIQUE DE LA DIRECTION': `Édité le : ${formattedDateTime}`, 'VALEUR': '' },
+        { 'AUDIT ANALYTIQUE DE LA DIRECTION': `Mention légale : Généré par Planora. www.planora.com`, 'VALEUR': '' },
+        { 'AUDIT ANALYTIQUE DE LA DIRECTION': `Mode d'export : ${isBW ? 'Noir & Blanc' : 'Couleur'}`, 'VALEUR': '' },
+        { 'AUDIT ANALYTIQUE DE LA DIRECTION': '', 'VALEUR': '' },
+        { 'AUDIT ANALYTIQUE DE LA DIRECTION': '--- SYNTHÈSE EXÉCUTIVE ---', 'VALEUR': '' },
+        { 'AUDIT ANALYTIQUE DE LA DIRECTION': interp.summary, 'VALEUR': '' },
+        { 'AUDIT ANALYTIQUE DE LA DIRECTION': '', 'VALEUR': '' },
+        { 'AUDIT ANALYTIQUE DE LA DIRECTION': '--- INDICATEURS CLÉS (KPIS) ---', 'VALEUR': '' },
+        ...((interp.kpis || []).map(k => ({ 'AUDIT ANALYTIQUE DE LA DIRECTION': k.label, 'VALEUR': `${k.value} (${k.hint})` }))),
+        { 'AUDIT ANALYTIQUE DE LA DIRECTION': '', 'VALEUR': '' },
+        { 'AUDIT ANALYTIQUE DE LA DIRECTION': '--- RECOMMANDATIONS DÉCISIONNELLES ---', 'VALEUR': '' },
+        ...((interp.recommendations || []).map((rec, i) => ({ 'AUDIT ANALYTIQUE DE LA DIRECTION': `Action ${i + 1}`, 'VALEUR': rec }))),
+        { 'AUDIT ANALYTIQUE DE LA DIRECTION': '', 'VALEUR': '' },
+        { 'AUDIT ANALYTIQUE DE LA DIRECTION': 'Généré par Planora. www.planora.com', 'VALEUR': '' }
+      ];
+      const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+
       const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Synthese_Direction');
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
-      const fileName = `Export_Analytique_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}_${chartType}.xlsx`;
+      const fileName = `Export_Analytique_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}_${chartType}_${exportColorMode}.xlsx`;
       XLSX.writeFile(wb, fileName);
 
-      setExportSuccessMsg("Fichier Excel (.xlsx) généré et téléchargé avec succès !");
+      setExportSuccessMsg(`Classeur Excel (.xlsx) généré et téléchargé avec succès (${exportColorMode === 'bw' ? 'Noir & Blanc' : 'Couleur'}) !`);
       setTimeout(() => setExportSuccessMsg(null), 4000);
     } catch (e) {
       console.error("Erreur export Excel :", e);
@@ -629,14 +1294,44 @@ export default function ChefAnalyticsDetailModal({
             </div>
           </div>
 
-          {/* ACTIONS D'EXPORTATION EN HAUT À DROITE */}
-          <div className="flex items-center gap-2.5">
+          {/* ACTIONS D'EXPORTATION ET CHOIX DU STYLE EN HAUT À DROITE */}
+          <div className="flex items-center gap-2 flex-wrap">
             
+            {/* SÉLECTEUR DE STYLE D'EXPORTATION (COULEUR VS NOIR & BLANC) */}
+            <div className={`flex items-center p-1 rounded-xl border text-[11px] font-bold ${isLight ? "bg-gray-100/90 border-gray-200" : "bg-slate-950/80 border-white/10"}`} title="Style visuel des exports PDF, Word et Excel">
+              <button
+                type="button"
+                onClick={() => setExportColorMode('color')}
+                className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
+                  exportColorMode === 'color'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : isLight ? 'text-gray-600 hover:text-gray-900' : 'text-gray-400 hover:text-white'
+                }`}
+                title="Export couleur moderne & dynamique"
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-rose-400 via-amber-300 to-emerald-400"></span>
+                <span>Couleur</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setExportColorMode('bw')}
+                className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
+                  exportColorMode === 'bw'
+                    ? 'bg-slate-800 text-white shadow-sm'
+                    : isLight ? 'text-gray-600 hover:text-gray-900' : 'text-gray-400 hover:text-white'
+                }`}
+                title="Export noir & blanc contrasté (optimisé pour impression et photocopie économique)"
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-slate-300 border border-slate-600"></span>
+                <span>Noir &amp; Blanc</span>
+              </button>
+            </div>
+
             {/* BOUTON EXPORT PDF */}
             <button
               type="button"
               onClick={handleExportPDF}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95 border ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 border ${
                 isLight
                   ? isPremiumOrSchool
                     ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-700 shadow-rose-600/20'
@@ -645,10 +1340,36 @@ export default function ChefAnalyticsDetailModal({
                   ? 'bg-rose-600 hover:bg-rose-500 text-white border-rose-500/30 shadow-rose-600/20'
                   : 'bg-rose-950/40 hover:bg-rose-950/60 text-rose-300 border-rose-500/20'
               }`}
-              title={isPremiumOrSchool ? "Télécharger le rapport d'analyse détaillé en PDF" : "Réservé aux abonnés Premium et School"}
+              title={isPremiumOrSchool ? "Télécharger le rapport d'analyse 1 page A4 strict en PDF" : "Réservé aux abonnés Premium et School"}
             >
-              <FileText className={`w-4 h-4 ${isLight ? (isPremiumOrSchool ? 'text-white' : 'text-rose-600') : 'text-rose-400'}`} />
-              <span>Export PDF</span>
+              <FileText className={`w-3.5 h-3.5 ${isLight ? (isPremiumOrSchool ? 'text-white' : 'text-rose-600') : 'text-rose-400'}`} />
+              <span>PDF A4</span>
+              {!isPremiumOrSchool && (
+                <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono flex items-center gap-0.5 border ${
+                  isLight ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                }`}>
+                  <Lock className="w-2.5 h-2.5" /> VIP
+                </span>
+              )}
+            </button>
+
+            {/* BOUTON EXPORT WORD (.DOC) */}
+            <button
+              type="button"
+              onClick={handleExportWord}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 border ${
+                isLight
+                  ? isPremiumOrSchool
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-700 shadow-blue-600/20'
+                    : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200'
+                  : isPremiumOrSchool
+                  ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-500/30 shadow-blue-600/20'
+                  : 'bg-blue-950/40 hover:bg-blue-950/60 text-blue-300 border-blue-500/20'
+              }`}
+              title={isPremiumOrSchool ? "Télécharger le rapport éditable sous Microsoft Word (.doc)" : "Réservé aux abonnés Premium et School"}
+            >
+              <FileText className={`w-3.5 h-3.5 ${isLight ? (isPremiumOrSchool ? 'text-white' : 'text-blue-600') : 'text-blue-400'}`} />
+              <span>Word</span>
               {!isPremiumOrSchool && (
                 <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono flex items-center gap-0.5 border ${
                   isLight ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
@@ -662,7 +1383,7 @@ export default function ChefAnalyticsDetailModal({
             <button
               type="button"
               onClick={handleExportExcel}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95 border ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 border ${
                 isLight
                   ? isPremiumOrSchool
                     ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 shadow-emerald-600/20'
@@ -671,10 +1392,10 @@ export default function ChefAnalyticsDetailModal({
                   ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500/30 shadow-emerald-600/20'
                   : 'bg-emerald-950/40 hover:bg-emerald-950/60 text-emerald-300 border-emerald-500/20'
               }`}
-              title={isPremiumOrSchool ? "Télécharger les données d'analyse en format Excel .xlsx" : "Réservé aux abonnés Premium et School"}
+              title={isPremiumOrSchool ? "Télécharger les données d'analyse en format Excel .xlsx avec synthèse" : "Réservé aux abonnés Premium et School"}
             >
-              <FileSpreadsheet className={`w-4 h-4 ${isLight ? (isPremiumOrSchool ? 'text-white' : 'text-emerald-600') : 'text-emerald-400'}`} />
-              <span>Export Excel</span>
+              <FileSpreadsheet className={`w-3.5 h-3.5 ${isLight ? (isPremiumOrSchool ? 'text-white' : 'text-emerald-600') : 'text-emerald-400'}`} />
+              <span>Excel</span>
               {!isPremiumOrSchool && (
                 <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono flex items-center gap-0.5 border ${
                   isLight ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
@@ -1070,9 +1791,9 @@ export default function ChefAnalyticsDetailModal({
         <footer className={`px-6 py-3.5 border-t flex items-center justify-between gap-4 shrink-0 z-10 flex-wrap ${isLight ? "bg-gray-50/90 border-gray-200/80 text-gray-600" : "bg-slate-950/60 border-white/10 text-gray-400"}`}>
           <div className="text-xs flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-indigo-500" />
-            <span>Données synchronisées en temps réel • Exports PDF &amp; Excel certifiés direction</span>
+            <span>Données en temps réel • Exports PDF A4, Word (.doc) &amp; Excel (.xlsx) certifiés direction</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={handleExportPDF}
@@ -1085,9 +1806,27 @@ export default function ChefAnalyticsDetailModal({
                   ? 'bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border-rose-500/30'
                   : 'bg-white/5 hover:bg-white/10 text-gray-400 border-white/10'
               }`}
+              title="Exporter au format PDF A4 strict (1 page)"
             >
               <FileText className="w-3.5 h-3.5 text-rose-500" />
-              <span>PDF</span>
+              <span>PDF A4</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleExportWord}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer border ${
+                isLight
+                  ? isPremiumOrSchool
+                    ? 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 shadow-sm'
+                    : 'bg-gray-100 text-gray-400 border-gray-200'
+                  : isPremiumOrSchool
+                  ? 'bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border-blue-500/30'
+                  : 'bg-white/5 hover:bg-white/10 text-gray-400 border-white/10'
+              }`}
+              title="Exporter au format Microsoft Word (.doc)"
+            >
+              <FileText className="w-3.5 h-3.5 text-blue-500" />
+              <span>Word</span>
             </button>
             <button
               type="button"
@@ -1101,6 +1840,7 @@ export default function ChefAnalyticsDetailModal({
                   ? 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border-emerald-500/30'
                   : 'bg-white/5 hover:bg-white/10 text-gray-400 border-white/10'
               }`}
+              title="Exporter au format Excel (.xlsx)"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500" />
               <span>Excel</span>
@@ -1108,7 +1848,7 @@ export default function ChefAnalyticsDetailModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all cursor-pointer ml-2"
+              className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all cursor-pointer ml-1"
             >
               Fermer la vue détaillée
             </button>

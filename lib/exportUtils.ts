@@ -208,7 +208,7 @@ export function exportTimetableToPdf(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(100, 116, 139); // slate-500
-  doc.text(`Édité le ${now} • Année Scolaire en cours`, 205, 18);
+  doc.text(`Année Scolaire en cours • Document Officiel`, 205, 18);
 
   // Filet de séparation sobre
   doc.setDrawColor(226, 232, 240);
@@ -452,11 +452,18 @@ export function exportTimetableToPdf(
 
   // --- PIED DE PAGE DISCRET ACADÉMIQUE ---
   const footerY = tableBodyY + SLOT_LABELS.length * rowHeight + totalBreaksH + 6;
+  const nowObj = new Date();
+  const formattedDateTime = nowObj.toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  }) + ' à ' + nowObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
   doc.setTextColor(100, 116, 139);
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${schoolName} • ${schoolSlogan || "Validé par la direction des études."}`, 12, footerY);
-  doc.text(`Document officiel de rentrée scolaire • Certifié conforme`, 205, footerY);
+  doc.text(`Généré par Planora. www.planora.com • Direction ${schoolName}`, 12, footerY);
+  doc.text(`Édité le ${formattedDateTime}`, 285, footerY, { align: 'right' });
 
   doc.save(`${schoolName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_planning_${cls.name}.pdf`);
 }
@@ -504,7 +511,7 @@ export function exportTeacherTimetableToPdf(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(100, 116, 139);
-  doc.text(`Volume : ${assignedHours}h / ${teacher.weeklyQuota}h contractuelles  •  Édité le ${now}`, 175, 18);
+  doc.text(`Volume : ${assignedHours}h / ${teacher.weeklyQuota}h contractuelles`, 195, 18);
 
   doc.setDrawColor(226, 232, 240);
   doc.setLineWidth(0.4);
@@ -645,11 +652,18 @@ export function exportTeacherTimetableToPdf(
   }
 
   const footerY = tableBodyY + SLOT_LABELS.length * rowHeight + 6;
+  const nowObj = new Date();
+  const formattedDateTime = nowObj.toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  }) + ' à ' + nowObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
   doc.setTextColor(100, 116, 139);
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${schoolName} • Emploi du temps individuel de l'enseignant`, 12, footerY);
-  doc.text(`Document officiel de rentrée scolaire • Direction des études`, 205, footerY);
+  doc.text(`Généré par Planora. www.planora.com • Direction ${schoolName}`, 12, footerY);
+  doc.text(`Édité le ${formattedDateTime}`, 285, footerY, { align: 'right' });
 
   doc.save(`planning_prof_${teacher.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.pdf`);
 }
@@ -701,7 +715,7 @@ export function exportAllTeachersTimetableToPdf(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(100, 116, 139);
-    doc.text(`Charge : ${assignedHours}h / ${teacher.weeklyQuota}h • Page ${index + 1}/${teachers.length}`, 185, 18);
+    doc.text(`Charge : ${assignedHours}h / ${teacher.weeklyQuota}h contractuelles`, 185, 18);
 
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.4);
@@ -836,11 +850,18 @@ export function exportAllTeachersTimetableToPdf(
     }
 
     const footerY = tableBodyY + SLOT_LABELS.length * rowHeight + 6;
+    const nowObj = new Date();
+    const formattedDateTime = nowObj.toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric'
+    }) + ' à ' + nowObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
     doc.setTextColor(100, 116, 139);
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setFont('helvetica', 'normal');
-    doc.text(`${schoolName} • Recueil des emplois du temps enseignants`, 12, footerY);
-    doc.text(`Édité le ${now} • Document Officiel`, 205, footerY);
+    doc.text(`Généré par Planora. www.planora.com • Direction ${schoolName}`, 12, footerY);
+    doc.text(`Édité le ${formattedDateTime} • Page ${index + 1}/${teachers.length}`, 285, footerY, { align: 'right' });
   });
 
   doc.save(`emplois_du_temps_tous_profs_${schoolName.toLowerCase().replace(/[^a-z0-9]/g, '_')}.pdf`);
@@ -1000,7 +1021,12 @@ export function exportTimetableToWord(
   const cls = classes.find(c => c.id === classId);
   if (!cls) return;
 
-  const d = new Date().toLocaleDateString('fr-FR');
+  const nowObj = new Date();
+  const formattedDateTime = nowObj.toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  }) + ' à ' + nowObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   const escapedSchoolName = escapeHtml(schoolName);
   const escapedSchoolSlogan = escapeHtml(schoolSlogan);
   const escapedClassName = escapeHtml(cls.name);
@@ -1095,7 +1121,6 @@ export function exportTimetableToWord(
           </td>
           <td style="vertical-align: middle; text-align: right;">
             <div class="doc-meta">Emploi du Temps — Classe : ${escapedClassName}</div>
-            <div style="font-size: 8pt; color: #64748b;">Édité le ${d}</div>
           </td>
         </tr>
       </table>
@@ -1114,8 +1139,8 @@ export function exportTimetableToWord(
 
       <table class="footer-text">
         <tr>
-          <td>Document officiel certifié • <strong>${escapedSchoolName}</strong></td>
-          <td style="text-align: right;">Tous droits réservés.</td>
+          <td>Généré par Planora. www.planora.com • Direction <strong>${escapedSchoolName}</strong></td>
+          <td style="text-align: right;">Édité le ${formattedDateTime}</td>
         </tr>
       </table>
     </body>
@@ -1156,7 +1181,12 @@ export function exportTeacherTimetableToWord(
 
   if (teachersToExport.length === 0) return;
 
-  const d = new Date().toLocaleDateString('fr-FR');
+  const nowObj = new Date();
+  const formattedDateTime = nowObj.toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  }) + ' à ' + nowObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   const escapedSchoolName = escapeHtml(schoolName);
   const escapedSchoolSlogan = escapeHtml(schoolSlogan);
 
@@ -1219,7 +1249,7 @@ export function exportTeacherTimetableToWord(
             </td>
             <td style="vertical-align: middle; text-align: right;">
               <div class="doc-meta" style="color: #16a34a;">Emploi du Temps — Professeur : ${escapedTeacherName}</div>
-              <div style="font-size: 8pt; color: #64748b;">Charge : ${assignedHours}h / ${teacher.weeklyQuota}h • Édité le ${d}</div>
+              <div style="font-size: 8pt; color: #64748b;">Charge : ${assignedHours}h / ${teacher.weeklyQuota}h contractuelles</div>
             </td>
           </tr>
         </table>
@@ -1238,8 +1268,8 @@ export function exportTeacherTimetableToWord(
 
         <table class="footer-text">
           <tr>
-            <td>Document officiel enseignant • <strong>${escapedSchoolName}</strong></td>
-            <td style="text-align: right;">Tous droits réservés.</td>
+            <td>Généré par Planora. www.planora.com • Direction <strong>${escapedSchoolName}</strong></td>
+            <td style="text-align: right;">Édité le ${formattedDateTime}</td>
           </tr>
         </table>
       </div>

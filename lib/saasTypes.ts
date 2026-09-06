@@ -9,6 +9,7 @@ export interface SaaSPlanFeatures {
   prioritySupport: boolean;
   multiUser: boolean;
   customBranding: boolean;
+  pedagogicalPlanning?: boolean;
 }
 
 export interface SaaSPlan {
