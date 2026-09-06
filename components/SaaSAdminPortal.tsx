@@ -591,14 +591,27 @@ export default function SaaSAdminPortal({
 
     const targetPlan = plans.find(p => p.id === client.planId);
     const planName = targetPlan?.name || 'Abonnement';
-    const messageText = `Bonjour ! Voici votre clé d'activation Planora pour l'établissement "${client.schoolName}" (${planName}) : ${keyToSend}. Pour débloquer votre formule, connectez-vous sur votre Espace Établissement et renseignez cette clé dans la section "Activer ma clé de licence".`;
+    const messageText = `Bonjour ! Voici votre certificat et clé d'activation Planora pour l'établissement "${client.schoolName}" (${planName}) : ${keyToSend}. Vous trouverez en pièce jointe votre PDF officiel. Pour débloquer votre formule, connectez-vous sur votre Espace Établissement et renseignez cette clé dans la section "Activer ma clé de licence".`;
 
+    // 1. Generate and download PDF
+    try {
+      import('@/lib/pdfKeyGenerator').then(({ generateKeyPdf }) => {
+        if (targetPlan) {
+          const doc = generateKeyPdf(client, targetPlan, keyToSend);
+          doc.save(`Certificat_Planora_${client.schoolName.replace(/\\s+/g, '_')}.pdf`);
+        }
+      });
+    } catch (err) {
+      console.error("Failed to generate PDF", err);
+    }
+
+    // 2. Open Whatsapp/Email link for the text
     if (type === 'whatsapp') {
       const cleanPhone = (client.whatsapp || client.phone || '').replace(/[^0-9]/g, '');
       const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(messageText)}`;
       window.open(waUrl, '_blank');
     } else {
-      const emailSubject = `Votre clé d'activation Planora - ${client.schoolName}`;
+      const emailSubject = `Votre certificat d'activation Planora - ${client.schoolName}`;
       const mailUrl = `mailto:${client.adminEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(messageText)}`;
       window.open(mailUrl, '_blank');
     }
