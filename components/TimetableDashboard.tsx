@@ -836,7 +836,7 @@ export default function TimetableDashboard({
   };
 
   // Validate request, deliver key and automatically register client (Gated until key redemption)
-  const handleValidateAndDeliverRequest = async (requestId: string, deliveryType?: 'whatsapp' | 'email') => {
+  const handleValidateAndDeliverRequest = async (requestId: string, deliveryType?: 'whatsapp' | 'email' | 'share') => {
     const req = saasActivationRequests.find(r => r.id === requestId);
     if (!req) return;
 
@@ -961,19 +961,81 @@ export default function TimetableDashboard({
 
     showNotification(`Établissement ${req.schoolName} enregistré (en attente d'activation de sa clé) !`, 'success');
 
-    // 5. Open messaging if requested
+    // 5. Open messaging / sharing with PDF if requested
     const targetPlan = saasPlans.find(p => p.id === req.planId);
     const planName = targetPlan?.name || 'Abonnement';
-    const messageText = `Bonjour ! Votre commande pour l'établissement "${req.schoolName}" (${planName}) a été validée. Voici votre clé d'activation Planora : ${keyToSend}. Pour débloquer votre formule, connectez-vous sur votre Espace Établissement et renseignez cette clé dans la section "Activer ma clé de licence".`;
+    const emailSubject = `Votre certificat officiel d'activation Planora - ${req.schoolName}`;
+    const messageText = `Bonjour ! Votre commande pour l'établissement "${req.schoolName}" (${planName}) a été validée avec succès.
 
-    if (deliveryType === 'whatsapp') {
-      const cleanPhone = req.whatsapp.replace(/[^0-9]/g, '');
-      const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(messageText)}`;
-      window.open(waUrl, '_blank');
-    } else if (deliveryType === 'email') {
-      const emailSubject = `Votre clé d'activation Planora - ${req.schoolName}`;
-      const mailUrl = `mailto:${req.adminEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(messageText)}`;
-      window.open(mailUrl, '_blank');
+Voici votre clé d'activation officielle : ${keyToSend}
+
+📄 Le certificat PDF officiel avec tous les détails de votre souscription est joint à ce message.
+
+Pour débloquer votre formule :
+1. Rendez-vous sur votre Espace Établissement Planora.
+2. Cliquez sur "Activer ma clé de licence".
+3. Renseignez votre clé : ${keyToSend}`;
+
+    if (deliveryType && targetPlan) {
+      try {
+        const { generateKeyPdfFile } = await import('@/lib/pdfKeyGenerator');
+        const clientObjForPdf: SaaSClient = {
+          id: req.clientId || `cli_${Date.now()}`,
+          schoolName: req.schoolName,
+          logoIcon: 'GraduationCap',
+          adminName: req.adminName || `Admin ${req.schoolName}`,
+          adminEmail: req.adminEmail,
+          phone: req.whatsapp,
+          whatsapp: req.whatsapp,
+          cityCountry: req.cityCountry || 'Sénégal',
+          planId: req.planId,
+          status: 'pending_key',
+          startDate: nowStr,
+          trialEndDate: nowStr,
+          subscriptionEndDate: new Date(Date.now() + (req.durationMonths || 1) * 30 * 86400000).toISOString().split('T')[0],
+          paymentMethod: req.paymentMethod,
+          totalPaidFCFA: req.amountFCFA,
+          createdAt: nowStr,
+          lastActiveAt: "À l'instant",
+          classesCount: 0,
+          teachersCount: 0
+        };
+
+        const { doc, file, fileName } = generateKeyPdfFile(clientObjForPdf, targetPlan, keyToSend);
+
+        if (deliveryType === 'share') {
+          if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+              await navigator.share({
+                files: [file],
+                title: emailSubject,
+                text: messageText
+              });
+              return;
+            } catch (err: any) {
+              if (err.name !== 'AbortError') {
+                console.warn("Web share failed, downloading PDF fallback", err);
+              }
+            }
+          }
+        }
+
+        // Download PDF
+        doc.save(fileName);
+
+        if (deliveryType === 'whatsapp') {
+          const cleanPhone = req.whatsapp.replace(/[^0-9]/g, '');
+          const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(messageText)}`;
+          window.open(waUrl, '_blank');
+          showNotification(`Certificat PDF téléchargé ! Cliquez sur l'icône 📎 trombone dans WhatsApp pour joindre le PDF.`, 'info');
+        } else if (deliveryType === 'email') {
+          const mailUrl = `mailto:${req.adminEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(messageText)}`;
+          window.open(mailUrl, '_blank');
+          showNotification(`Certificat PDF téléchargé ! Joignez le fichier ${fileName} à votre e-mail.`, 'info');
+        }
+      } catch (err) {
+        console.error("Failed to generate or deliver PDF certificate", err);
+      }
     }
   };
 

@@ -129,3 +129,12 @@ export function generateKeyPdf(client: SaaSClient, plan: SaaSPlan, key: string) 
 
   return doc;
 }
+
+export function generateKeyPdfFile(client: SaaSClient, plan: SaaSPlan, key: string): { doc: jsPDF; file: File; fileName: string } {
+  const doc = generateKeyPdf(client, plan, key);
+  const cleanSchool = client.schoolName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const fileName = `Certificat_Planora_${cleanSchool}.pdf`;
+  const blob = doc.output('blob');
+  const file = new File([blob], fileName, { type: 'application/pdf' });
+  return { doc, file, fileName };
+}

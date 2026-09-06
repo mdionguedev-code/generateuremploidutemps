@@ -50,7 +50,9 @@ import {
   Maximize2,
   EyeOff,
   KeyRound,
-  ShieldCheck
+  ShieldCheck,
+  Share2,
+  Paperclip
 } from 'lucide-react';
 import {
   dbAdminCreateClientUser,
@@ -109,7 +111,7 @@ interface SaaSAdminPortalProps {
   onUpdateTransactions: (txs: SaaSPaymentTransaction[]) => void;
   onUpdateSettings: (settings: SaaSGlobalSettings) => void;
   onUpdateActivationRequests?: (requests: SaaSActivationRequest[]) => void;
-  onValidateAndDeliverRequest?: (requestId: string, deliveryType?: 'whatsapp' | 'email') => void;
+  onValidateAndDeliverRequest?: (requestId: string, deliveryType?: 'whatsapp' | 'email' | 'share') => void;
   onSwitchToClientView: (client: SaaSClient) => void;
   theme: 'dark' | 'light';
 }
@@ -152,6 +154,16 @@ export default function SaaSAdminPortal({
   const [selectedInvoice, setSelectedInvoice] = useState<SaaSPaymentTransaction | null>(null);
   const [waveSaveSuccess, setWaveSaveSuccess] = useState(false);
   const [adminDetailModal, setAdminDetailModal] = useState<'mrr' | 'plans' | null>(null);
+  const [deliveryGuideModal, setDeliveryGuideModal] = useState<{
+    isOpen: boolean;
+    client: SaaSClient;
+    planName: string;
+    key: string;
+    type: 'whatsapp' | 'email' | 'share';
+    fileName: string;
+    messageText: string;
+  } | null>(null);
+  const [copiedDeliveryMessage, setCopiedDeliveryMessage] = useState(false);
 
   // New client form state
   const [showDefaultPassword, setShowDefaultPassword] = useState(false);
@@ -525,7 +537,7 @@ export default function SaaSAdminPortal({
     }
   };
 
-  const handleSendActivationKey = (client: SaaSClient, type: 'whatsapp' | 'email') => {
+  const handleSendActivationKey = async (client: SaaSClient, type: 'whatsapp' | 'email' | 'share') => {
     let keyToSend = client.licenseKey;
     let updatedClients = [...clients];
     let updatedKeys = [...licenseKeys];
@@ -591,29 +603,65 @@ export default function SaaSAdminPortal({
 
     const targetPlan = plans.find(p => p.id === client.planId);
     const planName = targetPlan?.name || 'Abonnement';
-    const messageText = `Bonjour ! Voici votre certificat et clé d'activation Planora pour l'établissement "${client.schoolName}" (${planName}) : ${keyToSend}. Vous trouverez en pièce jointe votre PDF officiel. Pour débloquer votre formule, connectez-vous sur votre Espace Établissement et renseignez cette clé dans la section "Activer ma clé de licence".`;
+    const emailSubject = `Votre certificat officiel d'activation Planora - ${client.schoolName}`;
+    const messageText = `Bonjour ! Voici votre certificat officiel et clé d'activation Planora pour l'établissement "${client.schoolName}" (${planName}) : ${keyToSend}.
 
-    // 1. Generate and download PDF
+📄 Le certificat PDF officiel avec tous les avantages de votre formule est joint à ce message.
+
+Pour activer votre formule :
+1. Connectez-vous sur votre Espace Établissement Planora.
+2. Rendez-vous dans la section "Activer ma clé de licence".
+3. Renseignez votre clé : ${keyToSend}`;
+
+    // Generate PDF and handle sharing / sending
     try {
-      import('@/lib/pdfKeyGenerator').then(({ generateKeyPdf }) => {
-        if (targetPlan) {
-          const doc = generateKeyPdf(client, targetPlan, keyToSend);
-          doc.save(`Certificat_Planora_${client.schoolName.replace(/\\s+/g, '_')}.pdf`);
-        }
-      });
-    } catch (err) {
-      console.error("Failed to generate PDF", err);
-    }
+      const { generateKeyPdfFile } = await import('@/lib/pdfKeyGenerator');
+      if (targetPlan) {
+        const { doc, file, fileName } = generateKeyPdfFile(client, targetPlan, keyToSend);
 
-    // 2. Open Whatsapp/Email link for the text
-    if (type === 'whatsapp') {
-      const cleanPhone = (client.whatsapp || client.phone || '').replace(/[^0-9]/g, '');
-      const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(messageText)}`;
-      window.open(waUrl, '_blank');
-    } else {
-      const emailSubject = `Votre certificat d'activation Planora - ${client.schoolName}`;
-      const mailUrl = `mailto:${client.adminEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(messageText)}`;
-      window.open(mailUrl, '_blank');
+        if (type === 'share') {
+          if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+              await navigator.share({
+                files: [file],
+                title: emailSubject,
+                text: messageText
+              });
+              return;
+            } catch (err: any) {
+              if (err.name !== 'AbortError') {
+                console.warn("Web share failed or canceled, falling back to download", err);
+              }
+            }
+          }
+        }
+
+        // 1. Download PDF to device
+        doc.save(fileName);
+
+        // 2. Open messaging if requested
+        if (type === 'whatsapp') {
+          const cleanPhone = (client.whatsapp || client.phone || '').replace(/[^0-9]/g, '');
+          const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(messageText)}`;
+          window.open(waUrl, '_blank');
+        } else if (type === 'email') {
+          const mailUrl = `mailto:${client.adminEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(messageText)}`;
+          window.open(mailUrl, '_blank');
+        }
+
+        // 3. Open guidance modal
+        setDeliveryGuideModal({
+          isOpen: true,
+          client,
+          planName,
+          key: keyToSend,
+          type,
+          fileName,
+          messageText
+        });
+      }
+    } catch (err) {
+      console.error("Failed to generate or deliver PDF key", err);
     }
   };
 
@@ -1380,21 +1428,31 @@ export default function SaaSAdminPortal({
 
                           <td className="p-4 text-right">
                             <div className="flex items-center justify-end gap-2">
-                              {/* ACTION 1: WHATSAPP DIRECT DELIVERY */}
+                              {/* ACTION 1: DIRECT SHARE WITH PDF */}
+                              <button
+                                onClick={() => onValidateAndDeliverRequest?.(req.id, 'share')}
+                                className="px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white border border-purple-500/30 transition-all text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                                title="Valider, générer et partager directement le certificat PDF"
+                              >
+                                <Share2 className="w-3.5 h-3.5" />
+                                <span>Partager</span>
+                              </button>
+
+                              {/* ACTION 2: WHATSAPP DIRECT DELIVERY */}
                               <button
                                 onClick={() => onValidateAndDeliverRequest?.(req.id, 'whatsapp')}
                                 className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/30 transition-all text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-                                title="Valider, inscrire et envoyer la clé par WhatsApp"
+                                title="Valider, inscrire et envoyer la clé & certificat par WhatsApp"
                               >
                                 <Phone className="w-3.5 h-3.5" />
                                 <span>WhatsApp</span>
                               </button>
 
-                              {/* ACTION 2: EMAIL DIRECT DELIVERY */}
+                              {/* ACTION 3: EMAIL DIRECT DELIVERY */}
                               <button
                                 onClick={() => onValidateAndDeliverRequest?.(req.id, 'email')}
                                 className="px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 transition-all text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-                                title="Valider, inscrire et envoyer la clé par Email"
+                                title="Valider, inscrire et envoyer la clé & certificat par Email"
                               >
                                 <Mail className="w-3.5 h-3.5" />
                                 <span>Email</span>
@@ -1512,28 +1570,35 @@ export default function SaaSAdminPortal({
                               </span>
                               <div>
                                 <span className="block font-bold text-white text-sm">{client.schoolName}</span>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                  <span className="text-gray-400 text-[11px] truncate max-w-[150px]">
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="text-gray-400 text-[11px] truncate max-w-[140px]">
                                     {client.adminName} • {client.adminEmail}
                                   </span>
                                   <button
                                     onClick={() => handleSendActivationKey(client, 'email')}
                                     className="p-1 rounded bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer"
-                                    title="Envoyer la clé par Email"
+                                    title="Envoyer la clé & certificat par Email"
                                   >
                                     <Mail className="w-3 h-3" />
                                   </button>
                                 </div>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                  <span className="text-gray-500 text-[10px] font-mono">
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="text-gray-500 text-[10px] font-mono truncate max-w-[140px]">
                                     {client.whatsapp || client.phone} • {client.cityCountry}
                                   </span>
                                   <button
                                     onClick={() => handleSendActivationKey(client, 'whatsapp')}
                                     className="p-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
-                                    title="Envoyer la clé par WhatsApp"
+                                    title="Envoyer la clé & certificat par WhatsApp"
                                   >
                                     <Phone className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleSendActivationKey(client, 'share')}
+                                    className="p-1 rounded bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 hover:text-purple-300 transition-colors cursor-pointer"
+                                    title="Partager directement le fichier PDF (Web Share)"
+                                  >
+                                    <Share2 className="w-3 h-3" />
                                   </button>
                                 </div>
                               </div>
@@ -1578,6 +1643,15 @@ export default function SaaSAdminPortal({
 
                           <td className="p-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
+                              {/* Share / Send Certificate PDF */}
+                              <button
+                                onClick={() => handleSendActivationKey(client, 'share')}
+                                className="p-2 rounded-xl bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white border border-purple-500/30 transition-all cursor-pointer"
+                                title="Partager / Envoyer le certificat PDF & clé d'activation"
+                              >
+                                <FileText className="w-4 h-4" />
+                              </button>
+
                               {/* Open Client View */}
                               <button
                                 onClick={() => onSwitchToClientView(client)}
@@ -3579,6 +3653,143 @@ export default function SaaSAdminPortal({
                 <button
                   onClick={() => setAdminDetailModal(null)}
                   className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs"
+                >
+                  Fermer
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+        {/* MODAL: DELIVER / SHARE ACTIVATION KEY & CERTIFICATE PDF */}
+        {deliveryGuideModal?.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-slate-900 border border-indigo-500/30 w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-5 relative overflow-hidden text-left"
+            >
+              {/* Background gradient decorative glow */}
+              <div className="absolute top-0 right-0 -mr-16 -mt-16 w-48 h-48 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+              <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-white/10 pb-4 relative z-10">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-base">Certificat &amp; Clé d&apos;Activation</h3>
+                    <p className="text-xs text-indigo-400 font-medium">
+                      {deliveryGuideModal.client.schoolName} • {deliveryGuideModal.planName}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setDeliveryGuideModal(null)}
+                  className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  <XCircle className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* PDF Downloaded Success Badge */}
+              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-emerald-300">
+                    Certificat PDF officiel généré et téléchargé avec succès !
+                  </p>
+                  <p className="text-[11px] text-gray-400 font-mono break-all">
+                    Fichier : {deliveryGuideModal.fileName}
+                  </p>
+                </div>
+              </div>
+
+              {/* Key Box */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-white/10 space-y-2">
+                <span className="text-[10px] uppercase tracking-wider font-bold text-gray-400 block">
+                  Clé d&apos;activation attribuée
+                </span>
+                <div className="flex items-center justify-between gap-2 bg-slate-900 px-3 py-2 rounded-xl border border-white/5">
+                  <code className="font-mono text-sm font-bold text-indigo-300">
+                    {deliveryGuideModal.key}
+                  </code>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(deliveryGuideModal.key);
+                      setCopiedDeliveryMessage(true);
+                      setTimeout(() => setCopiedDeliveryMessage(false), 2500);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    {copiedDeliveryMessage ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedDeliveryMessage ? "Copié !" : "Copier"}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Instructions */}
+              <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/20 space-y-2 text-xs text-gray-300">
+                <div className="flex items-center gap-2 font-bold text-indigo-300">
+                  <Paperclip className="w-4 h-4 text-indigo-400" />
+                  <span>Comment joindre le PDF ?</span>
+                </div>
+                <ol className="list-decimal list-inside space-y-1 text-[11px] text-gray-400 leading-relaxed">
+                  <li>Le message WhatsApp ou Email a été prérempli automatiquement.</li>
+                  <li>Cliquez sur l&apos;icône <strong>📎 Pièce jointe</strong> dans WhatsApp ou Mail.</li>
+                  <li>Sélectionnez le fichier <strong>{deliveryGuideModal.fileName}</strong> dans votre dossier &ldquo;Téléchargements&rdquo;.</li>
+                </ol>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-white/10">
+                <button
+                  onClick={() => handleSendActivationKey(deliveryGuideModal.client, 'share')}
+                  className="py-2.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-purple-600/20 transition-all cursor-pointer"
+                >
+                  <Share2 className="w-4 h-4" />
+                  <span>Partager (Web Share)</span>
+                </button>
+
+                <button
+                  onClick={() => handleSendActivationKey(deliveryGuideModal.client, 'whatsapp')}
+                  className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
+                >
+                  <Phone className="w-4 h-4" />
+                  <span>Ouvrir WhatsApp</span>
+                </button>
+
+                <button
+                  onClick={() => handleSendActivationKey(deliveryGuideModal.client, 'email')}
+                  className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-gray-200 border border-white/10 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Mail className="w-4 h-4" />
+                  <span>Ouvrir Email</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    import('@/lib/pdfKeyGenerator').then(({ generateKeyPdf }) => {
+                      const targetP = plans.find(p => p.id === deliveryGuideModal.client.planId);
+                      if (targetP) {
+                        const doc = generateKeyPdf(deliveryGuideModal.client, targetP, deliveryGuideModal.key);
+                        doc.save(deliveryGuideModal.fileName);
+                      }
+                    });
+                  }}
+                  className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-gray-200 border border-white/10 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Re-télécharger PDF</span>
+                </button>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  onClick={() => setDeliveryGuideModal(null)}
+                  className="w-full py-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white font-bold text-xs transition-colors cursor-pointer"
                 >
                   Fermer
                 </button>
