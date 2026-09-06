@@ -7250,11 +7250,6 @@ Pour débloquer votre formule :
                   </div>
                 )}
 
-                {/* DISCRETE BRANDING FOOTER */}
-                <footer className="w-full py-6 mt-8 border-t border-white/5 text-center text-xs text-gray-500/50 font-medium tracking-wide">
-                  Développé par Xidma Hitech, 2026
-                </footer>
-
               </main>
             </div>
           </div>

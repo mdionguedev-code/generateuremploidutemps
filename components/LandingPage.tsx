@@ -848,13 +848,6 @@ export default function LandingPage({
               </button>
             </div>
           </div>
-
-          {/* DISCRETE BRANDING FOOTER */}
-          <div className="w-full pt-8 mt-10 border-t border-white/5 text-center">
-            <p className="text-xs text-[#bccbb9]/40 font-medium tracking-wide">
-              Développé par Xidma Hitech, 2026
-            </p>
-          </div>
         </footer>
 
         {/* Modal de Documentation Officielle Interactive */}
