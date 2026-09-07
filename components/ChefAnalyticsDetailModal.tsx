@@ -868,7 +868,7 @@ export default function ChefAnalyticsDetailModal({
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6.8);
       doc.setTextColor(148, 163, 184);
-      doc.text(`Généré par Planora. www.planora.com  •  Direction ${schoolName}`, 14, 286);
+      doc.text(`Généré par IziSchool AI  •  Direction ${schoolName}`, 14, 286);
       doc.text(`Édité le ${formattedDateTime}  •  Page 1/1`, 196, 286, { align: 'right' });
 
       const fileName = `Rapport_Analytique_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}_${chartType}_${exportColorMode}.pdf`;
@@ -1075,7 +1075,7 @@ export default function ChefAnalyticsDetailModal({
             </div>
 
             <div class="footer">
-              <div style="display: table-cell; text-align: left;">Généré par Planora. www.planora.com  •  Direction ${schoolName}</div>
+              <div style="display: table-cell; text-align: left;">Généré par IziSchool AI  •  Direction ${schoolName}</div>
               <div style="display: table-cell; text-align: right;">Édité le ${formattedDateTime}  •  Page 1/1</div>
             </div>
           </div>
@@ -1182,7 +1182,7 @@ export default function ChefAnalyticsDetailModal({
         { 'AUDIT ANALYTIQUE DE LA DIRECTION': interp.title.toUpperCase(), 'VALEUR': '' },
         { 'AUDIT ANALYTIQUE DE LA DIRECTION': `Établissement : ${schoolName}`, 'VALEUR': '' },
         { 'AUDIT ANALYTIQUE DE LA DIRECTION': `Édité le : ${formattedDateTime}`, 'VALEUR': '' },
-        { 'AUDIT ANALYTIQUE DE LA DIRECTION': `Mention légale : Généré par Planora. www.planora.com`, 'VALEUR': '' },
+        { 'AUDIT ANALYTIQUE DE LA DIRECTION': `Mention légale : Généré par IziSchool AI`, 'VALEUR': '' },
         { 'AUDIT ANALYTIQUE DE LA DIRECTION': `Mode d'export : ${isBW ? 'Noir & Blanc' : 'Couleur'}`, 'VALEUR': '' },
         { 'AUDIT ANALYTIQUE DE LA DIRECTION': '', 'VALEUR': '' },
         { 'AUDIT ANALYTIQUE DE LA DIRECTION': '--- SYNTHÈSE EXÉCUTIVE ---', 'VALEUR': '' },
@@ -1194,7 +1194,7 @@ export default function ChefAnalyticsDetailModal({
         { 'AUDIT ANALYTIQUE DE LA DIRECTION': '--- RECOMMANDATIONS DÉCISIONNELLES ---', 'VALEUR': '' },
         ...((interp.recommendations || []).map((rec, i) => ({ 'AUDIT ANALYTIQUE DE LA DIRECTION': `Action ${i + 1}`, 'VALEUR': rec }))),
         { 'AUDIT ANALYTIQUE DE LA DIRECTION': '', 'VALEUR': '' },
-        { 'AUDIT ANALYTIQUE DE LA DIRECTION': 'Généré par Planora. www.planora.com', 'VALEUR': '' }
+        { 'AUDIT ANALYTIQUE DE LA DIRECTION': 'Généré par IziSchool AI', 'VALEUR': '' }
       ];
       const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
 

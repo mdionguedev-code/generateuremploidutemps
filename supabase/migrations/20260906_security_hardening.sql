@@ -1,6 +1,6 @@
 -- ====================================================================
 -- MIGRATION DE SÉCURISATION GLOBALE (RLS, POLICIES, RPC SECURITY DEFINER)
--- SaaS Diongue-IziSchool / Planora
+-- SaaS IziSchool AI
 -- Date: 2026-09-06
 -- ====================================================================
 

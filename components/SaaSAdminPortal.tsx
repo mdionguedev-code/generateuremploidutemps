@@ -655,13 +655,13 @@ export default function SaaSAdminPortal({
 
     const targetPlan = plans.find(p => p.id === client.planId);
     const planName = targetPlan?.name || 'Abonnement';
-    const emailSubject = `Votre certificat officiel d'activation Planora - ${client.schoolName}`;
-    const messageText = `Bonjour ! Voici votre certificat officiel et clé d'activation Planora pour l'établissement "${client.schoolName}" (${planName}) : ${keyToSend}.
+    const emailSubject = `Votre certificat officiel d'activation IziSchool AI - ${client.schoolName}`;
+    const messageText = `Bonjour ! Voici votre certificat officiel et clé d'activation IziSchool AI pour l'établissement "${client.schoolName}" (${planName}) : ${keyToSend}.
 
 📄 Le certificat PDF officiel avec tous les avantages de votre formule est joint à ce message.
 
 Pour activer votre formule :
-1. Connectez-vous sur votre Espace Établissement Planora.
+1. Connectez-vous sur votre Espace Établissement IziSchool AI.
 2. Rendez-vous dans la section "Activer ma clé de licence".
 3. Renseignez votre clé : ${keyToSend}`;
 
@@ -845,13 +845,13 @@ Pour activer votre formule :
       };
 
       const planName = targetPlan?.name || 'Abonnement';
-      const emailSubject = `Votre certificat officiel d'activation Planora - ${dummyClient.schoolName}`;
-      const messageText = `Bonjour ! Voici votre certificat officiel et clé d'activation Planora pour l'établissement "${dummyClient.schoolName}" (${planName}) : ${keyObj.key}.
+      const emailSubject = `Votre certificat officiel d'activation IziSchool AI - ${dummyClient.schoolName}`;
+      const messageText = `Bonjour ! Voici votre certificat officiel et clé d'activation IziSchool AI pour l'établissement "${dummyClient.schoolName}" (${planName}) : ${keyObj.key}.
 
 📄 Le certificat PDF officiel avec tous les détails de votre souscription est disponible.
 
 Pour activer votre formule :
-1. Connectez-vous sur votre Espace Établissement Planora.
+1. Connectez-vous sur votre Espace Établissement IziSchool AI.
 2. Rendez-vous dans la section "Activer ma clé de licence".
 3. Renseignez votre clé : ${keyObj.key}`;
 
@@ -2870,7 +2870,7 @@ Pour activer votre formule :
                       type="button"
                       onClick={() => {
                         navigator.clipboard.writeText(
-                          `Vos identifiants Diongue-IziSchool pour ${createdClientSuccess.schoolName} :\nEmail: ${createdClientSuccess.email}\nMot de passe: ${createdClientSuccess.password}\nLien de connexion: ${window.location.origin}`
+                          `Vos identifiants IziSchool AI pour ${createdClientSuccess.schoolName} :\nEmail: ${createdClientSuccess.email}\nMot de passe: ${createdClientSuccess.password}\nLien de connexion: ${window.location.origin}`
                         );
                         setCopiedPassword(true);
                         setTimeout(() => setCopiedPassword(false), 2500);
@@ -3198,7 +3198,7 @@ Pour activer votre formule :
                       type="button"
                       onClick={() => {
                         navigator.clipboard.writeText(
-                          `Bonjour,\nVoici vos nouveaux identifiants Diongue-IziSchool pour ${resetPasswordClient.schoolName} :\nEmail: ${resetPasswordClient.adminEmail}\nNouveau Mot de passe: ${resetPasswordInput}\nLien de connexion: ${window.location.origin}`
+                          `Bonjour,\nVoici vos nouveaux identifiants IziSchool AI pour ${resetPasswordClient.schoolName} :\nEmail: ${resetPasswordClient.adminEmail}\nNouveau Mot de passe: ${resetPasswordInput}\nLien de connexion: ${window.location.origin}`
                         );
                         setCopiedResetCreds(true);
                         setTimeout(() => setCopiedResetCreds(false), 2500);

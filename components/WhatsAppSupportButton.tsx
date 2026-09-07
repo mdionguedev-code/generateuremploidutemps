@@ -10,7 +10,7 @@ interface WhatsAppSupportButtonProps {
 
 export default function WhatsAppSupportButton({
   phoneNumber = '221785927510',
-  message = "Bonjour ! J'ai besoin d'assistance concernant l'application Planora Emplois du Temps."
+  message = "Bonjour ! J'ai besoin d'assistance concernant l'application IziSchool AI."
 }: WhatsAppSupportButtonProps) {
   const [isHovered, setIsHovered] = useState(false);
 

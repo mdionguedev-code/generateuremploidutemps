@@ -1,4 +1,4 @@
-# 📘 GUIDE MAÎTRE ET ARCHITECTURE GLOBALE : SAAS DIONGUE-IZISCHOOL
+# 📘 GUIDE MAÎTRE ET ARCHITECTURE GLOBALE : SAAS IZISCHOOL AI
 
 > **Document de Référence & Mémoire Projet**  
 > Ce document synthétise l'architecture intégrale, le design system, les algorithmes de résolution sous contraintes, le modèle SaaS multi-tenant, les fonctionnalités clés et les points forts du logiciel.
@@ -7,7 +7,7 @@
 
 ## 🧭 1. VUE D'ENSEMBLE DU PROJET
 
-**Diongue-IziSchool** est un SaaS B2B moderne conçu pour automatiser et optimiser la création, la gestion et l'exportation des emplois du temps scolaires (collèges, lycées, universités, instituts de formation).
+**IziSchool AI** est un SaaS B2B moderne conçu pour automatiser et optimiser la création, la gestion et l'exportation des emplois du temps scolaires (collèges, lycées, universités, instituts de formation).
 
 ### 🎯 Objectifs Principaux
 1. **Élimination totale des conflits d'horaires** (superposition de profs, de classes, ou de salles).

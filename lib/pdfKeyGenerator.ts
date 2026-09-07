@@ -36,7 +36,7 @@ export function generateKeyPdf(client: SaaSClient, plan: SaaSPlan, key: string) 
   setTextColorHex('#ffffff');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(28);
-  doc.text('PLANORA', 105, 20, { align: 'center' });
+  doc.text('IZISCHOOL AI', 105, 20, { align: 'center' });
   
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
@@ -124,8 +124,8 @@ export function generateKeyPdf(client: SaaSClient, plan: SaaSPlan, key: string) 
   
   setTextColorHex('#ffffff');
   doc.setFontSize(10);
-  doc.text("Pour activer votre clé, rendez-vous sur votre espace Établissement Planora", 105, footerY, { align: 'center' });
-  doc.text("www.planora.com | contact@planora.com", 105, footerY + 8, { align: 'center' });
+  doc.text("Pour activer votre clé, rendez-vous sur votre espace Établissement IziSchool AI", 105, footerY, { align: 'center' });
+  doc.text("contact@izischool.ai", 105, footerY + 8, { align: 'center' });
 
   return doc;
 }
@@ -133,7 +133,7 @@ export function generateKeyPdf(client: SaaSClient, plan: SaaSPlan, key: string) 
 export function generateKeyPdfFile(client: SaaSClient, plan: SaaSPlan, key: string): { doc: jsPDF; file: File; fileName: string } {
   const doc = generateKeyPdf(client, plan, key);
   const cleanSchool = client.schoolName.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const fileName = `Certificat_Planora_${cleanSchool}.pdf`;
+  const fileName = `Certificat_IziSchool_AI_${cleanSchool}.pdf`;
   const blob = doc.output('blob');
   const file = new File([blob], fileName, { type: 'application/pdf' });
   return { doc, file, fileName };

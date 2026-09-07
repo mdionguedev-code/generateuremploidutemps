@@ -62,7 +62,7 @@ export default function ResetPasswordPage() {
           </div>
           <h2 className="text-xl font-bold text-white">Nouveau Mot de Passe</h2>
           <p className="text-xs text-gray-400 mt-1">
-            Définissez votre nouveau mot de passe pour accéder à votre espace Diongue-IziSchool.
+            Définissez votre nouveau mot de passe pour accéder à votre espace IziSchool AI.
           </p>
         </div>
 

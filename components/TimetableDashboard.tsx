@@ -297,7 +297,7 @@ export default function TimetableDashboard({
   // Ils ne sont plus persistés via localStorage.
 
   // --- School / Etablissement Settings States ---
-  const [schoolName, setSchoolName] = useState<string>('Diongue-IziSchool');
+  const [schoolName, setSchoolName] = useState<string>('IziSchool AI');
   const [schoolSlogan, setSchoolSlogan] = useState<string>("Validé par la direction des études.");
   const [schoolLogo, setSchoolLogo] = useState<string>('');
   const [schoolLogoType, setSchoolLogoType] = useState<'icon' | 'url'>('icon');
@@ -1082,7 +1082,7 @@ export default function TimetableDashboard({
     // 5. Open messaging / sharing with PDF if requested
     const targetPlan = saasPlans.find(p => p.id === req.planId);
     const planName = targetPlan?.name || 'Abonnement';
-    const emailSubject = `Votre certificat officiel d'activation Planora - ${req.schoolName}`;
+    const emailSubject = `Votre certificat officiel d'activation IziSchool AI - ${req.schoolName}`;
     const messageText = `Bonjour ! Votre commande pour l'établissement "${req.schoolName}" (${planName}) a été validée avec succès.
 
 Voici votre clé d'activation officielle : ${keyToSend}
@@ -1090,7 +1090,7 @@ Voici votre clé d'activation officielle : ${keyToSend}
 📄 Le certificat PDF officiel avec tous les détails de votre souscription est joint à ce message.
 
 Pour débloquer votre formule :
-1. Rendez-vous sur votre Espace Établissement Planora.
+1. Rendez-vous sur votre Espace Établissement IziSchool AI.
 2. Cliquez sur "Activer ma clé de licence".
 3. Renseignez votre clé : ${keyToSend}`;
 
@@ -7147,7 +7147,7 @@ Pour débloquer votre formule :
                                 type="text"
                                 value={schoolName}
                                 onChange={(e) => setSchoolName(e.target.value)}
-                                placeholder="Ex: Lycée Excellence Diongue, Collège IziSchool"
+                                placeholder="Ex: Lycée d'Excellence, Collège IziSchool AI"
                                 className={`w-full rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-colors shadow-inner border ${isLight
                                     ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-500'
                                     : 'bg-slate-950/80 border-white/10 text-white focus:border-indigo-500'

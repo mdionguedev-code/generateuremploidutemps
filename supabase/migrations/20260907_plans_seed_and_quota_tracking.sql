@@ -1,6 +1,6 @@
 -- ====================================================================
 -- MIGRATION : SEED DES PLANS SAAS ET SUIVI DE QUOTA
--- SaaS Diongue-IziSchool / Planora
+-- SaaS IziSchool AI
 -- Date: 2026-09-07
 -- ====================================================================
 -- IMPORTANT: Exécuter après 20260906_security_hardening.sql

@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const hasApiKey = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY';
 
     const localSummarySuggestions = (): string => {
-      let advice = `### 💡 Analyse Locale de l'Assistant IziSchool\n\n`;
+      let advice = `### 💡 Analyse Locale de l'Assistant IziSchool AI\n\n`;
       
       if (unscheduled && unscheduled.length > 0) {
         advice += `⚠️ **Alerte de charge :** Il y a **${unscheduled.length} heures** non planifiées dans l'emploi du temps actuel. \n`;
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     });
 
     const prompt = `
-En tant qu'expert conseiller pédagogique et architecte d'emplois du temps pour le SaaS scolaire "Diongue-IziSchool", analyse ces données scolaires et suggère des optimisations intelligentes pour l'emploi du temps.
+En tant qu'expert conseiller pédagogique et architecte d'emplois du temps pour le SaaS scolaire "IziSchool AI", analyse ces données scolaires et suggère des optimisations intelligentes pour l'emploi du temps.
 Réduis de manière proactive les temps morts (trous dans la journée) pour les enseignants et les classes.
 
 DONNÉES :

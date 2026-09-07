@@ -172,7 +172,7 @@ export async function exportTimetableToPdf(
   classes: ClassGroup[],
   teachers: Teacher[],
   subjects: Subject[],
-  schoolName: string = "Diongue-IziSchool",
+  schoolName: string = "IziSchool AI",
   schoolSlogan: string = "Validé par la direction des études.",
   schoolBreaks: any[] = [],
   schoolLogo: string = ""
@@ -473,7 +473,7 @@ export async function exportTimetableToPdf(
   doc.setTextColor(100, 116, 139);
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Généré par Planora. www.planora.com • Direction ${schoolName}`, 12, footerY);
+  doc.text(`Généré par IziSchool AI • Direction ${schoolName}`, 12, footerY);
   doc.text(`Édité le ${formattedDateTime}`, 285, footerY, { align: 'right' });
 
   doc.save(`${schoolName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_planning_${cls.name}.pdf`);
@@ -488,7 +488,7 @@ export async function exportTeacherTimetableToPdf(
   classes: ClassGroup[],
   teachers: Teacher[],
   subjects: Subject[],
-  schoolName: string = "Diongue-IziSchool",
+  schoolName: string = "IziSchool AI",
   schoolSlogan: string = "Validé par la direction des études.",
   schoolLogo: string = ""
 ) {
@@ -686,7 +686,7 @@ export async function exportTeacherTimetableToPdf(
   doc.setTextColor(100, 116, 139);
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Généré par Planora. www.planora.com • Direction ${schoolName}`, 12, footerY);
+  doc.text(`Généré par IziSchool AI • Direction ${schoolName}`, 12, footerY);
   doc.text(`Édité le ${formattedDateTime}`, 285, footerY, { align: 'right' });
 
   doc.save(`planning_prof_${teacher.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.pdf`);
@@ -700,7 +700,7 @@ export async function exportAllTeachersTimetableToPdf(
   classes: ClassGroup[],
   teachers: Teacher[],
   subjects: Subject[],
-  schoolName: string = "Diongue-IziSchool",
+  schoolName: string = "IziSchool AI",
   schoolSlogan: string = "Validé par la direction des études.",
   schoolLogo: string = ""
 ) {
@@ -897,7 +897,7 @@ export async function exportAllTeachersTimetableToPdf(
     doc.setTextColor(100, 116, 139);
     doc.setFontSize(7.5);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Généré par Planora. www.planora.com • Direction ${schoolName}`, 12, footerY);
+    doc.text(`Généré par IziSchool AI • Direction ${schoolName}`, 12, footerY);
     doc.text(`Édité le ${formattedDateTime} • Page ${index + 1}/${teachers.length}`, 285, footerY, { align: 'right' });
   });
 
@@ -1049,7 +1049,7 @@ export function exportTimetableToWord(
   classes: ClassGroup[],
   teachers: Teacher[],
   subjects: Subject[],
-  schoolName: string = "Diongue-IziSchool",
+  schoolName: string = "IziSchool AI",
   schoolSlogan: string = "Validé par la direction des études.",
   schoolLogo: string = "",
   schoolLogoIcon: string = "GraduationCap",
@@ -1183,7 +1183,7 @@ export function exportTimetableToWord(
 
       <table class="footer-text">
         <tr>
-          <td>Généré par Planora. www.planora.com • Direction <strong>${escapedSchoolName}</strong></td>
+          <td>Généré par IziSchool AI • Direction <strong>${escapedSchoolName}</strong></td>
           <td style="text-align: right;">Édité le ${formattedDateTime}</td>
         </tr>
       </table>
@@ -1211,7 +1211,7 @@ export function exportTeacherTimetableToWord(
   classes: ClassGroup[],
   teachers: Teacher[],
   subjects: Subject[],
-  schoolName: string = "Diongue-IziSchool",
+  schoolName: string = "IziSchool AI",
   schoolSlogan: string = "Validé par la direction des études.",
   schoolLogo: string = "",
   schoolLogoIcon: string = "GraduationCap"
@@ -1317,7 +1317,7 @@ export function exportTeacherTimetableToWord(
 
         <table class="footer-text">
           <tr>
-            <td>Généré par Planora. www.planora.com • Direction <strong>${escapedSchoolName}</strong></td>
+            <td>Généré par IziSchool AI • Direction <strong>${escapedSchoolName}</strong></td>
             <td style="text-align: right;">Édité le ${formattedDateTime}</td>
           </tr>
         </table>

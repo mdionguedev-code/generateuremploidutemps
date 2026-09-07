@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
     });
 
     const systemInstructions = `
-Vous êtes l'Agent d'intelligence artificielle de planification scolaire pour "Diongue-IziSchool".
+Vous êtes l'Agent d'intelligence artificielle de planification scolaire pour "IziSchool AI".
 Votre but est de prendre un emploi du temps existant, des matières, des enseignants, des groupes de classes, et d'apporter des réajustements optimaux de planning pour satisfaire des instructions ou résoudre un problème.
 
 ### RÈGLES FORMELLES À RESPECTER ABSOLUMENT :

@@ -160,7 +160,7 @@ export default function DocumentationView({
               <span>Garantie de sérénité</span>
             </div>
             <p className={`text-[10px] leading-relaxed ${isLight ? "text-gray-600 font-normal" : "text-gray-400"}`}>
-              Planora élimine les conflits et vous fait gagner des semaines de travail manuel.
+              IziSchool AI élimine les conflits et vous fait gagner des semaines de travail manuel.
             </p>
           </div>
         </aside>
@@ -175,11 +175,11 @@ export default function DocumentationView({
           <div className={`space-y-3 border-b pb-6 ${isLight ? "border-gray-200" : "border-white/10"}`}>
             <h2 className={`text-3xl sm:text-4xl font-black tracking-tight ${isLight ? "text-gray-950" : "text-white"
               }`}>
-              Guide d'Utilisation Planora
+              Guide d'Utilisation IziSchool AI
             </h2>
             <p className={`text-sm leading-relaxed ${isLight ? "text-gray-600 font-medium" : "text-gray-400"
               }`}>
-              Ce guide complet détaille chaque fonctionnalité de l'application Planora. Lisez ce document pour configurer votre établissement, générer vos premiers emplois du temps et éditer vos rapports administratifs.
+              Ce guide complet détaille chaque fonctionnalité de l'application IziSchool AI. Lisez ce document pour configurer votre établissement, générer vos premiers emplois du temps et éditer vos rapports administratifs.
             </p>
           </div>
 
@@ -191,11 +191,11 @@ export default function DocumentationView({
               <span>1. Présentation &amp; Garanties</span>
             </div>
             <h3 className={`text-xl font-black ${isLight ? "text-gray-950" : "text-white"}`}>
-              Pourquoi Planora ?
+              Pourquoi IziSchool AI ?
             </h3>
             <p className={`text-xs sm:text-sm leading-relaxed ${isLight ? "text-gray-700 font-medium" : "text-gray-300"
               }`}>
-              Planora est une application SaaS conçue spécifiquement pour simplifier et fiabiliser la création des emplois du temps scolaires dans les collèges, lycées et écoles supérieures. Elle garantit l'absence totale de conflits d'horaires et optimise le placement des cours en respectant rigoureusement les quotas de chaque enseignant.
+              IziSchool AI est une application SaaS conçue spécifiquement pour simplifier et fiabiliser la création des emplois du temps scolaires dans les collèges, lycées et écoles supérieures. Elle garantit l'absence totale de conflits d'horaires et optimise le placement des cours en respectant rigoureusement les quotas de chaque enseignant.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
               <div className={`p-4 rounded-2xl border space-y-1.5 shadow-sm ${isLight ? "bg-white border-gray-200 text-gray-900" : "bg-white/[0.02] border-white/10 text-white"
@@ -301,7 +301,7 @@ export default function DocumentationView({
             </h3>
             <p className={`text-xs sm:text-sm leading-relaxed ${isLight ? "text-gray-700 font-medium" : "text-gray-300"
               }`}>
-              Le moteur de Planora utilise des contraintes matricielles strictes pour empêcher toute anomalie physique de planification :
+              Le moteur de IziSchool AI utilise des contraintes matricielles strictes pour empêcher toute anomalie physique de planification :
             </p>
             <ul className={`text-xs space-y-2 list-disc pl-5 ${isLight ? "text-gray-700 font-medium" : "text-gray-400"}`}>
               <li><strong>Conflit d'enseignant :</strong> Un professeur ne peut jamais dispenser de cours dans deux classes distinctes au même instant.</li>
@@ -413,7 +413,7 @@ export default function DocumentationView({
               <div className={`p-4 rounded-2xl border space-y-1 ${isLight ? "bg-white border-gray-200 shadow-sm" : "bg-white/[0.02] border-white/10"}`}>
                 <h4 className={`font-bold text-xs ${isLight ? "text-gray-950" : "text-white"}`}>Comment le système gère-t-il les cours de 2h ?</h4>
                 <p className={`text-[11px] leading-relaxed ${isLight ? "text-gray-700 font-medium" : "text-gray-300"}`}>
-                  Afin de garantir un confort d'affichage et d'impression, Planora regroupe automatiquement deux heures de cours successives partagées par le même enseignant et la même classe.
+                  Afin de garantir un confort d'affichage et d'impression, IziSchool AI regroupe automatiquement deux heures de cours successives partagées par le même enseignant et la même classe.
                 </p>
               </div>
 
@@ -443,7 +443,7 @@ export default function DocumentationView({
             </h4>
             <p className={`text-xs max-w-lg mx-auto leading-relaxed ${isLight ? "text-gray-600 font-medium" : "text-gray-400"
               }`}>
-              Utilisez Planora pour assurer une rentrée scolaire sans stress ni conflits d'horaires.
+              Utilisez IziSchool AI pour assurer une rentrée scolaire sans stress ni conflits d'horaires.
             </p>
             <div className="flex justify-center gap-3">
               <button

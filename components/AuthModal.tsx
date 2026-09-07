@@ -188,7 +188,7 @@ export default function AuthModal({
                   ? 'Mot de Passe Oublié'
                   : isSignUp
                   ? 'Créer un Compte Établissement'
-                  : 'Connexion à Diongue-IziSchool'}
+                  : 'Connexion à IziSchool AI'}
               </h3>
               <p className="text-xs text-slate-400 mt-1">
                 {isForgotPassword

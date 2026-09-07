@@ -441,7 +441,7 @@ export default function PedagogicalPlanningTab({
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
       doc.setTextColor(148, 163, 184);
-      doc.text(`Généré par Planora. www.planora.com • Direction ${schoolName}`, 14, 202);
+      doc.text(`Généré par IziSchool AI • Direction ${schoolName}`, 14, 202);
       doc.text(`Édité le ${formattedDateTime}`, 283, 202, { align: 'right' });
 
       doc.save(`Repartition_Pedagogique_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
@@ -647,7 +647,7 @@ export default function PedagogicalPlanningTab({
 
           <div className="max-w-xl mx-auto space-y-2">
             <h3 className="text-2xl sm:text-3xl font-black tracking-tight">
-              Passez à Planora Premium pour débloquer la Planification Intelligente
+              Passez à IziSchool AI Premium pour débloquer la Planification Intelligente
             </h3>
             <p className={`text-xs sm:text-sm leading-relaxed ${isLight ? "text-slate-600" : "text-slate-300"}`}>
               Le module de <strong>Planification &amp; Répartition Pédagogique</strong> résout le casse-tête de la rentrée scolaire en équilibrant mathématiquement la charge de travail entre vos enseignants et en respectant scrupuleusement leurs quotas d'heures.

@@ -127,7 +127,7 @@ export default function LegalModal({
                 </div>
 
                 <p className="text-gray-300">
-                  Les présentes Conditions Générales d’Utilisation (ci-après « CGU ») ont pour objet de définir les modalités de mise à disposition et d&apos;utilisation de la plateforme <strong>Planora</strong> (ci-après « la Plateforme »), service SaaS de génération et de gestion d&apos;emplois du temps scolaires.
+                  Les présentes Conditions Générales d’Utilisation (ci-après « CGU ») ont pour objet de définir les modalités de mise à disposition et d&apos;utilisation de la plateforme <strong>IziSchool AI</strong> (ci-après « la Plateforme »), service SaaS de génération et de gestion d&apos;emplois du temps scolaires.
                 </p>
 
                 <div className="space-y-4">
@@ -170,7 +170,7 @@ export default function LegalModal({
                 </div>
 
                 <p className="text-gray-300">
-                  Les présentes Conditions Générales de Vente (ci-après « CGV ») régissent les ventes d&apos;abonnements aux services SaaS de la plateforme <strong>Planora</strong> conclues entre l&apos;éditeur et les établissements scolaires ou professionnels (ci-après « le Client »).
+                  Les présentes Conditions Générales de Vente (ci-après « CGV ») régissent les ventes d&apos;abonnements aux services SaaS de la plateforme <strong>IziSchool AI</strong> conclues entre l&apos;éditeur et les établissements scolaires ou professionnels (ci-après « le Client »).
                 </p>
 
                 <div className="space-y-4">
@@ -210,7 +210,7 @@ export default function LegalModal({
 
                   <h3 className="text-base font-bold text-indigo-300">4. Limitation du Droit de Rétractation</h3>
                   <p className="text-gray-300 text-xs">
-                    S&apos;adressant exclusivement à des professionnels (divisions d&apos;études d&apos;établissements scolaires), les ventes d&apos;abonnements sur Planora sont fermes et définitives dès la génération de la clé de licence.
+                    S&apos;adressant exclusivement à des professionnels (divisions d&apos;études d&apos;établissements scolaires), les ventes d&apos;abonnements sur IziSchool AI sont fermes et définitives dès la génération de la clé de licence.
                   </p>
                 </div>
               </div>
@@ -264,7 +264,7 @@ export default function LegalModal({
                 </div>
 
                 <p className="text-gray-300">
-                  Cette politique explique l&apos;usage que nous faisons des cookies et traceurs locaux lors de votre navigation sur la plateforme Planora.
+                  Cette politique explique l&apos;usage que nous faisons des cookies et traceurs locaux lors de votre navigation sur la plateforme IziSchool AI.
                 </p>
 
                 <div className="space-y-4">
