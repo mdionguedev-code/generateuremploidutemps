@@ -3536,7 +3536,13 @@ Pour débloquer votre formule :
             settings={saasSettings}
             activationRequests={saasActivationRequests}
             onUpdateClients={setSaasClients}
-            onUpdatePlans={setSaasPlans}
+            onUpdatePlans={async (updatedPlans) => {
+              setSaasPlans(updatedPlans);
+              const { updateSaaSPlanInDb } = await import('@/lib/supabase/dbService');
+              for (const p of updatedPlans) {
+                await updateSaaSPlanInDb(p);
+              }
+            }}
             onUpdateLicenseKeys={setSaasLicenseKeys}
             onUpdateTransactions={setSaasTransactions}
             onUpdateSettings={setSaasSettings}

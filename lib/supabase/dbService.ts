@@ -919,7 +919,33 @@ export async function dbGetPublicPlans(): Promise<SaaSPlan[]> {
   }));
 }
 
+export async function updateSaaSPlanInDb(plan: SaaSPlan): Promise<boolean> {
+  if (!(await verifyAdminRole())) return false;
+  const supabase = createClient();
+  const { error } = await supabase
+    .from('saas_plans')
+    .upsert({
+      id: plan.id,
+      name: plan.name,
+      code: plan.code,
+      monthly_price_fcfa: plan.monthlyPriceFCFA,
+      monthly_price_eur: plan.monthlyPriceEUR || Math.round(plan.monthlyPriceFCFA / 655.957),
+      max_classes: plan.maxClasses,
+      max_teachers: plan.maxTeachers,
+      max_generations: plan.maxGenerations,
+      max_exports: plan.maxExports,
+      features: plan.features,
+      popular: plan.popular,
+      description: plan.description,
+      badge_text: plan.badgeText,
+      wave_payment_url: plan.wavePaymentUrl
+    });
+  if (error) console.error('Erreur mise à jour plan saas_plans:', error);
+  return !error;
+}
+
 // -------------------------------------------------------------
+
 // VÉRIFICATION ET INCRÉMENTATION DES QUOTAS VIA RPC DB
 // Toute la logique de comptage est côté base de données (SECURITY DEFINER)
 // -------------------------------------------------------------

@@ -684,7 +684,7 @@ export default function PedagogicalPlanningTab({
               onClick={onOpenUpgrade}
               className="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-sm shadow-xl shadow-amber-500/25 transition-all hover:scale-105 active:scale-95 cursor-pointer border border-amber-300"
             >
-              Activer l'offre Premium (15 000 FCFA / mois)
+              Activer l'offre Premium (10 000 FCFA / mois)
             </button>
           </div>
         </div>
