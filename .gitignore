@@ -38,4 +38,4 @@ pnpm-debug.log*
 .vscode/
 .gemini/
 .agents/
-
+supabase/.temp/

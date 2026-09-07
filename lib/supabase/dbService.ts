@@ -885,8 +885,9 @@ export async function dbGetPublicPlans(): Promise<SaaSPlan[]> {
     .order('monthly_price_fcfa', { ascending: true });
 
   if (error || !plansData || plansData.length === 0) {
-    console.warn('dbGetPublicPlans: aucun plan en base, retour tableau vide.', error);
-    return [];
+    console.warn('dbGetPublicPlans: aucun plan en base, retour des plans par défaut officiels.', error);
+    const { DEFAULT_OFFICIAL_PLANS } = require('@/lib/saasTypes');
+    return DEFAULT_OFFICIAL_PLANS;
   }
 
   return plansData.map(p => ({

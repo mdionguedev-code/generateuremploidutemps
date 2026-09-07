@@ -182,17 +182,17 @@ export default function LegalModal({
                     </div>
                     <div className="p-3.5 rounded-xl bg-white/5 border border-white/10">
                       <h4 className="font-bold text-white mb-1">Offre Standard</h4>
-                      <p className="text-gray-400 mb-1">10 000 FCFA (15 €) / mois</p>
+                      <p className="text-gray-400 mb-1">7 500 FCFA (11 €) / mois</p>
                       <p className="text-gray-500">8 classes, 15 enseignants, 30 générations &amp; PDF.</p>
                     </div>
                     <div className="p-3.5 rounded-xl bg-white/5 border border-white/10">
                       <h4 className="font-bold text-white mb-1">Offre Premium</h4>
-                      <p className="text-gray-400 mb-1">15 000 FCFA (23 €) / mois</p>
+                      <p className="text-gray-400 mb-1">10 000 FCFA (15 €) / mois</p>
                       <p className="text-gray-500">20 classes, 25 enseignants, 50 générations &amp; multi-formats.</p>
                     </div>
                     <div className="p-3.5 rounded-xl bg-white/5 border border-white/10">
                       <h4 className="font-bold text-white mb-1">Offre School</h4>
-                      <p className="text-gray-400 mb-1">30 000 FCFA (46 €) / mois</p>
+                      <p className="text-gray-400 mb-1">25 000 FCFA (38 €) / mois</p>
                       <p className="text-gray-500">Divisions illimitées, custom branding, IA prioritaire.</p>
                     </div>
                   </div>

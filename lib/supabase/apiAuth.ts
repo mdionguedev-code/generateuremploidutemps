@@ -63,7 +63,7 @@ export async function verifyUserPlanAccess(): Promise<
     } : {
       // Fallback de sécurité minimal (structure, jamais de données demo)
       id: 'plan_school', name: 'School', code: 'SCHOOL',
-      monthlyPriceFCFA: 30000, monthlyPriceEUR: 46,
+      monthlyPriceFCFA: 25000, monthlyPriceEUR: 38,
       maxClasses: 999, maxTeachers: 999, maxGenerations: 9999, maxExports: 9999,
       features: {
         pdfExport: true, excelExport: true, wordExport: true,

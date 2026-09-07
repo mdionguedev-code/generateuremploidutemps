@@ -138,7 +138,8 @@ import {
   SaaSPaymentTransaction,
   SaaSGlobalSettings,
   PaymentMethod,
-  SaaSActivationRequest
+  SaaSActivationRequest,
+  DEFAULT_OFFICIAL_PLANS
 } from '@/lib/saasTypes';
 
 import {
@@ -432,7 +433,7 @@ export default function TimetableDashboard({
   };
 
   // --- SaaS Platform States ---
-  const [saasPlans, setSaasPlans] = useState<SaaSPlan[]>([]);
+  const [saasPlans, setSaasPlans] = useState<SaaSPlan[]>(DEFAULT_OFFICIAL_PLANS);
   const [saasClients, setSaasClients] = useState<SaaSClient[]>([]);
   const [saasLicenseKeys, setSaasLicenseKeys] = useState<SaaSLicenseKey[]>([]);
   const [saasTransactions, setSaasTransactions] = useState<SaaSPaymentTransaction[]>([]);

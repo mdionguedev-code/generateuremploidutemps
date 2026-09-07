@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import DocumentationView from './DocumentationView';
 import LicensePurchaseModal from './LicensePurchaseModal';
 import LegalModal from './LegalModal';
-import { SaaSPlan, PaymentMethod } from '@/lib/saasTypes';
+import { SaaSPlan, PaymentMethod, DEFAULT_OFFICIAL_PLANS } from '@/lib/saasTypes';
 
 interface LandingPageProps {
   onOpenLogin: () => void;
@@ -43,7 +43,7 @@ export default function LandingPage({
     {
       id: 2,
       name: "Mme Astou Fall",
-      role: "Responsable des Études",
+      role: "Chef des travaux",
       initials: "AF",
       text: "Ce générateur a révolutionné la préparation de notre rentrée. Les contraintes complexes, comme les pauses de l'établissement ou le positionnement prioritaire de l'EPS, sont intégrées avec une rigueur absolue. L'emploi du temps final est d'une grande fluidité.",
       stars: 5,
@@ -52,7 +52,7 @@ export default function LandingPage({
     {
       id: 3,
       name: "M. Amadou Diop",
-      role: "Directeur des Enseignements",
+      role: "Principal",
       initials: "AD",
       text: "La précision du solveur quant à l'optimisation des grilles horaires de cours est irréprochable. Nos enseignants ne subissent plus de trous dans leurs plannings et les journées des élèves sont harmonieuses et sans heures perdues.",
       stars: 5,
@@ -61,7 +61,7 @@ export default function LandingPage({
     {
       id: 4,
       name: "Mme Mariama Sow",
-      role: "Censeur",
+      role: "Directeur d'étude",
       initials: "MS",
       text: "L'intelligence artificielle de Planora assure une répartition optimale et équilibrée. De plus, la détection de conflit en temps réel sur les ajustements manuels nous apporte une sérénité totale lors des derniers réglages d'effectifs.",
       stars: 5,
@@ -70,7 +70,7 @@ export default function LandingPage({
     {
       id: 5,
       name: "M. Ousmane Diallo",
-      role: "Secrétaire Général",
+      role: "Chef des travaux",
       initials: "OD",
       text: "La clarté des plannings générés et la diversité des formats d'exports (PDF, Word, Excel) facilitent grandement la communication avec les équipes pédagogiques. Chaque professeur dispose instantanément d'une fiche claire et propre.",
       stars: 5,
@@ -81,7 +81,8 @@ export default function LandingPage({
 
 
   const handleChoosePlan = (planId: string) => {
-    const foundPlan = plans.find(p => p.id === planId);
+    const availablePlans = plans && plans.length > 0 ? plans : DEFAULT_OFFICIAL_PLANS;
+    const foundPlan = availablePlans.find(p => p.id === planId) || DEFAULT_OFFICIAL_PLANS.find(p => p.id === planId);
     if (foundPlan) {
       setSelectedPlanForPurchase(foundPlan);
       setIsPurchaseModalOpen(true);
@@ -378,11 +379,11 @@ export default function LandingPage({
               <div className="glass-panel glass-panel-hover p-8 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-[#22c55e]/10 rounded-full blur-[40px] group-hover:bg-[#22c55e]/20 transition-all"></div>
                 <div className="w-12 h-12 bg-white/5 border border-white/10 rounded-lg flex items-center justify-center mb-6 text-[#6bff8f]">
-                  <span className="material-symbols-outlined">group</span>
+                  <span className="material-symbols-outlined">bar_chart</span>
                 </div>
-                <h3 className="text-xl font-bold text-[#dae2fd] mb-3">Multi-accès</h3>
+                <h3 className="text-xl font-bold text-[#dae2fd] mb-3">Rapports &amp; Statistiques</h3>
                 <p className="text-sm text-[#bccbb9] leading-relaxed">
-                  Collaboration entre administrateurs. Travaillez en équipe sur les mêmes plannings en temps réel.
+                  Le chef d&apos;établissement accède à des bilans statistiques détaillés et exportables pour analyser la répartition des cours et la charge horaire.
                 </p>
               </div>
 
@@ -709,7 +710,7 @@ export default function LandingPage({
                   <h3 className="text-lg font-bold text-[#dae2fd] mb-1">Standard</h3>
                   <p className="text-[#bccbb9] text-[11px] mb-4 font-sans">Pour les petites structures</p>
                   <div className="text-2xl font-black text-white mb-6">
-                    10 000 FCFA<span className="text-[10px] text-[#bccbb9] font-normal">/mois</span>
+                    7 500 FCFA<span className="text-[10px] text-[#bccbb9] font-normal">/mois</span>
                   </div>
                   <ul className="flex flex-col gap-2.5 mb-6 text-[11px]">
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> 30 générations max</li>
@@ -735,7 +736,7 @@ export default function LandingPage({
                   <h3 className="text-lg font-bold text-[#dae2fd] mb-1">Premium</h3>
                   <p className="text-[#bccbb9] text-[11px] mb-4 font-sans">Pour les collèges &amp; lycées</p>
                   <div className="text-2xl font-black text-white mb-6">
-                    15 000 FCFA<span className="text-[10px] text-[#bccbb9] font-normal">/mois</span>
+                    10 000 FCFA<span className="text-[10px] text-[#bccbb9] font-normal">/mois</span>
                   </div>
                   <ul className="flex flex-col gap-2.5 mb-6 text-[11px]">
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> 50 générations max</li>
@@ -743,6 +744,7 @@ export default function LandingPage({
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> 25 profs max</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> 50 exportations max (PDF, Word, Excel)</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Module Planification &amp; Répartition Équitable</li>
+                    <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Export des statistiques et rapports</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Assistant IA Gemini</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Support Prioritaire</li>
                   </ul>
@@ -762,7 +764,7 @@ export default function LandingPage({
                   <h3 className="text-lg font-bold text-[#dae2fd] mb-1">School</h3>
                   <p className="text-[#bccbb9] text-[11px] mb-4 font-sans">Offre complète &amp; réseau</p>
                   <div className="text-2xl font-black text-white mb-6">
-                    30 000 FCFA<span className="text-[10px] text-[#bccbb9] font-normal">/mois</span>
+                    25 000 FCFA<span className="text-[10px] text-[#bccbb9] font-normal">/mois</span>
                   </div>
                   <ul className="flex flex-col gap-2.5 mb-6 text-[11px]">
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Classes illimitées</li>
@@ -770,6 +772,7 @@ export default function LandingPage({
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Générations illimitées</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Exportations illimitées (Tout format)</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Module Planification &amp; Répartition Équitable</li>
+                    <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Export des statistiques et rapports</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Assistant IA prioritaire</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Custom Branding (Logo &amp; URL)</li>
                     <li className="flex items-center gap-2 font-semibold text-white"><span className="material-symbols-outlined text-[#4be277] text-xs">check</span> Multi-comptes &amp; Réseaux</li>

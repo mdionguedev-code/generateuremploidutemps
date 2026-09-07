@@ -101,9 +101,112 @@ export interface SaaSGlobalSettings {
     merchantPhone: string;
     globalWaveUrl: string;
     qrCodeUrl?: string;
-    instructions: string;
+    instructions?: string;
   };
 }
+
+export const DEFAULT_OFFICIAL_PLANS: SaaSPlan[] = [
+  {
+    id: 'plan_trial',
+    name: 'Gratuit',
+    code: 'TRIAL',
+    monthlyPriceFCFA: 0,
+    monthlyPriceEUR: 0,
+    maxClasses: 2,
+    maxTeachers: 2,
+    maxGenerations: 4,
+    maxExports: 4,
+    features: {
+      pdfExport: true,
+      excelExport: false,
+      wordExport: false,
+      geminiAI: false,
+      prioritySupport: false,
+      multiUser: false,
+      customBranding: true,
+      pedagogicalPlanning: false
+    },
+    popular: false,
+    description: 'Pour tester le générateur (2 classes, 2 profs, 4 générations & 4 exports PDF).',
+    badgeText: 'Gratuit',
+    wavePaymentUrl: 'https://pay.wave.com/m/M_SN_GESTSCOLAIRE_DECOUVERTE'
+  },
+  {
+    id: 'plan_standard',
+    name: 'Standard',
+    code: 'STANDARD',
+    monthlyPriceFCFA: 7500,
+    monthlyPriceEUR: 11,
+    maxClasses: 8,
+    maxTeachers: 15,
+    maxGenerations: 30,
+    maxExports: 25,
+    features: {
+      pdfExport: true,
+      excelExport: false,
+      wordExport: false,
+      geminiAI: false,
+      prioritySupport: false,
+      multiUser: false,
+      customBranding: true,
+      pedagogicalPlanning: false
+    },
+    popular: false,
+    description: 'Pour les petites structures (8 classes, 15 profs, 30 générations & 25 exports PDF).',
+    badgeText: 'Standard',
+    wavePaymentUrl: 'https://pay.wave.com/m/M_SN_GESTSCOLAIRE_PLAN_STANDARD'
+  },
+  {
+    id: 'plan_premium',
+    name: 'Premium',
+    code: 'PREMIUM',
+    monthlyPriceFCFA: 10000,
+    monthlyPriceEUR: 15,
+    maxClasses: 20,
+    maxTeachers: 25,
+    maxGenerations: 50,
+    maxExports: 50,
+    features: {
+      pdfExport: true,
+      excelExport: true,
+      wordExport: true,
+      geminiAI: true,
+      prioritySupport: true,
+      multiUser: false,
+      customBranding: true,
+      pedagogicalPlanning: true
+    },
+    popular: true,
+    description: 'Pour collèges & lycées (20 classes, 25 profs, 50 générations & 50 exports Tout format).',
+    badgeText: 'Recommandé',
+    wavePaymentUrl: 'https://pay.wave.com/m/M_SN_GESTSCOLAIRE_PLAN_PREMIUM'
+  },
+  {
+    id: 'plan_school',
+    name: 'School',
+    code: 'SCHOOL',
+    monthlyPriceFCFA: 25000,
+    monthlyPriceEUR: 38,
+    maxClasses: 999,
+    maxTeachers: 999,
+    maxGenerations: 9999,
+    maxExports: 9999,
+    features: {
+      pdfExport: true,
+      excelExport: true,
+      wordExport: true,
+      geminiAI: true,
+      prioritySupport: true,
+      multiUser: true,
+      customBranding: true,
+      pedagogicalPlanning: true
+    },
+    popular: false,
+    description: 'Générations & Exportations illimitées, IA prioritaire, Custom Branding, Multi-comptes.',
+    badgeText: 'Illimité & VIP',
+    wavePaymentUrl: 'https://pay.wave.com/m/M_SN_GESTSCOLAIRE_PLAN_SCHOOL'
+  }
+];
 
 export type RequestType = 'new_activation' | 'upgrade' | 'renewal';
 export type RequestStatus = 'pending' | 'delivered' | 'rejected';

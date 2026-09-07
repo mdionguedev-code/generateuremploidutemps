@@ -131,10 +131,10 @@ Toutes les grilles peuvent être exportées fidèlement aux formats officiels :
 Le SaaS intègre une architecture commerciale complète ([`components/SaaSAdminPortal.tsx`](file:///c:/Users/HP/Desktop/SAAS%20EMPLOIS%20TEMPS/components/SaaSAdminPortal.tsx)) :
 
 ### 💎 Grille Tarifaire (FCFA / Mois)
-1. **Starter (Gratuit - 0 FCFA)** : Jusqu'à 3 classes, 5 professeurs, exports PDF/Excel basiques.
-2. **Établissement Standard (10 000 FCFA / mois)** : Jusqu'à 15 classes, 30 professeurs, exports PDF, Excel, Word, logo personnalisé.
-3. **Pro Élite Académie (15 000 FCFA / mois)** : Classes et profs illimités, IA Gemini, exports Word personnalisés, support prioritaire.
-4. **Sur Mesure Réseau Scolaire (Sur Devis)** : Multi-sites, accompagnement dédié.
+1. **Starter (Gratuit - 0 FCFA)** : Jusqu'à 2 classes, 2 professeurs, exports PDF basiques.
+2. **Établissement Standard (7 500 FCFA / mois)** : Jusqu'à 8 classes, 15 professeurs, exports PDF (25 max).
+3. **Pro Élite Académie (10 000 FCFA / mois)** : Jusqu'à 20 classes, 25 professeurs, exports tout format, IA Gemini, support prioritaire.
+4. **Sur Mesure Réseau Scolaire / School (25 000 FCFA / mois)** : Multi-sites, accès illimité, accompagnement dédié.
 
 ### 👑 Portail Administrateur SaaS
 - **Tableau de Bord Financier (KPIs)** : Revenu Mensuel Récurrent (MRR), total encaissé, taux de conversion, volume de clients actifs.
