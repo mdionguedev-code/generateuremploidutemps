@@ -241,9 +241,13 @@ export default function LandingPage({
 
         {/* --- NAVIGATION --- */}
         <nav className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 md:px-12 py-4 bg-[#0b1326]/80 backdrop-blur-md border-b border-white/10">
-          <a className="text-xl md:text-2xl font-bold text-[#dae2fd] flex items-center gap-2" href="#">
-            <span className="material-symbols-outlined text-[#4be277]" style={{ fontVariationSettings: "'FILL' 1" }}>calendar_month</span>
-            Planora
+          <a className="text-xl md:text-2xl font-bold text-[#dae2fd] flex items-center gap-2.5 group" href="#">
+            <img
+              src="/logo.png"
+              alt="Planora Logo"
+              className="h-8 md:h-9 w-auto object-contain transition-transform group-hover:scale-105"
+            />
+            <span className="tracking-tight">Planora</span>
           </a>
           <div className="hidden md:flex items-center gap-6 lg:gap-8">
             <a className="text-xs font-medium text-[#bccbb9] hover:text-[#dae2fd] transition-colors hover:bg-white/5 rounded-lg px-3 py-2" href="#features">Fonctionnalités</a>
@@ -795,9 +799,13 @@ export default function LandingPage({
         {/* --- FOOTER --- */}
         <footer className="w-full py-16 px-6 md:px-12 flex flex-col md:flex-row justify-between items-start max-w-7xl mx-auto bg-[#060e20] border-t border-white/5 relative z-10">
           <div className="flex flex-col gap-4 mb-8 md:mb-0 max-w-sm text-left">
-            <a className="text-xl font-bold text-[#dae2fd] flex items-center gap-2" href="#">
-              <span className="material-symbols-outlined text-[#4be277]" style={{ fontVariationSettings: "'FILL' 1" }}>calendar_month</span>
-              Planora
+            <a className="text-xl font-bold text-[#dae2fd] flex items-center gap-2.5" href="#">
+              <img
+                src="/logo.png"
+                alt="Planora Logo"
+                className="h-8 w-auto object-contain"
+              />
+              <span>Planora</span>
             </a>
             <p className="text-sm text-[#bccbb9] leading-relaxed">
               La solution d&apos;organisation intelligente pour les établissements modernes.

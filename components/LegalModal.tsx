@@ -57,10 +57,11 @@ export default function LegalModal({
               isLight ? "text-gray-900" : "text-white"
             }`}>
               Mentions Légales &amp; Règlements
-              <span className={`text-[10px] font-mono font-black px-2 py-0.5 rounded-full border ${
+              <span className={`text-[10px] font-mono font-black px-2 py-0.5 rounded-full border inline-flex items-center gap-1.5 ${
                 isLight ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-indigo-500/10 text-indigo-400 border-indigo-500/25"
               }`}>
-                Planora
+                <img src="/logo.png" alt="Planora" className="w-3.5 h-3.5 object-contain" />
+                <span>Planora</span>
               </span>
             </h1>
           </div>

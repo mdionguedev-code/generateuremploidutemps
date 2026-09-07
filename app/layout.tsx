@@ -2,8 +2,12 @@ import type {Metadata} from 'next';
 import './globals.css'; // Global styles
 
 export const metadata: Metadata = {
-  title: "Diongue-IziSchool — Générateur d'Emploi du Temps IA & Algorithmique",
-  description: "Conception et génération intelligente d'emplois du temps optimisés sous contraintes pour Diongue-IziSchool.",
+  title: "Planora — Générateur d'Emploi du Temps Intelligent IA & SaaS",
+  description: "Conception et génération intelligente d'emplois du temps optimisés sans conflit pour collèges, lycées et établissements d'enseignement.",
+  icons: {
+    icon: '/logo.png',
+    apple: '/logo.png',
+  },
 };
 
 export default function RootLayout({children}: {children: React.ReactNode}) {

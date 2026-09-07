@@ -72,7 +72,8 @@ export default function DocumentationView({
           <div>
             <h1 className={`font-black text-base tracking-tight flex items-center gap-2 ${isLight ? "text-gray-900" : "text-white"
               }`}>
-              Documentation Planora
+              <img src="/logo.png" alt="Planora Logo" className="w-5 h-5 object-contain inline-block" />
+              <span>Documentation Planora</span>
               <span className={`text-[10px] font-mono font-black px-2 py-0.5 rounded-full border ${isLight ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                 }`}>
                 Officielle
