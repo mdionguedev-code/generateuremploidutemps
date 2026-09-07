@@ -943,7 +943,7 @@ Pour activer votre formule :
                   ? 'bg-purple-50 text-purple-600 border-purple-200 shadow-sm'
                   : 'bg-purple-500/20 text-purple-400 border-purple-500/30'
               }`}>
-                <img src="/logo.png" alt="Planora" className="w-6 h-6 object-contain" />
+                <img src="/logo.png" alt="IziSchool AI" className="w-6 h-6 object-contain" />
               </span>
               <div>
                 <h2 className={`text-2xl font-black tracking-tight flex items-center gap-2.5 ${

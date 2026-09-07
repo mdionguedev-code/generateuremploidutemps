@@ -240,12 +240,12 @@ export default function LandingPage({
         <div className="fixed bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-[#22c55e]/10 blur-[150px] rounded-full pointer-events-none z-0"></div>
 
         {/* --- NAVIGATION --- */}
-        <nav className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 md:px-12 py-3 md:py-3.5 bg-[#0b1326]/85 backdrop-blur-md border-b border-white/10">
-          <a className="flex items-center group py-0.5" href="#" aria-label="IziSchool AI">
+        <nav className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-4 sm:px-6 md:px-12 py-2 md:py-2.5 bg-[#0b1326]/90 backdrop-blur-md border-b border-white/10">
+          <a className="flex items-center group py-0.5 shrink-0" href="#" aria-label="IziSchool AI">
             <img
               src="/logo.png"
               alt="IziSchool AI"
-              className="h-11 sm:h-12 md:h-14 w-auto object-contain transition-transform group-hover:scale-105 drop-shadow-[0_2px_12px_rgba(75,226,119,0.2)]"
+              className="h-16 sm:h-20 md:h-24 w-auto object-contain transition-transform group-hover:scale-105 drop-shadow-[0_4px_16px_rgba(75,226,119,0.25)]"
             />
           </a>
           <div className="hidden md:flex items-center gap-6 lg:gap-8">
@@ -275,7 +275,7 @@ export default function LandingPage({
         </nav>
 
         {/* --- MAIN CONTENT --- */}
-        <main className="flex-grow z-10 relative pt-[92px] sm:pt-[84px] md:pt-[76px]">
+        <main className="flex-grow z-10 relative pt-[98px] sm:pt-[108px] md:pt-[118px]">
           
           {/* HERO SECTION */}
           <section className="pt-6 sm:pt-4 md:pt-4 pb-16 md:pb-24 px-6 md:px-12 max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
