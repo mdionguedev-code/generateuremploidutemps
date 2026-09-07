@@ -796,62 +796,75 @@ export default function LandingPage({
         </main>
 
         {/* --- FOOTER --- */}
-        <footer className="w-full py-16 px-6 md:px-12 flex flex-col md:flex-row justify-between items-start max-w-7xl mx-auto bg-[#060e20] border-t border-white/5 relative z-10">
-          <div className="flex flex-col gap-4 mb-8 md:mb-0 max-w-sm text-left">
-            <a className="flex items-center group mb-2" href="#" aria-label="IziSchool AI">
-              <img
-                src="/logo.png"
-                alt="IziSchool AI"
-                className="h-12 md:h-14 w-auto object-contain transition-transform group-hover:scale-105"
-              />
-            </a>
-            <p className="text-sm text-[#bccbb9] leading-relaxed">
-              La solution d&apos;organisation intelligente pour les établissements modernes.
-            </p>
-            <p className="text-xs text-[#bccbb9]/60 mt-4">
+        <footer className="w-full py-12 md:py-16 px-6 md:px-12 flex flex-col md:flex-row justify-between items-start max-w-7xl mx-auto bg-[#060e20] border-t border-white/5 relative z-10">
+          <div className="w-full md:w-auto flex flex-col mb-8 md:mb-0 max-w-sm text-left">
+            {/* Logo + Texte alignés horizontalement sur mobile, empilés sur desktop */}
+            <div className="flex flex-row md:flex-col items-center md:items-start gap-3.5 sm:gap-4">
+              <a className="flex items-center group shrink-0" href="#" aria-label="IziSchool AI">
+                <img
+                  src="/logo.png"
+                  alt="IziSchool AI"
+                  className="h-10 sm:h-12 md:h-14 w-auto object-contain transition-transform group-hover:scale-105"
+                />
+              </a>
+              <p className="text-xs sm:text-sm text-[#bccbb9] leading-relaxed">
+                La solution d&apos;organisation intelligente pour les établissements modernes.
+              </p>
+            </div>
+            {/* Copyright visible sur desktop à son emplacement initial */}
+            <p className="hidden md:block text-xs text-[#bccbb9]/60 mt-4">
               © 2026 IziSchool AI. Tous droits réservés. Optimisé par l&apos;intelligence artificielle.
             </p>
           </div>
-          <div className="flex flex-wrap gap-12 text-left">
-            <div className="flex flex-col gap-3">
-              <span className="text-xs text-white font-bold mb-2 uppercase tracking-wider font-mono">Produit</span>
-              <a className="text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors" href="#features">Fonctionnalités</a>
+
+          {/* Colonnes Produit & Légal avec taille réduite sur mobile */}
+          <div className="flex flex-row gap-8 sm:gap-12 text-left">
+            <div className="flex flex-col gap-2 md:gap-3">
+              <span className="text-[11px] md:text-xs text-white font-bold mb-1 md:mb-2 uppercase tracking-wider font-mono">Produit</span>
+              <a className="text-xs md:text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors" href="#features">Fonctionnalités</a>
               <button 
                 onClick={() => setIsDocOpen(true)}
-                className="text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors text-left bg-transparent border-0 cursor-pointer p-0"
+                className="text-xs md:text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors text-left bg-transparent border-0 cursor-pointer p-0"
               >
                 Documentation
               </button>
-              <a className="text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors" href="#pricing">Tarifs</a>
-              <a className="text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors" href="#">Blog</a>
+              <a className="text-xs md:text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors" href="#pricing">Tarifs</a>
+              <a className="text-xs md:text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors" href="#">Blog</a>
             </div>
-            <div className="flex flex-col gap-3">
-              <span className="text-xs text-white font-bold mb-2 uppercase tracking-wider font-mono">Légal</span>
+            <div className="flex flex-col gap-2 md:gap-3">
+              <span className="text-[11px] md:text-xs text-white font-bold mb-1 md:mb-2 uppercase tracking-wider font-mono">Légal</span>
               <button 
                 onClick={() => { setLegalTab('cgu'); setIsLegalOpen(true); }}
-                className="text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors text-left bg-transparent border-0 cursor-pointer p-0"
+                className="text-xs md:text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors text-left bg-transparent border-0 cursor-pointer p-0"
               >
                 Conditions d&apos;utilisation (CGU)
               </button>
               <button 
                 onClick={() => { setLegalTab('cgv'); setIsLegalOpen(true); }}
-                className="text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors text-left bg-transparent border-0 cursor-pointer p-0"
+                className="text-xs md:text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors text-left bg-transparent border-0 cursor-pointer p-0"
               >
                 Conditions de Vente (CGV)
               </button>
               <button 
                 onClick={() => { setLegalTab('privacy'); setIsLegalOpen(true); }}
-                className="text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors text-left bg-transparent border-0 cursor-pointer p-0"
+                className="text-xs md:text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors text-left bg-transparent border-0 cursor-pointer p-0"
               >
                 Politique de confidentialité
               </button>
               <button 
                 onClick={() => { setLegalTab('cookies'); setIsLegalOpen(true); }}
-                className="text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors text-left bg-transparent border-0 cursor-pointer p-0"
+                className="text-xs md:text-sm text-[#bccbb9] hover:text-[#4be277] transition-colors text-left bg-transparent border-0 cursor-pointer p-0"
               >
                 Politique des cookies
               </button>
             </div>
+          </div>
+
+          {/* Copyright tout en bas sur mobile uniquement */}
+          <div className="md:hidden w-full pt-6 mt-8 border-t border-white/5 text-left">
+            <p className="text-xs text-[#bccbb9]/60">
+              © 2026 IziSchool AI. Tous droits réservés. Optimisé par l&apos;intelligence artificielle.
+            </p>
           </div>
         </footer>
 
