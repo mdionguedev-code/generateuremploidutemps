@@ -861,7 +861,7 @@ export default function LandingPage({
           </div>
 
           {/* Copyright tout en bas sur mobile uniquement */}
-          <div className="md:hidden w-full pt-6 mt-8 border-t border-white/5 text-left">
+          <div className="md:hidden w-full pt-6 mt-8 border-t border-white/5 text-center">
             <p className="text-xs text-[#bccbb9]/60">
               © 2026 IziSchool AI. Tous droits réservés. Optimisé par l&apos;intelligence artificielle.
             </p>
