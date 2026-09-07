@@ -272,10 +272,10 @@ export default function LandingPage({
         </nav>
 
         {/* --- MAIN CONTENT --- */}
-        <main className="flex-grow z-10 relative pt-[68px] md:pt-[76px]">
+        <main className="flex-grow z-10 relative pt-[92px] sm:pt-[84px] md:pt-[76px]">
           
           {/* HERO SECTION */}
-          <section className="pt-3 md:pt-4 pb-16 md:pb-24 px-6 md:px-12 max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
+          <section className="pt-6 sm:pt-4 md:pt-4 pb-16 md:pb-24 px-6 md:px-12 max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
             <div className="lg:w-1/2 flex flex-col gap-6 relative z-10 text-left">
               <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 w-max">
                 <span className="material-symbols-outlined text-[#4be277] text-[16px]">bolt</span>
