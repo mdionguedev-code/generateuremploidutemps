@@ -36,7 +36,7 @@ export default function LandingPage({
       name: "M. Malick Ndiaye",
       role: "Proviseur",
       initials: "MN",
-      text: "La qualité des emplois du temps générés par Planora est exceptionnelle. Les heures de cours de 1h s'enchaînent de manière fluide, et le découpage des volumes horaires impairs respecte parfaitement notre cahier des charges, sans aucun conflit de professeur.",
+      text: "La qualité des emplois du temps générés par notre solution est exceptionnelle. Les heures de cours de 1h s'enchaînent de manière fluide, et le découpage des volumes horaires impairs respecte parfaitement notre cahier des charges, sans aucun conflit de professeur.",
       stars: 5,
       glowColor: "from-[#571bc1]/10"
     },
@@ -63,7 +63,7 @@ export default function LandingPage({
       name: "Mme Mariama Sow",
       role: "Directeur d'étude",
       initials: "MS",
-      text: "L'intelligence artificielle de Planora assure une répartition optimale et équilibrée. De plus, la détection de conflit en temps réel sur les ajustements manuels nous apporte une sérénité totale lors des derniers réglages d'effectifs.",
+      text: "L'intelligence artificielle de notre plateforme assure une répartition optimale et équilibrée. De plus, la détection de conflit en temps réel sur les ajustements manuels nous apporte une sérénité totale lors des derniers réglages d'effectifs.",
       stars: 5,
       glowColor: "from-[#d0bcff]/10"
     },
@@ -240,14 +240,13 @@ export default function LandingPage({
         <div className="fixed bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-[#22c55e]/10 blur-[150px] rounded-full pointer-events-none z-0"></div>
 
         {/* --- NAVIGATION --- */}
-        <nav className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 md:px-12 py-4 bg-[#0b1326]/80 backdrop-blur-md border-b border-white/10">
-          <a className="text-xl md:text-2xl font-bold text-[#dae2fd] flex items-center gap-2.5 group" href="#">
+        <nav className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 md:px-12 py-3 md:py-3.5 bg-[#0b1326]/85 backdrop-blur-md border-b border-white/10">
+          <a className="flex items-center group py-0.5" href="#" aria-label="IziSchool AI">
             <img
               src="/logo.png"
-              alt="Planora Logo"
-              className="h-8 md:h-9 w-auto object-contain transition-transform group-hover:scale-105"
+              alt="IziSchool AI"
+              className="h-11 sm:h-12 md:h-14 w-auto object-contain transition-transform group-hover:scale-105 drop-shadow-[0_2px_12px_rgba(75,226,119,0.2)]"
             />
-            <span className="tracking-tight">Planora</span>
           </a>
           <div className="hidden md:flex items-center gap-6 lg:gap-8">
             <a className="text-xs font-medium text-[#bccbb9] hover:text-[#dae2fd] transition-colors hover:bg-white/5 rounded-lg px-3 py-2" href="#features">Fonctionnalités</a>
@@ -294,7 +293,7 @@ export default function LandingPage({
               
               <div className="flex flex-wrap items-center gap-4 mt-2">
                 <button onClick={onOpenLogin} className="btn-primary hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2 cursor-pointer">
-                  Essayer Planora gratuitement
+                  Commencer gratuitement
                   <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                 </button>
                 <button 
@@ -323,7 +322,7 @@ export default function LandingPage({
             <div className="lg:w-1/2 w-full relative">
               <div className="absolute inset-0 bg-gradient-to-tr from-[#571bc1]/30 to-[#4be277]/30 blur-[80px] rounded-full z-0"></div>
               <img 
-                alt="Planora interface preview" 
+                alt="Interface preview" 
                 className="relative z-10 w-full rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 transition-transform duration-700 hover:scale-[1.01]" 
                 src="/hero_image.png"
               />
@@ -337,7 +336,7 @@ export default function LandingPage({
                 La complexité, <span className="text-gradient-primary">rendue simple.</span>
               </h2>
               <p className="text-base sm:text-lg text-[#bccbb9]">
-                Ne passez plus des heures sur des tableurs. Planora gère les contraintes pour vous.
+                Ne passez plus des heures sur des tableurs. Notre intelligence artificielle gère les contraintes pour vous.
               </p>
             </div>
             
@@ -375,7 +374,7 @@ export default function LandingPage({
                 </div>
                 <h3 className="text-xl font-bold text-[#dae2fd] mb-3">Gestion des contraintes</h3>
                 <p className="text-sm text-[#bccbb9] leading-relaxed">
-                  Disponibilités des profs, salles spécifiques, regroupements de classes... Planora intègre toutes vos règles métier.
+                  Disponibilités des profs, salles spécifiques, regroupements de classes... Notre solveur intègre toutes vos règles métier.
                 </p>
               </div>
 
@@ -397,7 +396,7 @@ export default function LandingPage({
           {/* --- HOW IT WORKS SECTION (5 ÉTAPES DU SAAS) --- */}
           <section className="py-24 px-6 md:px-12 max-w-7xl mx-auto relative z-10 border-t border-white/5" id="how-it-works">
             <h2 className="text-3xl md:text-4xl font-bold text-[#dae2fd] text-center mb-4">
-              Comment fonctionne Planora en <span className="text-[#4be277]">5 étapes</span>
+              Comment ça fonctionne en <span className="text-[#4be277]">5 étapes</span>
             </h2>
             <p className="text-sm md:text-base text-gray-400 text-center max-w-2xl mx-auto mb-20">
               Un parcours guidé de bout en bout pour concevoir l'emploi du temps parfait de votre établissement scolaire en quelques minutes.
@@ -799,19 +798,18 @@ export default function LandingPage({
         {/* --- FOOTER --- */}
         <footer className="w-full py-16 px-6 md:px-12 flex flex-col md:flex-row justify-between items-start max-w-7xl mx-auto bg-[#060e20] border-t border-white/5 relative z-10">
           <div className="flex flex-col gap-4 mb-8 md:mb-0 max-w-sm text-left">
-            <a className="text-xl font-bold text-[#dae2fd] flex items-center gap-2.5" href="#">
+            <a className="flex items-center group mb-2" href="#" aria-label="IziSchool AI">
               <img
                 src="/logo.png"
-                alt="Planora Logo"
-                className="h-8 w-auto object-contain"
+                alt="IziSchool AI"
+                className="h-12 md:h-14 w-auto object-contain transition-transform group-hover:scale-105"
               />
-              <span>Planora</span>
             </a>
             <p className="text-sm text-[#bccbb9] leading-relaxed">
               La solution d&apos;organisation intelligente pour les établissements modernes.
             </p>
             <p className="text-xs text-[#bccbb9]/60 mt-4">
-              © 2026 Planora AI. Tous droits réservés. Optimisé par l&apos;intelligence artificielle.
+              © 2026 IziSchool AI. Tous droits réservés. Optimisé par l&apos;intelligence artificielle.
             </p>
           </div>
           <div className="flex flex-wrap gap-12 text-left">

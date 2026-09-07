@@ -2,7 +2,7 @@ import type {Metadata} from 'next';
 import './globals.css'; // Global styles
 
 export const metadata: Metadata = {
-  title: "Planora — Générateur d'Emploi du Temps Intelligent IA & SaaS",
+  title: "IziSchool AI — Générateur d'Emploi du Temps Intelligent SaaS",
   description: "Conception et génération intelligente d'emplois du temps optimisés sans conflit pour collèges, lycées et établissements d'enseignement.",
   icons: {
     icon: '/logo.png',
