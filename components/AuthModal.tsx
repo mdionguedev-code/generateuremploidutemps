@@ -111,7 +111,7 @@ export default function AuthModal({
       if (signUpError) {
         setError(signUpError.message);
       } else {
-        setSuccessMsg("Votre compte a été créé avec succès ! Vous pouvez maintenant vous connecter.");
+        setSuccessMsg("🎉 Votre compte a été créé avec succès ! Un e-mail de confirmation vient de vous être envoyé. Veuillez consulter votre boîte de réception et cliquer sur le lien pour valider votre adresse e-mail avant de vous connecter.");
         setIsSignUp(false);
       }
     } else {
@@ -161,14 +161,14 @@ export default function AuthModal({
           transition={{ duration: 0.2, ease: 'easeOut' }}
           className="relative w-full max-w-[420px] rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl shadow-slate-950/60 overflow-hidden"
         >
-          {/* Bouton de Fermeture */}
+          {/* Bouton de Fermeture Rouge Standard */}
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/5 transition-all cursor-pointer z-20"
-            title="Fermer"
+            className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer z-30 shadow-md flex items-center justify-center"
+            title="Fermer la fenêtre"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4.5 h-4.5 stroke-[2.5]" />
           </button>
 
           <div className="p-6 sm:p-7">
@@ -247,9 +247,12 @@ export default function AuthModal({
 
             {/* Success Message */}
             {successMsg && (
-              <div className="mb-4 p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-                <span>{successMsg}</span>
+              <div className="mb-4 p-3.5 rounded-xl bg-emerald-950/70 border border-emerald-500/50 text-emerald-200 text-xs flex items-start gap-3 shadow-lg">
+                <Mail className="w-5 h-5 shrink-0 text-emerald-400 mt-0.5 animate-bounce" />
+                <div className="space-y-1">
+                  <p className="font-bold text-emerald-300">Validation de votre adresse E-mail</p>
+                  <p className="leading-relaxed text-emerald-200/90 text-[11px]">{successMsg}</p>
+                </div>
               </div>
             )}
 

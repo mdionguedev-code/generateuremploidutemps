@@ -33,11 +33,20 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname
 
-  if (!user && (path.startsWith('/admin') || path.startsWith('/user') || path.startsWith('/dashboard'))) {
-    // Redirect to login if user is not authenticated
-    const url = request.nextUrl.clone()
-    url.pathname = '/' // Redirect to home/login
-    return NextResponse.redirect(url)
+  if (!user) {
+    if (path.startsWith('/api/timetable')) {
+      return NextResponse.json(
+        { error: 'Authentification requise pour accéder aux services API de planification.' },
+        { status: 401 }
+      )
+    }
+
+    if (path.startsWith('/admin') || path.startsWith('/user') || path.startsWith('/dashboard')) {
+      // Redirect to login if user is not authenticated
+      const url = request.nextUrl.clone()
+      url.pathname = '/' // Redirect to home/login
+      return NextResponse.redirect(url)
+    }
   }
 
   if (user) {
@@ -48,7 +57,8 @@ export async function updateSession(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    const role = profile?.role || 'user';
+    const isMasterAdmin = user.email?.toLowerCase() === 'diongpaco@gmail.com';
+    const role = isMasterAdmin ? 'admin' : (profile?.role || 'user');
 
     // Protect admin routes
     if (path.startsWith('/admin') && role !== 'admin') {

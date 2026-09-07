@@ -2,9 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI, Type } from '@google/genai';
 import { generateTimetable } from '@/lib/solver';
 import { DayTimeSlot, Teacher, ClassGroup, TimetableEntry } from '@/lib/types';
+import { verifyUserPlanAccess } from '@/lib/supabase/apiAuth';
 
 export async function POST(req: NextRequest) {
   try {
+    const authRes = await verifyUserPlanAccess();
+    if (!authRes.success) {
+      return NextResponse.json({ error: authRes.error }, { status: authRes.status });
+    }
+
+    const { plan, isSubscriptionActive } = authRes.context;
+    if (!isSubscriptionActive || !plan.features?.geminiAI) {
+      return NextResponse.json(
+        { error: 'Les fonctionnalités d\'intelligence artificielle Gemini ne sont pas incluses dans votre formule d\'abonnement active.' },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     const { action, subjects, teachers, classes, timetable, unscheduled, problem, suggestions } = body;
 
@@ -16,7 +30,8 @@ export async function POST(req: NextRequest) {
     }
 
     const hasApiKey = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY';
-    const activeTextSource = action === 'apply-suggestions' ? (suggestions || '') : (problem || '');
+    const rawTextSource = action === 'apply-suggestions' ? (suggestions || '') : (problem || '');
+    const activeTextSource = String(rawTextSource).replace(/[`$]/g, '').slice(0, 500);
 
     // --- FALLBACK HEURISTIC SCHEDULING (FOR EXCELLENCE EVEN WITHOUT APIS) ---
     if (!hasApiKey) {

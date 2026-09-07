@@ -17,7 +17,14 @@ export default async function AdminPage() {
     .eq('id', user.id)
     .single();
 
-  if (!profile || profile.role !== 'admin') {
+  const isMasterAdmin = user.email?.toLowerCase() === 'diongpaco@gmail.com';
+  if (isMasterAdmin && profile?.role !== 'admin') {
+    try {
+      await supabase.from('profiles').upsert({ id: user.id, email: user.email, role: 'admin' }, { onConflict: 'id' });
+    } catch (e) {
+      console.error(e);
+    }
+  } else if (!profile || profile.role !== 'admin') {
     redirect('/user');
   }
 

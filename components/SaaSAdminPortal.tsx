@@ -216,31 +216,20 @@ export default function SaaSAdminPortal({
       if (resetDataType === 'test_requests') {
         if (onUpdateActivationRequests) onUpdateActivationRequests([]);
         onUpdateTransactions([]);
-        localStorage.removeItem('saas_activation_requests');
-        localStorage.removeItem('saas_transactions');
         setResetDataSuccess("Les demandes d'activation et le journal de transactions ont été réinitialisés avec succès !");
       } else if (resetDataType === 'unused_keys') {
         const activeKeys = licenseKeys.filter(k => k.status === 'used');
         onUpdateLicenseKeys(activeKeys);
-        localStorage.setItem('saas_keys', JSON.stringify(activeKeys));
         setResetDataSuccess(`Toutes les clés de licence non attribuées ont été supprimées (${licenseKeys.length - activeKeys.length} clés nettoyées).`);
       } else if (resetDataType === 'test_clients') {
         onUpdateClients([]);
-        localStorage.removeItem('saas_clients');
         setResetDataSuccess("La liste des établissements clients a été réinitialisée.");
       } else if (resetDataType === 'full_saas') {
-        localStorage.removeItem('saas_clients');
-        localStorage.removeItem('saas_keys');
-        localStorage.removeItem('saas_transactions');
-        localStorage.removeItem('saas_activation_requests');
-        localStorage.removeItem('saas_settings');
-        
         onUpdateClients([]);
         onUpdateLicenseKeys([]);
         onUpdateTransactions([]);
         if (onUpdateActivationRequests) onUpdateActivationRequests([]);
-        
-        setResetDataSuccess("Réinitialisation Générale SaaS effectuée avec succès ! Les données locales ont été remises à zéro.");
+        setResetDataSuccess("Réinitialisation Générale SaaS effectuée avec succès ! Les données ont été remises à zéro.");
       }
     } catch (err) {
       setResetDataError("Une erreur est survenue lors de la réinitialisation des données.");
@@ -661,11 +650,7 @@ export default function SaaSAdminPortal({
     if (keyWasAssignedOrGenerated) {
       onUpdateClients(updatedClients);
       onUpdateLicenseKeys(updatedKeys);
-      
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('saas_clients', JSON.stringify(updatedClients));
-        localStorage.setItem('saas_keys', JSON.stringify(updatedKeys));
-      }
+      // Données mises à jour via Supabase uniquement — pas de localStorage
     }
 
     const targetPlan = plans.find(p => p.id === client.planId);
@@ -2052,6 +2037,14 @@ Pour activer votre formule :
                       <div className="flex items-center gap-2">
                         {plan.features.geminiAI ? <Check className="w-4 h-4 text-emerald-400" /> : <XCircle className="w-4 h-4 text-gray-600" />}
                         <span className={plan.features.geminiAI ? 'text-indigo-300 font-bold' : 'text-gray-500 line-through'}>Conseiller IA Gemini Pro</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {plan.features.pedagogicalPlanning ? <Check className="w-4 h-4 text-emerald-400" /> : <XCircle className="w-4 h-4 text-gray-600" />}
+                        <span className={plan.features.pedagogicalPlanning ? 'text-purple-300 font-bold' : 'text-gray-500 line-through'}>Module Répartition Pédagogique</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {plan.features.customBranding ? <Check className="w-4 h-4 text-emerald-400" /> : <XCircle className="w-4 h-4 text-gray-600" />}
+                        <span className={plan.features.customBranding ? 'text-white' : 'text-gray-500 line-through'}>Branding &amp; Logo Établissement</span>
                       </div>
                       <div className="flex items-center gap-2">
                         {plan.features.prioritySupport ? <Check className="w-4 h-4 text-emerald-400" /> : <XCircle className="w-4 h-4 text-gray-600" />}
@@ -3886,6 +3879,26 @@ Pour activer votre formule :
                       type="number"
                       value={editingPlanModal.maxTeachers}
                       onChange={e => setEditingPlanModal({ ...editingPlanModal, maxTeachers: Number(e.target.value) })}
+                      className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-400 mb-1 font-semibold">Quota Max Générations :</label>
+                    <input
+                      type="number"
+                      value={editingPlanModal.maxGenerations ?? 9999}
+                      onChange={e => setEditingPlanModal({ ...editingPlanModal, maxGenerations: Number(e.target.value) })}
+                      className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-400 mb-1 font-semibold">Quota Max Exports :</label>
+                    <input
+                      type="number"
+                      value={editingPlanModal.maxExports ?? 9999}
+                      onChange={e => setEditingPlanModal({ ...editingPlanModal, maxExports: Number(e.target.value) })}
                       className="w-full bg-slate-950 border border-white/10 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-indigo-500"
                     />
                   </div>

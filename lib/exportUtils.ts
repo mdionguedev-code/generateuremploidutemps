@@ -174,7 +174,8 @@ export async function exportTimetableToPdf(
   subjects: Subject[],
   schoolName: string = "Diongue-IziSchool",
   schoolSlogan: string = "Validé par la direction des études.",
-  schoolBreaks: any[] = []
+  schoolBreaks: any[] = [],
+  schoolLogo: string = ""
 ) {
   const { jsPDF } = await import('jspdf');
   const DAYS = activeExportDays;
@@ -194,15 +195,26 @@ export async function exportTimetableToPdf(
     year: 'numeric'
   });
 
-  // --- EN-TÊTE RÉDUIT, SOBRE & ACADÉMIQUE ---
+  // --- EN-TÊTE RÉDUIT, SOBRE & ACADÉMIQUE AVEC LOGO OPTIONNEL ---
+  let headerTextX = 12;
+  if (schoolLogo && schoolLogo.trim()) {
+    try {
+      const format = schoolLogo.includes('image/jpeg') || schoolLogo.includes('image/jpg') ? 'JPEG' : 'PNG';
+      doc.addImage(schoolLogo, format, 12, 8, 22, 11, undefined, 'FAST');
+      headerTextX = 38;
+    } catch (e) {
+      console.warn("Logo non affiché dans le PDF:", e);
+    }
+  }
+
   doc.setTextColor(15, 23, 42); // slate-900
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
-  doc.text(schoolName.toUpperCase(), 12, 12);
+  doc.text(schoolName.toUpperCase(), headerTextX, 12);
 
   doc.setFontSize(11);
   doc.setTextColor(67, 56, 202); // indigo-700
-  doc.text(`Emploi du Temps Officiel — Classe : ${cls.name}`, 12, 18);
+  doc.text(`Emploi du Temps Officiel — Classe : ${cls.name}`, headerTextX, 18);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
@@ -477,7 +489,8 @@ export async function exportTeacherTimetableToPdf(
   teachers: Teacher[],
   subjects: Subject[],
   schoolName: string = "Diongue-IziSchool",
-  schoolSlogan: string = "Validé par la direction des études."
+  schoolSlogan: string = "Validé par la direction des études.",
+  schoolLogo: string = ""
 ) {
   const { jsPDF } = await import('jspdf');
   const DAYS = activeExportDays;
@@ -499,14 +512,25 @@ export async function exportTeacherTimetableToPdf(
   });
 
   // En-tête compact et lisible
+  let headerTextX = 12;
+  if (schoolLogo && schoolLogo.trim()) {
+    try {
+      const format = schoolLogo.includes('image/jpeg') || schoolLogo.includes('image/jpg') ? 'JPEG' : 'PNG';
+      doc.addImage(schoolLogo, format, 12, 8, 22, 11, undefined, 'FAST');
+      headerTextX = 38;
+    } catch (e) {
+      console.warn("Logo non affiché dans le PDF enseignant:", e);
+    }
+  }
+
   doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
-  doc.text(schoolName.toUpperCase(), 12, 12);
+  doc.text(schoolName.toUpperCase(), headerTextX, 12);
 
   doc.setFontSize(11);
   doc.setTextColor(16, 185, 129); // emerald-600
-  doc.text(`Emploi du Temps Enseignant — Professeur : ${teacher.name}`, 12, 18);
+  doc.text(`Emploi du Temps Enseignant — Professeur : ${teacher.name}`, headerTextX, 18);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
@@ -677,7 +701,8 @@ export async function exportAllTeachersTimetableToPdf(
   teachers: Teacher[],
   subjects: Subject[],
   schoolName: string = "Diongue-IziSchool",
-  schoolSlogan: string = "Validé par la direction des études."
+  schoolSlogan: string = "Validé par la direction des études.",
+  schoolLogo: string = ""
 ) {
   if (teachers.length === 0) return;
 
@@ -704,14 +729,25 @@ export async function exportAllTeachersTimetableToPdf(
     const assignedHours = timetable.filter(e => e.teacherId === teacher.id).length;
 
     // En-tête compact
+    let headerTextX = 12;
+    if (schoolLogo && schoolLogo.trim()) {
+      try {
+        const format = schoolLogo.includes('image/jpeg') || schoolLogo.includes('image/jpg') ? 'JPEG' : 'PNG';
+        doc.addImage(schoolLogo, format, 12, 8, 22, 11, undefined, 'FAST');
+        headerTextX = 38;
+      } catch (e) {
+        console.warn("Logo non affiché dans le PDF global enseignant:", e);
+      }
+    }
+
     doc.setTextColor(15, 23, 42);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
-    doc.text(schoolName.toUpperCase(), 12, 12);
+    doc.text(schoolName.toUpperCase(), headerTextX, 12);
 
     doc.setFontSize(11);
     doc.setTextColor(16, 185, 129);
-    doc.text(`Emploi du Temps Enseignant — ${teacher.name}`, 12, 18);
+    doc.text(`Emploi du Temps Enseignant — ${teacher.name}`, headerTextX, 18);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
@@ -1119,8 +1155,13 @@ export function exportTimetableToWord(
       <table class="header-section">
         <tr>
           <td style="vertical-align: middle;">
-            <div class="school-title">${escapedSchoolName}</div>
-            <div style="font-size: 8.5pt; color: #64748b;">${escapedSchoolSlogan}</div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              ${schoolLogo && schoolLogo.trim() ? `<img src="${schoolLogo}" style="max-height: 48px; max-width: 140px; object-fit: contain; vertical-align: middle; margin-right: 12px;" alt="Logo Établissement" />` : ''}
+              <div>
+                <div class="school-title">${escapedSchoolName}</div>
+                <div style="font-size: 8.5pt; color: #64748b;">${escapedSchoolSlogan}</div>
+              </div>
+            </div>
           </td>
           <td style="vertical-align: middle; text-align: right;">
             <div class="doc-meta">Emploi du Temps — Classe : ${escapedClassName}</div>
@@ -1247,8 +1288,13 @@ export function exportTeacherTimetableToWord(
         <table class="header-section">
           <tr>
             <td style="vertical-align: middle;">
-              <div class="school-title">${escapedSchoolName}</div>
-              <div style="font-size: 8.5pt; color: #64748b;">${escapedSchoolSlogan}</div>
+              <div style="display: flex; align-items: center; gap: 12px;">
+                ${schoolLogo && schoolLogo.trim() ? `<img src="${schoolLogo}" style="max-height: 48px; max-width: 140px; object-fit: contain; vertical-align: middle; margin-right: 12px;" alt="Logo Établissement" />` : ''}
+                <div>
+                  <div class="school-title">${escapedSchoolName}</div>
+                  <div style="font-size: 8.5pt; color: #64748b;">${escapedSchoolSlogan}</div>
+                </div>
+              </div>
             </td>
             <td style="vertical-align: middle; text-align: right;">
               <div class="doc-meta" style="color: #16a34a;">Emploi du Temps — Professeur : ${escapedTeacherName}</div>

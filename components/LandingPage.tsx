@@ -8,8 +8,6 @@ import { SaaSPlan, PaymentMethod } from '@/lib/saasTypes';
 
 interface LandingPageProps {
   onOpenLogin: () => void;
-  onDirectDemoClient: () => void;
-  onDirectDemoAdmin: () => void;
   onPurchaseLicenseRequest: (
     schoolName: string,
     email: string,
@@ -25,8 +23,6 @@ interface LandingPageProps {
 
 export default function LandingPage({
   onOpenLogin,
-  onDirectDemoClient,
-  onDirectDemoAdmin,
   onPurchaseLicenseRequest,
   plans,
   theme = 'dark'

@@ -11,6 +11,7 @@ import {
   RotateCcw, 
   Check, 
   Crown, 
+  Lock,
   Copy, 
   Edit3, 
   FileSpreadsheet, 
@@ -323,6 +324,10 @@ export default function PedagogicalPlanningTab({
   };
 
   const handleApplyToApplicationClasses = () => {
+    if (!isPremiumOrSchool) {
+      onOpenUpgrade();
+      return;
+    }
     const updatedClasses = classes.map(cls => {
       const newAssignments: ClassAssignment[] = [];
       const subMap = classRequirements[cls.id] || {};
@@ -560,10 +565,14 @@ export default function PedagogicalPlanningTab({
               <button
                 type="button"
                 onClick={onOpenUpgrade}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 flex items-center gap-2 cursor-pointer border border-amber-400/40"
+                title="Nécessite le plan Premium ou School"
+                className="group/vip relative px-4 py-2.5 rounded-xl bg-[#1c1507] border border-amber-500/70 text-amber-400 font-extrabold text-xs shadow-lg flex items-center gap-2 cursor-pointer transition-all hover:border-amber-400 hover:bg-[#281d09]"
               >
-                <Crown className="w-4 h-4" />
-                <span>Débloquer avec Premium</span>
+                <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="tracking-wider uppercase">VIP (Plan Supérieur Requis)</span>
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/vip:block text-[10px] font-medium py-1 px-2.5 rounded-lg whitespace-nowrap bg-slate-950/95 text-amber-200 border border-amber-500/40 shadow-xl z-50 pointer-events-none">
+                  Répartition pédagogique réservée aux formules Premium & School
+                </span>
               </button>
             )}
           </div>
@@ -1062,10 +1071,16 @@ export default function PedagogicalPlanningTab({
                   <button
                     type="button"
                     onClick={handleApplyToApplicationClasses}
-                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-600/20 flex items-center gap-2 cursor-pointer transition-all hover:scale-105 active:scale-95"
+                    title={!isPremiumOrSchool ? "Nécessite le plan Premium ou School" : undefined}
+                    className={`group/vip relative px-5 py-2.5 rounded-xl font-black text-xs shadow-lg flex items-center gap-2 cursor-pointer transition-all hover:scale-105 active:scale-95 ${!isPremiumOrSchool ? 'bg-[#1c1507] border border-amber-500/70 text-amber-400' : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-600/20'}`}
                   >
-                    <Check className="w-4 h-4" />
+                    {!isPremiumOrSchool ? <Lock className="w-4 h-4 text-amber-400 shrink-0" /> : <Check className="w-4 h-4" />}
                     <span>Appliquer la répartition aux classes</span>
+                    {!isPremiumOrSchool && (
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/vip:block text-[10px] font-medium py-1 px-2.5 rounded-lg whitespace-nowrap bg-slate-950/95 text-amber-200 border border-amber-500/40 shadow-xl z-50 pointer-events-none">
+                        Fonctionnalité réservée aux formules Premium & School
+                      </span>
+                    )}
                   </button>
                 </div>
               </div>

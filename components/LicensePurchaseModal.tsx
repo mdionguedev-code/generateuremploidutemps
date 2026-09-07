@@ -320,10 +320,10 @@ export default function LicensePurchaseModal({
             </div>
             <button
               onClick={handleClose}
-              className="p-1.5 rounded-lg transition-all cursor-pointer bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/30 hover:border-rose-500/50 hover:scale-105 active:scale-95 shadow-md shadow-rose-500/5"
-              title="Fermer"
+              className="p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer shadow-md flex items-center justify-center shrink-0"
+              title="Fermer la fenêtre"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-4.5 h-4.5 stroke-[2.5]" />
             </button>
           </div>
 

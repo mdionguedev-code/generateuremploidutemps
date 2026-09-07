@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Shield,
@@ -19,7 +19,9 @@ import {
   Copy,
   Smartphone,
   QrCode,
-  Lock
+  Lock,
+  Crown,
+  ArrowLeft
 } from 'lucide-react';
 
 import { SaaSPlan, SaaSClient, SaaSLicenseKey, PaymentMethod, SaaSGlobalSettings } from '@/lib/saasTypes';
@@ -36,6 +38,10 @@ interface ClientSubscriptionModalProps {
   exportCount?: number;
   maxExports?: number;
   theme?: 'light' | 'dark';
+  restrictedFeaturePrompt?: {
+    featureName: string;
+    reason?: string;
+  } | null;
   onApplyLicenseKey: (keyStr: string) => Promise<{ success: boolean; message: string }> | { success: boolean; message: string };
   onSimulatePayment: (planId: string, paymentMethod: PaymentMethod, durationMonths: number) => void;
   onRequestUpgradeOrRenewal?: (params: {
@@ -64,27 +70,47 @@ export default function ClientSubscriptionModal({
   exportCount = 0,
   maxExports = 25,
   theme = 'dark',
+  restrictedFeaturePrompt,
   onApplyLicenseKey,
   onSimulatePayment,
   onRequestUpgradeOrRenewal
 }: ClientSubscriptionModalProps) {
   const isLight = theme === 'light';
+
+  // Les plans proviennent exclusivement de la base de données (via props)
+  // Si vides au montage, le modal affiche un état de chargement
+  const safePlans = (plans && plans.length > 0) ? plans : [];
+  const currentPlan =
+    safePlans.find(p => p.id === currentClient?.planId) ||
+    safePlans.find(p => p.id === 'plan_trial') ||
+    safePlans[0] ||
+    null;
+
   const [activeTab, setActiveTab] = useState<'my_plan' | 'upgrade' | 'redeem_key'>(
-    currentClient.status === 'pending_key' ? 'redeem_key' : 'my_plan'
+    restrictedFeaturePrompt ? 'upgrade' : (currentClient?.status === 'pending_key' ? 'redeem_key' : 'my_plan')
   );
+
+  useEffect(() => {
+    if (restrictedFeaturePrompt) {
+      setActiveTab('upgrade');
+    }
+  }, [restrictedFeaturePrompt, isOpen]);
+
   const [inputKey, setInputKey] = useState('');
   const [keyError, setKeyError] = useState<string | null>(null);
   const [keySuccess, setKeySuccess] = useState<string | null>(null);
 
-  const [selectedPlanForUpgrade, setSelectedPlanForUpgrade] = useState<string>(currentClient.planId || 'plan_standard');
+  const [selectedPlanForUpgrade, setSelectedPlanForUpgrade] = useState<string>(() => {
+    if (currentClient?.planId === 'plan_trial') return 'plan_standard';
+    if (currentClient?.planId === 'plan_standard') return 'plan_premium';
+    return currentClient?.planId || 'plan_standard';
+  });
   const [durationMonthsForUpgrade, setDurationMonthsForUpgrade] = useState<number>(1);
-  const [contactWhatsapp, setContactWhatsapp] = useState(currentClient.whatsapp || currentClient.phone || '');
-  const [contactEmail, setContactEmail] = useState(currentClient.adminEmail || '');
+  const [contactWhatsapp, setContactWhatsapp] = useState(currentClient?.whatsapp || currentClient?.phone || '');
+  const [contactEmail, setContactEmail] = useState(currentClient?.adminEmail || '');
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('Wave');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentDone, setPaymentDone] = useState(false);
-
-  const currentPlan = plans.find(p => p.id === currentClient.planId) || plans[0];
 
   const handleRedeemKeySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,7 +135,7 @@ export default function ClientSubscriptionModal({
     e.preventDefault();
     setIsProcessingPayment(true);
 
-    const targetPlan = plans.find(p => p.id === selectedPlanForUpgrade);
+    const targetPlan = safePlans.find(p => p.id === selectedPlanForUpgrade);
     const amount = (targetPlan?.monthlyPriceFCFA || 0) * durationMonthsForUpgrade;
     const isRenewal = selectedPlanForUpgrade === currentClient.planId;
     const reqType: 'upgrade' | 'renewal' = isRenewal ? 'renewal' : 'upgrade';
@@ -157,7 +183,7 @@ export default function ClientSubscriptionModal({
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className={`rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 relative overflow-hidden max-h-[92vh] flex flex-col font-sans transition-all ${
+        className={`rounded-3xl p-6 max-w-xl w-full shadow-2xl space-y-4 relative overflow-hidden max-h-[92vh] flex flex-col font-sans transition-all ${
           isLight
             ? "bg-white border border-gray-200/90 text-gray-900 shadow-indigo-950/15"
             : "bg-slate-900 border border-indigo-500/30 text-white"
@@ -179,21 +205,17 @@ export default function ClientSubscriptionModal({
                 </span>
               </h3>
               <p className={`text-xs truncate mt-0.5 ${isLight ? "text-gray-500 font-medium" : "text-gray-400"}`}>
-                {currentClient.schoolName}
+                {currentClient?.schoolName || 'Mon Établissement'}
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className={`p-2 rounded-xl border transition-all cursor-pointer shadow-sm ${
-              isLight
-                ? "bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 border-gray-200"
-                : "bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border-white/10"
-            }`}
-            title="Fermer la fenêtre d'abonnement"
+            className="p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer shadow-md flex items-center justify-center shrink-0"
+            title="Fermer la fenêtre"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4.5 h-4.5 stroke-[2.5]" />
           </button>
         </div>
 
@@ -217,13 +239,14 @@ export default function ClientSubscriptionModal({
               setSelectedMethod('Wave');
               setDurationMonthsForUpgrade(1);
             }}
-            className={`px-3.5 py-2 rounded-xl font-bold transition-all cursor-pointer ${
+            className={`px-3.5 py-2 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'upgrade'
                 ? 'bg-indigo-600 !text-white shadow-md shadow-indigo-600/20'
                 : isLight ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-100' : 'text-gray-400 hover:text-white'
             }`}
           >
-            Changer d'Offre
+            <Crown className="w-3.5 h-3.5" />
+            <span>Passer à l&apos;Offre Supérieure</span>
           </button>
           <button
             type="button"
@@ -235,12 +258,64 @@ export default function ClientSubscriptionModal({
             }`}
           >
             <Key className="w-3.5 h-3.5" />
-            Clé
+            <span>Clé de Licence</span>
           </button>
         </div>
 
         {/* SCROLLABLE BODY CONTAINER */}
         <div className="flex-1 overflow-y-auto pr-1 space-y-4 relative z-10 max-h-[70vh]">
+
+          {/* BANNIÈRE SPÉCIALE ACCÈS RESTREINT (CHOIX DU CLIENT) */}
+          {restrictedFeaturePrompt && (
+            <div className={`p-4 rounded-2xl border space-y-3 shadow-md ${
+              isLight
+                ? "bg-gradient-to-r from-amber-50 to-orange-50 border-amber-300 text-amber-950"
+                : "bg-gradient-to-r from-amber-950/40 via-slate-900 to-orange-950/30 border-amber-500/40 text-amber-200"
+            }`}>
+              <div className="flex items-start gap-3">
+                <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-500 border border-amber-500/30 shrink-0">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div className="space-y-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-mono font-black uppercase px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30">
+                      Nécessite un plan supérieur
+                    </span>
+                    <h4 className={`text-sm font-black ${isLight ? "text-slate-950" : "text-white"}`}>
+                      {restrictedFeaturePrompt.featureName}
+                    </h4>
+                  </div>
+                  <p className={`text-xs leading-relaxed ${isLight ? "text-slate-700 font-medium" : "text-slate-300"}`}>
+                    {restrictedFeaturePrompt.reason}
+                  </p>
+                </div>
+              </div>
+
+              {/* LES 2 CHOIX CLAIRS */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-amber-500/20">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('upgrade')}
+                  className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                >
+                  <Crown className="w-4 h-4" />
+                  <span>Continuer vers un plan supérieur</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className={`py-2.5 px-3 rounded-xl font-bold text-xs border flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+                    isLight
+                      ? "bg-white hover:bg-slate-100 text-slate-700 border-slate-300 shadow-sm"
+                      : "bg-white/10 hover:bg-white/15 text-white border-white/10"
+                  }`}
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Retourner au tableau de bord</span>
+                </button>
+              </div>
+            </div>
+          )}
           
           {/* TAB 1: MY CURRENT PLAN */}
           {activeTab === 'my_plan' && (
@@ -271,10 +346,10 @@ export default function ClientSubscriptionModal({
                     Expire le
                   </span>
                   <span className={`text-sm font-black block ${isLight ? "text-emerald-700" : "text-emerald-400"}`}>
-                    {currentClient.subscriptionEndDate}
+                    {currentClient?.subscriptionEndDate || 'Non définie'}
                   </span>
                   <span className={`block text-[10px] ${isLight ? "text-gray-600 font-medium" : "text-gray-500 text-[9px]"}`}>
-                    Paiement: <strong>{currentClient.paymentMethod || 'Wave'}</strong>
+                    Paiement: <strong>{currentClient?.paymentMethod || 'Wave'}</strong>
                   </span>
                 </div>
               </div>
@@ -286,14 +361,14 @@ export default function ClientSubscriptionModal({
                   <div className="flex justify-between items-center text-xs">
                     <span className={isLight ? "text-gray-700 font-bold" : "text-gray-400 text-[10px]"}>Classes</span>
                     <span className={`font-mono font-bold text-xs ${isLight ? "text-gray-950" : "text-white"}`}>
-                      {currentClient.classesCount}/{currentPlan.maxClasses >= 999 ? '∞' : currentPlan.maxClasses}
+                      {currentClient?.classesCount || 0}/{currentPlan.maxClasses >= 999 ? '∞' : currentPlan.maxClasses}
                     </span>
                   </div>
                   <div className={`h-2 rounded-full overflow-hidden flex ${isLight ? "bg-gray-200" : "bg-slate-900"}`}>
                     <div
                       className="h-full bg-indigo-600 rounded-full transition-all duration-500"
                       style={{
-                        width: `${Math.min(100, (currentClient.classesCount / (currentPlan.maxClasses || 1)) * 100)}%`
+                        width: `${Math.min(100, ((currentClient?.classesCount || 0) / (currentPlan.maxClasses || 1)) * 100)}%`
                       }}
                     />
                   </div>
@@ -303,14 +378,14 @@ export default function ClientSubscriptionModal({
                   <div className="flex justify-between items-center text-xs">
                     <span className={isLight ? "text-gray-700 font-bold" : "text-gray-400 text-[10px]"}>Enseignants</span>
                     <span className={`font-mono font-bold text-xs ${isLight ? "text-gray-950" : "text-white"}`}>
-                      {currentClient.teachersCount}/{currentPlan.maxTeachers >= 999 ? '∞' : currentPlan.maxTeachers}
+                      {currentClient?.teachersCount || 0}/{currentPlan.maxTeachers >= 999 ? '∞' : currentPlan.maxTeachers}
                     </span>
                   </div>
                   <div className={`h-2 rounded-full overflow-hidden flex ${isLight ? "bg-gray-200" : "bg-slate-900"}`}>
                     <div
                       className="h-full bg-emerald-600 rounded-full transition-all duration-500"
                       style={{
-                        width: `${Math.min(100, (currentClient.teachersCount / (currentPlan.maxTeachers || 1)) * 100)}%`
+                        width: `${Math.min(100, ((currentClient?.teachersCount || 0) / (currentPlan.maxTeachers || 1)) * 100)}%`
                       }}
                     />
                   </div>
@@ -352,13 +427,29 @@ export default function ClientSubscriptionModal({
 
               </div>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('upgrade')}
-                className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 !text-white font-black text-xs shadow-md shadow-indigo-600/25 transition-all cursor-pointer text-center active:scale-[0.99]"
-              >
-                Mettre à niveau mon offre
-              </button>
+              {/* DUAL ACTION BUTTONS (CHOIX DU CLIENT) */}
+              <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('upgrade')}
+                  className="flex-1 py-3 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 !text-white font-black text-xs shadow-md shadow-indigo-600/25 transition-all cursor-pointer text-center active:scale-[0.99] flex items-center justify-center gap-2"
+                >
+                  <Crown className="w-4 h-4" />
+                  <span>Continuer vers un plan supérieur</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className={`py-3 px-4 rounded-2xl font-bold text-xs border flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.99] ${
+                    isLight
+                      ? "bg-white hover:bg-slate-100 text-slate-700 border-slate-300 shadow-sm"
+                      : "bg-white/5 hover:bg-white/10 text-gray-300 border-white/10"
+                  }`}
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Retourner au tableau de bord</span>
+                </button>
+              </div>
             </div>
           )}
 
@@ -366,20 +457,28 @@ export default function ClientSubscriptionModal({
           {activeTab === 'upgrade' && (
             <form onSubmit={handleUpgradeSubmit} className="space-y-3.5 text-xs relative z-10">
               {paymentDone ? (
-                <div className={`p-6 text-center rounded-2xl border space-y-2 ${isLight ? "bg-emerald-50 border-emerald-200 text-emerald-950" : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"}`}>
+                <div className={`p-6 text-center rounded-2xl border space-y-3 ${isLight ? "bg-emerald-50 border-emerald-200 text-emerald-950" : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"}`}>
                   <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-500 animate-bounce" />
                   <h4 className={`text-sm font-black font-sans ${isLight ? "text-emerald-950" : "text-white"}`}>
                     Demande transmise avec succès !
                   </h4>
                   <p className={`text-xs ${isLight ? "text-emerald-800" : "text-gray-300"}`}>
-                    Le lien de paiement Wave a été ouvert. L'administrateur validera et vous transmettra votre clé d'activation dès réception du paiement.
+                    Le lien de paiement Wave a été ouvert. L&apos;administrateur validera et vous transmettra votre clé d&apos;activation dès réception du paiement.
                   </p>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="mt-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs inline-flex items-center gap-2 cursor-pointer shadow-md"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Retourner au tableau de bord</span>
+                  </button>
                 </div>
               ) : (
                 <>
                   <div>
                     <label className={`block font-bold mb-1.5 text-xs ${isLight ? "text-gray-800" : "text-gray-300"}`}>
-                      Formule d'Abonnement :
+                      Choisir une Formule Supérieure :
                     </label>
                     <select
                       value={selectedPlanForUpgrade}
@@ -390,9 +489,9 @@ export default function ClientSubscriptionModal({
                           : "bg-slate-950 border-white/10 text-white"
                       }`}
                     >
-                      {plans.map(p => (
+                      {safePlans.map(p => (
                         <option key={p.id} value={p.id} className={isLight ? "bg-white text-gray-900" : "bg-slate-900 text-white"}>
-                          {p.name} ({p.monthlyPriceFCFA === 0 ? 'Gratuit' : `${p.monthlyPriceFCFA.toLocaleString('fr-FR')} FCFA/mois`})
+                          {p.name} ({p.monthlyPriceFCFA === 0 ? 'Gratuit' : `${p.monthlyPriceFCFA.toLocaleString('fr-FR')} FCFA/mois`}) - {p.maxClasses >= 999 ? 'Classes Illimitées' : `${p.maxClasses} classes max`}
                         </option>
                       ))}
                     </select>
@@ -437,14 +536,14 @@ export default function ClientSubscriptionModal({
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className={`p-3 rounded-xl border ${isLight ? "bg-gray-50 border-gray-200" : "bg-slate-950 border-white/5"}`}>
-                      <span className={`block text-[10px] uppercase font-bold ${isLight ? "text-gray-500" : "text-gray-400"}`}>Type de demande</span>
+                      <span className={`block text-[10px] uppercase font-bold ${isLight ? "text-gray-500" : "text-gray-400"}`}>Type d&apos;offre</span>
                       <span className={`font-black text-xs ${isLight ? "text-gray-900" : "text-white"}`}>
-                        {selectedPlanForUpgrade === currentClient.planId ? 'Renouvellement (1 Mois)' : 'Mise à niveau (1 Mois)'}
+                        {selectedPlanForUpgrade === currentClient?.planId ? 'Renouvellement (1 Mois)' : 'Mise à niveau (1 Mois)'}
                       </span>
                     </div>
 
                     {(() => {
-                      const targetPlan = plans.find(p => p.id === selectedPlanForUpgrade);
+                      const targetPlan = safePlans.find(p => p.id === selectedPlanForUpgrade);
                       const totalPrice = (targetPlan?.monthlyPriceFCFA || 0) * durationMonthsForUpgrade;
                       return (
                         <div className={`p-3 rounded-xl border font-mono text-xs flex flex-col justify-center ${
@@ -457,20 +556,33 @@ export default function ClientSubscriptionModal({
                     })()}
                   </div>
 
-                  <div className="pt-1">
+                  {/* DUAL ACTION BUTTONS (CHOIX DU CLIENT) */}
+                  <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
                     <button
                       type="submit"
                       disabled={isProcessingPayment}
-                      className="w-full py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 !text-white font-black text-xs shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99]"
+                      className="flex-1 py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 !text-white font-black text-xs shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99]"
                     >
                       {isProcessingPayment ? (
                         <span>Enregistrement de la demande...</span>
                       ) : (
                         <>
                           <CreditCard className="w-4 h-4" />
-                          <span>Passer au paiement ({((plans.find(p => p.id === selectedPlanForUpgrade)?.monthlyPriceFCFA || 0) * durationMonthsForUpgrade).toLocaleString('fr-FR')} FCFA)</span>
+                          <span>Passer au paiement Wave ({((safePlans.find(p => p.id === selectedPlanForUpgrade)?.monthlyPriceFCFA || 0) * durationMonthsForUpgrade).toLocaleString('fr-FR')} FCFA)</span>
                         </>
                       )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className={`py-3 px-4 rounded-2xl font-bold text-xs border flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.99] ${
+                        isLight
+                          ? "bg-white hover:bg-slate-100 text-slate-700 border-slate-300 shadow-sm"
+                          : "bg-white/5 hover:bg-white/10 text-gray-300 border-white/10"
+                      }`}
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      <span>Retourner au tableau de bord</span>
                     </button>
                   </div>
                 </>
@@ -519,13 +631,26 @@ export default function ClientSubscriptionModal({
                 />
               </div>
 
-              <div className="pt-1">
+              {/* DUAL ACTION BUTTONS (CHOIX DU CLIENT) */}
+              <div className="pt-1 flex flex-col sm:flex-row gap-2.5">
                 <button
                   type="submit"
-                  className="w-full py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 !text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99]"
+                  className="flex-1 py-3 px-4 rounded-2xl bg-amber-500 hover:bg-amber-400 !text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99]"
                 >
                   <Check className="w-4 h-4" />
-                  Valider &amp; Activer la Clé
+                  <span>Valider &amp; Activer la Clé</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className={`py-3 px-4 rounded-2xl font-bold text-xs border flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.99] ${
+                    isLight
+                      ? "bg-white hover:bg-slate-100 text-slate-700 border-slate-300 shadow-sm"
+                      : "bg-white/5 hover:bg-white/10 text-gray-300 border-white/10"
+                  }`}
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Retourner au tableau de bord</span>
                 </button>
               </div>
             </form>

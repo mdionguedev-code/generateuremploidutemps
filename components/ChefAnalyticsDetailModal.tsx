@@ -1408,10 +1408,10 @@ export default function ChefAnalyticsDetailModal({
             <button
               type="button"
               onClick={onClose}
-              className={`p-2 rounded-xl border transition-colors cursor-pointer ml-1 ${isLight ? "bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 border-gray-200" : "bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border-white/10"}`}
+              className="p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer shadow-md flex items-center justify-center ml-1 shrink-0"
               title="Fermer la vue détaillée"
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5 stroke-[2.5]" />
             </button>
           </div>
         </header>

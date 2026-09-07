@@ -49,7 +49,11 @@ import {
   EyeOff,
   KeyRound,
   CheckCircle2,
-  ShieldCheck
+  ShieldCheck,
+  Upload,
+  Image as ImageIcon,
+  FileImage,
+  X
 } from 'lucide-react';
 
 import dynamic from 'next/dynamic';
@@ -124,7 +128,8 @@ import {
   dbUserUpdatePassword,
   dbSubmitActivationRequest,
   dbAdminDeliverActivationRequest,
-  dbAdminGenerateLicenseKeys
+  dbAdminGenerateLicenseKeys,
+  dbGetUserQuotaUsage
 } from '@/lib/supabase/dbService';
 import {
   SaaSPlan,
@@ -173,6 +178,27 @@ import {
 } from '@/lib/solver';
 
 const ALL_DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+
+const VipLockBadge = ({
+  tooltip = "Nécessite le plan Premium ou School",
+  text = "VIP",
+  className = ""
+}: {
+  tooltip?: string;
+  text?: string;
+  className?: string;
+}) => (
+  <span
+    className={`group/vip relative inline-flex items-center gap-1 px-2 py-0.5 rounded border border-amber-500/70 bg-[#1c1507] text-amber-400 text-[10px] font-extrabold shadow-sm shrink-0 cursor-pointer transition-all hover:border-amber-400 hover:bg-[#281d09] ${className}`}
+  >
+    <Lock className="w-3 h-3 text-amber-400 shrink-0" />
+    <span className="tracking-wider uppercase">{text}</span>
+    {/* Discrete Hover Tooltip */}
+    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/vip:block text-[10px] font-medium py-1 px-2.5 rounded-lg whitespace-nowrap bg-slate-950/95 text-amber-200 border border-amber-500/40 shadow-xl z-50 pointer-events-none transition-all">
+      {tooltip}
+    </span>
+  </span>
+);
 
 export default function TimetableDashboard({
   initialPortalMode = 'client',
@@ -235,12 +261,9 @@ export default function TimetableDashboard({
     }
   }, [theme, currentViewMode, isMounted]);
 
-  useEffect(() => {
-    if (isMounted && typeof window !== 'undefined') {
-      localStorage.setItem(`school_generation_count_${currentClientId}`, generationCount.toString());
-      localStorage.setItem(`school_export_count_${currentClientId}`, exportCount.toString());
-    }
-  }, [generationCount, exportCount, currentClientId, isMounted]);
+  // NOTE: Les compteurs de quotas (générations, exports) sont chargés depuis
+  // la base de données au login via dbGetUserQuotaUsage().
+  // Pas de localStorage pour les données de quota.
 
   const entryIdCounterRef = useRef(1);
 
@@ -269,24 +292,76 @@ export default function TimetableDashboard({
   const [unscheduled, setUnscheduled] = useState<any[]>([]);
   const [generationScore, setGenerationScore] = useState<number>(0);
 
+  // NOTE : Les quotas sont chargés depuis la DB dans loadUserData().
+  // Ils ne sont plus persistés via localStorage.
+
   // --- School / Etablissement Settings States ---
   const [schoolName, setSchoolName] = useState<string>('Diongue-IziSchool');
   const [schoolSlogan, setSchoolSlogan] = useState<string>("Validé par la direction des études.");
   const [schoolLogo, setSchoolLogo] = useState<string>('');
   const [schoolLogoType, setSchoolLogoType] = useState<'icon' | 'url'>('icon');
   const [schoolLogoIcon, setSchoolLogoIcon] = useState<string>('GraduationCap');
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
+  const [isDraggingLogo, setIsDraggingLogo] = useState<boolean>(false);
+
+  const processAndFormatLogoFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      triggerNotification("Veuillez sélectionner un fichier image valide (PNG, JPG, WEBP, SVG).", "error");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      triggerNotification("L'image est trop volumineuse (maximum 10 Mo).", "error");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const src = e.target?.result as string;
+      if (!src) return;
+
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 400;
+        const MAX_HEIGHT = 150;
+
+        let width = img.width;
+        let height = img.height;
+
+        const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
+        canvas.width = Math.max(1, Math.round(width * ratio));
+        canvas.height = Math.max(1, Math.round(height * ratio));
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          setSchoolLogo(src);
+          triggerNotification("Logo de l'établissement importé !", "success");
+          return;
+        }
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        const formattedBase64 = canvas.toDataURL('image/png', 0.92);
+        setSchoolLogo(formattedBase64);
+        triggerNotification("Photo de l'établissement importée et optimisée pour l'en-tête !", "success");
+      };
+      img.onerror = () => {
+        triggerNotification("Impossible de charger le fichier image.", "error");
+      };
+      img.src = src;
+    };
+    reader.onerror = () => {
+      triggerNotification("Erreur lors de la lecture du fichier.", "error");
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     if (isMounted && typeof window !== 'undefined') {
-      localStorage.setItem('school_name', schoolName);
-      localStorage.setItem('school_slogan', schoolSlogan);
-      localStorage.setItem('school_logo', schoolLogo);
-      localStorage.setItem('school_logo_type', schoolLogoType);
-      localStorage.setItem('school_logo_icon', schoolLogoIcon);
-      localStorage.setItem('school_active_days', JSON.stringify(activeDays));
-      localStorage.setItem('school_start_hour', startHour.toString());
-      localStorage.setItem('school_end_hour', endHour.toString());
-      localStorage.setItem('school_breaks', JSON.stringify(schoolBreaks));
+      // Mise à jour de la config d'export (non métier, UI uniquement)
       setExportScheduleConfig(activeDays, slotLabels);
 
       if (currentUserId && !isLoadingDb) {
@@ -340,21 +415,7 @@ export default function TimetableDashboard({
     setIsAuthModalOpen(true);
   };
 
-  const handleLoginClient = (email: string) => {
-    setCurrentUserEmail(email);
-    setSaasPortalMode('client');
-    setCurrentViewMode('app');
-    setIsAuthModalOpen(false);
-    showNotification(`Connecté avec succès en tant que Client (${email})`, 'success');
-  };
 
-  const handleLoginAdmin = (email: string) => {
-    setCurrentUserEmail(email);
-    setSaasPortalMode('admin');
-    setCurrentViewMode('app');
-    setIsAuthModalOpen(false);
-    showNotification(`Connecté avec succès en tant qu'Administrateur SaaS (${email})`, 'success');
-  };
 
   const handleGoToLanding = async () => {
     try {
@@ -393,28 +454,27 @@ export default function TimetableDashboard({
   });
   const [saasActivationRequests, setSaasActivationRequests] = useState<SaaSActivationRequest[]>([]);
   const [isClientSubModalOpen, setIsClientSubModalOpen] = useState<boolean>(false);
-  const [isAdminPinModalOpen, setIsAdminPinModalOpen] = useState<boolean>(false);
-  const [adminPinInput, setAdminPinInput] = useState<string>('');
-  const [adminPinError, setAdminPinError] = useState<string>('');
+  const [restrictedFeaturePrompt, setRestrictedFeaturePrompt] = useState<{
+    featureName: string;
+    reason?: string;
+  } | null>(null);
+
+  const openUpgradeModal = (featureName: string, reason?: string) => {
+    setRestrictedFeaturePrompt({
+      featureName,
+      reason: reason || "Cette fonctionnalité nécessite une formule supérieure. Vous pouvez continuer vers une offre supérieure ou retourner à votre tableau de bord."
+    });
+    setIsClientSubModalOpen(true);
+  };
+  const [currentUserRole, setCurrentUserRole] = useState<'admin' | 'user'>('user');
 
   const handleRequestAdminAccess = () => {
     if (saasPortalMode === 'admin') return;
-    setAdminPinInput('');
-    setAdminPinError('');
-    setIsAdminPinModalOpen(true);
-  };
-
-  const handleVerifyAdminPin = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanPin = adminPinInput.trim().toUpperCase();
-    if (cleanPin === '1234' || cleanPin === 'ADMIN2026' || cleanPin === 'ADMIN') {
+    if (currentUserRole === 'admin') {
       setSaasPortalMode('admin');
-      setIsAdminPinModalOpen(false);
-      setAdminPinInput('');
-      setAdminPinError('');
-      showNotification("Authentification Administrateur SaaS réussie !", "success");
+      showNotification("Basculement vers l'Espace Administration SaaS.", "success");
     } else {
-      setAdminPinError("Code PIN d'accès Administrateur incorrect. Accès strictement réservé aux gestionnaires SaaS.");
+      showNotification("Accès refusé : Privilèges Administrateur SaaS requis sur votre compte.", "error");
     }
   };
 
@@ -427,13 +487,17 @@ export default function TimetableDashboard({
       setCurrentUserEmail(user.email || '');
 
       // 1. Fetch profile role, establishment data, and saas data in parallel
-      const [profileRes, estData, saasData] = await Promise.all([
+      const isMasterPre = user.email?.toLowerCase() === 'diongpaco@gmail.com';
+      const [profileRes, estData, saasData, quotaData] = await Promise.all([
         supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
         getEstablishmentData(user.id),
-        getSaaSAdminLivePlatformData()
+        getSaaSAdminLivePlatformData(), // null si non-admin (RLS)
+        isMasterPre ? Promise.resolve(null) : dbGetUserQuotaUsage(user.id)
       ]);
 
-      const role = profileRes.data?.role || 'user';
+      const isMaster = user.email?.toLowerCase() === 'diongpaco@gmail.com';
+      const role = isMaster ? 'admin' : (profileRes.data?.role || 'user');
+      setCurrentUserRole(role as 'admin' | 'user');
       if (role === 'admin') {
         setSaasPortalMode('admin');
       } else {
@@ -441,37 +505,57 @@ export default function TimetableDashboard({
       }
       setCurrentViewMode('app');
 
-      // 2. Set SaaS platform data
-      if (saasData.plans.length > 0) setSaasPlans(saasData.plans);
-      if (saasData.clients.length > 0) setSaasClients(saasData.clients);
-      setSaasLicenseKeys(saasData.licenseKeys);
-      setSaasActivationRequests(saasData.activationRequests);
-      if (saasData.transactions && saasData.transactions.length > 0) setSaasTransactions(saasData.transactions);
-      setSaasSettings(saasData.settings);
+      // 2. Set SaaS platform data (admin only - non-admins get null from getSaaSAdminLivePlatformData)
+      if (saasData) {
+        if (saasData.plans && saasData.plans.length > 0) setSaasPlans(saasData.plans);
+        if (saasData.clients && saasData.clients.length > 0) setSaasClients(saasData.clients);
+        if (saasData.licenseKeys) setSaasLicenseKeys(saasData.licenseKeys);
+        if (saasData.activationRequests) setSaasActivationRequests(saasData.activationRequests);
+        if (saasData.transactions && saasData.transactions.length > 0) setSaasTransactions(saasData.transactions);
+        if (saasData.settings) setSaasSettings(saasData.settings);
+      }
+
+      // 2b. Pour les clients non-admin : charger les plans depuis DB (lecture publique)
+      // et initialiser les quotas depuis la base de données
+      if (role !== 'admin') {
+        const { dbGetPublicPlans } = await import('@/lib/supabase/dbService');
+        const publicPlans = await dbGetPublicPlans();
+        if (publicPlans && publicPlans.length > 0) setSaasPlans(publicPlans);
+
+        if (quotaData) {
+          setGenerationCount(quotaData.generationCount);
+          setExportCount(quotaData.exportCount);
+          // maxGenerations et maxExports viennent du plan courant (résolu via saasPlans + userPlanId)
+        }
+      }
 
       // 3. Set client's actual data from database
-      setSubjects(estData.subjects);
-      setTeachers(estData.teachers);
-      setClasses(estData.classes);
-      setTimetable(estData.savedTimetable);
-      setUnscheduled(estData.savedUnscheduled);
-      setGenerationScore(estData.savedScore);
-      setSchoolName(estData.settings.schoolName);
-      setSchoolSlogan(estData.settings.schoolSlogan);
-      setSchoolLogo(estData.settings.schoolLogo);
-      setSchoolLogoType(estData.settings.schoolLogoType);
-      setSchoolLogoIcon(estData.settings.schoolLogoIcon);
-      setActiveDays(estData.settings.activeDays);
-      setStartHour(estData.settings.startHour);
-      setEndHour(estData.settings.endHour);
-      setSchoolBreaks(estData.settings.schoolBreaks || []);
-      setUserPlanId(estData.settings.planId || 'plan_trial');
+      if (estData) {
+        setSubjects(estData.subjects);
+        setTeachers(estData.teachers);
+        setClasses(estData.classes);
+        setTimetable(estData.savedTimetable);
+        setUnscheduled(estData.savedUnscheduled);
+        setGenerationScore(estData.savedScore);
+        if (estData.settings) {
+          setSchoolName(estData.settings.schoolName);
+          setSchoolSlogan(estData.settings.schoolSlogan);
+          setSchoolLogo(estData.settings.schoolLogo);
+          setSchoolLogoType(estData.settings.schoolLogoType);
+          setSchoolLogoIcon(estData.settings.schoolLogoIcon);
+          setActiveDays(estData.settings.activeDays);
+          setStartHour(estData.settings.startHour);
+          setEndHour(estData.settings.endHour);
+          setSchoolBreaks(estData.settings.schoolBreaks || []);
+          setUserPlanId(estData.settings.planId || 'plan_trial');
+        }
 
-      if (estData.classes.length > 0) {
-        setSelectedClassId(estData.classes[0].id);
-      }
-      if (estData.teachers.length > 0) {
-        setSelectedTeacherId('all');
+        if (estData.classes && estData.classes.length > 0) {
+          setSelectedClassId(estData.classes[0].id);
+        }
+        if (estData.teachers && estData.teachers.length > 0) {
+          setSelectedTeacherId('all');
+        }
       }
     } catch (err) {
       console.error('Error loading Supabase real data:', err);
@@ -494,7 +578,7 @@ export default function TimetableDashboard({
         } else {
           // Anonymous visitor on landing page
           const saasData = await getSaaSAdminLivePlatformData();
-          if (saasData.plans.length > 0) setSaasPlans(saasData.plans);
+          if (saasData && saasData.plans && saasData.plans.length > 0) setSaasPlans(saasData.plans);
           setIsLoadingDb(false);
           setIsMounted(true);
         }
@@ -530,18 +614,9 @@ export default function TimetableDashboard({
     };
   }, []);
 
-  // Sync SaaS states to localStorage once mounted
-  useEffect(() => {
-    if (isMounted && typeof window !== 'undefined') {
-      localStorage.setItem('saas_portal_mode', saasPortalMode);
-      localStorage.setItem('saas_plans', JSON.stringify(saasPlans));
-      localStorage.setItem('saas_clients', JSON.stringify(saasClients));
-      localStorage.setItem('saas_keys', JSON.stringify(saasLicenseKeys));
-      localStorage.setItem('saas_transactions', JSON.stringify(saasTransactions));
-      localStorage.setItem('saas_settings', JSON.stringify(saasSettings));
-      localStorage.setItem('saas_current_client_id', currentClientId);
-    }
-  }, [saasPortalMode, saasPlans, saasClients, saasLicenseKeys, saasTransactions, saasSettings, currentClientId, isMounted]);
+  // NOTE: Les données SaaS ne sont pas stockées en localStorage
+  // Elles sont systématiquement chargées depuis Supabase au montage
+  // pour garantir un contrôle exclusivement côté base de données.
 
   // Fallback defaults for safety during initial Supabase load
   const [userPlanId, setUserPlanId] = useState<string>('plan_trial');
@@ -563,7 +638,8 @@ export default function TimetableDashboard({
       geminiAI: false,
       prioritySupport: false,
       multiUser: false,
-      customBranding: false
+      customBranding: true,
+      pedagogicalPlanning: false
     },
     description: 'Formule de base',
     badgeText: 'Gratuit'
@@ -667,8 +743,10 @@ export default function TimetableDashboard({
       // Refresh live establishment data
       try {
         const estData = await getEstablishmentData(userId);
-        setSchoolName(estData.settings.schoolName);
-        setSchoolSlogan(estData.settings.schoolSlogan);
+        if (estData?.settings) {
+          setSchoolName(estData.settings.schoolName);
+          setSchoolSlogan(estData.settings.schoolSlogan);
+        }
       } catch (e) {
         console.error('Error refreshing establishment data:', e);
       }
@@ -676,9 +754,11 @@ export default function TimetableDashboard({
       // Refresh SaaS data
       try {
         const saasData = await getSaaSAdminLivePlatformData();
-        setSaasClients(saasData.clients);
-        setSaasLicenseKeys(saasData.licenseKeys);
-        setSaasActivationRequests(saasData.activationRequests);
+        if (saasData) {
+          if (saasData.clients) setSaasClients(saasData.clients);
+          if (saasData.licenseKeys) setSaasLicenseKeys(saasData.licenseKeys);
+          if (saasData.activationRequests) setSaasActivationRequests(saasData.activationRequests);
+        }
       } catch (e) {
         console.error('Error refreshing SaaS data:', e);
       }
@@ -784,12 +864,10 @@ export default function TimetableDashboard({
     showNotification(`Paiement de ${amount.toLocaleString('fr-FR')} FCFA via ${paymentMethod} confirmé !`, 'success');
   };
 
-  // Update activation requests
+  // Update activation requests (DB uniquement via prop callback)
   const handleUpdateActivationRequests = (requests: SaaSActivationRequest[]) => {
     setSaasActivationRequests(requests);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('saas_activation_requests', JSON.stringify(requests));
-    }
+    // Les données sont gérées par Supabase — pas de localStorage
   };
 
   // Create an activation, upgrade or renewal request and save to Supabase
@@ -991,18 +1069,12 @@ export default function TimetableDashboard({
     };
     const updatedTransactions = [newTx, ...saasTransactions];
 
-    // Save state & localStorage
+    // Mise à jour de l'état React (la DB a déjà été mise à jour via dbAdminDeliverActivationRequest)
     setSaasActivationRequests(updatedRequests);
     setSaasClients(updatedClients);
     setSaasLicenseKeys(updatedKeys);
     setSaasTransactions(updatedTransactions);
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('saas_activation_requests', JSON.stringify(updatedRequests));
-      localStorage.setItem('saas_clients', JSON.stringify(updatedClients));
-      localStorage.setItem('saas_keys', JSON.stringify(updatedKeys));
-      localStorage.setItem('saas_transactions', JSON.stringify(updatedTransactions));
-    }
+    // Pas de localStorage — Supabase est la seule source de vérité
 
     showNotification(`Établissement ${req.schoolName} enregistré (en attente d'activation de sa clé) !`, 'success');
 
@@ -1085,15 +1157,25 @@ Pour débloquer votre formule :
   };
 
   // Switch to client view from admin
-  const handleSwitchToClientView = (client: SaaSClient) => {
+  const handleSwitchToClientView = async (client: SaaSClient) => {
     setCurrentClientId(client.id);
     setSchoolName(client.schoolName);
     setSaasPortalMode('client');
-    const savedGenCount = localStorage.getItem(`school_generation_count_${client.id}`);
-    setGenerationCount(savedGenCount ? parseInt(savedGenCount, 10) : 0);
-    const savedExpCount = localStorage.getItem(`school_export_count_${client.id}`);
-    setExportCount(savedExpCount ? parseInt(savedExpCount, 10) : 0);
-    showNotification(`Connecté à l'espace de l'établissement : ${client.schoolName}`, 'info');
+    // Chargement des quotas depuis la base de données (pas localStorage)
+    try {
+      const quotaData = await dbGetUserQuotaUsage(client.id);
+      if (quotaData) {
+        setGenerationCount(quotaData.generationCount);
+        setExportCount(quotaData.exportCount);
+      } else {
+        setGenerationCount(0);
+        setExportCount(0);
+      }
+    } catch {
+      setGenerationCount(0);
+      setExportCount(0);
+    }
+    showNotification(`Connecté à l'établissement : ${client.schoolName}`, 'info');
   };
   const [isExecutingAi, setIsExecutingAi] = useState<boolean>(false);
   const [aiExecutionReasoning, setAiExecutionReasoning] = useState<string>('');
@@ -1150,27 +1232,10 @@ Pour débloquer votre formule :
   const [editingTeacherId, setEditingTeacherId] = useState<string | null>(null);
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
 
-  // Save Initial Values once when mounted if empty
-  useEffect(() => {
-    if (isMounted && typeof window !== 'undefined' && !localStorage.getItem('school_subjects')) {
-      localStorage.setItem('school_subjects', JSON.stringify(subjects));
-      localStorage.setItem('school_teachers', JSON.stringify(teachers));
-      localStorage.setItem('school_classes', JSON.stringify(classes));
-      localStorage.setItem('school_timetable', JSON.stringify(timetable));
-      localStorage.setItem('school_unscheduled', JSON.stringify(unscheduled));
-      localStorage.setItem('school_score', generationScore.toString());
-    }
-  }, [subjects, teachers, classes, timetable, unscheduled, generationScore, isMounted]);
+  // Les données sont chargées depuis Supabase au montage — pas de cache localStorage pour les données métier
 
-  // Sync state to local storage helper
-  const syncToLocalStorage = (newSubs: Subject[], newTeachs: Teacher[], newCls: ClassGroup[], newTable?: TimetableEntry[], newUn?: any[], newScr?: number) => {
-    localStorage.setItem('school_subjects', JSON.stringify(newSubs));
-    localStorage.setItem('school_teachers', JSON.stringify(newTeachs));
-    localStorage.setItem('school_classes', JSON.stringify(newCls));
-    if (newTable) localStorage.setItem('school_timetable', JSON.stringify(newTable));
-    if (newUn) localStorage.setItem('school_unscheduled', JSON.stringify(newUn));
-    if (newScr !== undefined) localStorage.setItem('school_score', newScr.toString());
-  };
+  // syncToLocalStorage supprimé : Supabase est la source de vérité pour toutes les données métier
+  // Les sauvegardes passent par dbSaveSubjects, dbSaveTeachers, dbSaveClasses, dbSaveTimetable
 
   // --- Backup & Restore Handlers ---
   const handleExportBackup = () => {
@@ -1206,6 +1271,16 @@ Pour débloquer votre formule :
       try {
         const data = JSON.parse(event.target?.result as string);
         if (data.subjects && data.teachers && data.classes) {
+          if (Array.isArray(data.classes) && data.classes.length > currentPlan.maxClasses) {
+            triggerNotification(`L'importation contient ${data.classes.length} classes, ce qui dépasse la limite de votre formule (${currentPlan.maxClasses} classes max). Veuillez passer à un plan supérieur.`, "error");
+            openUpgradeModal("Quota de Classes Dépassé (Import Sauvegarde)", `Ce fichier de sauvegarde contient ${data.classes.length} classes, ce qui dépasse la limite de ${currentPlan.maxClasses} classes autorisée par votre formule actuelle.`);
+            return;
+          }
+          if (Array.isArray(data.teachers) && data.teachers.length > currentPlan.maxTeachers) {
+            triggerNotification(`L'importation contient ${data.teachers.length} enseignants, ce qui dépasse la limite de votre formule (${currentPlan.maxTeachers} profs max). Veuillez passer à un plan supérieur.`, "error");
+            openUpgradeModal("Quota d'Enseignants Dépassé (Import Sauvegarde)", `Ce fichier de sauvegarde contient ${data.teachers.length} enseignants, ce qui dépasse la limite de ${currentPlan.maxTeachers} professeurs autorisée par votre formule actuelle.`);
+            return;
+          }
           setSubjects(data.subjects);
           setTeachers(data.teachers);
           setClasses(data.classes);
@@ -1218,14 +1293,29 @@ Pour débloquer votre formule :
           if (data.schoolLogoIcon) setSchoolLogoIcon(data.schoolLogoIcon);
           if (data.generationScore !== undefined) setGenerationScore(data.generationScore);
 
-          syncToLocalStorage(
-            data.subjects,
-            data.teachers,
-            data.classes,
-            data.timetable,
-            data.unscheduled,
-            data.generationScore
-          );
+          if (currentUserId && !isLoadingDb) {
+            saveEstablishmentSettings(currentUserId, {
+              schoolName: data.schoolName || schoolName,
+              schoolSlogan: data.schoolSlogan || schoolSlogan,
+              schoolLogo: data.schoolLogo || schoolLogo,
+              schoolLogoType: data.schoolLogoType || schoolLogoType,
+              schoolLogoIcon: data.schoolLogoIcon || schoolLogoIcon,
+              activeDays,
+              startHour,
+              endHour,
+              schoolBreaks
+            });
+            if (data.timetable) {
+              dbSaveTimetable(
+                currentUserId,
+                `Restauration JSON - ${new Date().toLocaleDateString('fr-FR')}`,
+                data.timetable,
+                data.unscheduled || [],
+                data.generationScore || 0,
+                { subjects: data.subjects, teachers: data.teachers, classes: data.classes, activeDays, totalSlots }
+              );
+            }
+          }
           showNotification("Restauration des données depuis le fichier JSON réussie !", "success");
         } else {
           showNotification("Fichier JSON invalide. Structure attendue manquante.", "error");
@@ -1245,12 +1335,14 @@ Pour débloquer votre formule :
     if (currentUserId) {
       setIsLoadingDb(true);
       const estData = await getEstablishmentData(currentUserId);
-      setSubjects(estData.subjects);
-      setTeachers(estData.teachers);
-      setClasses(estData.classes);
-      setTimetable(estData.savedTimetable);
-      setUnscheduled(estData.savedUnscheduled);
-      setGenerationScore(estData.savedScore);
+      if (estData) {
+        setSubjects(estData.subjects);
+        setTeachers(estData.teachers);
+        setClasses(estData.classes);
+        setTimetable(estData.savedTimetable);
+        setUnscheduled(estData.savedUnscheduled);
+        setGenerationScore(estData.savedScore);
+      }
       setIsLoadingDb(false);
       triggerNotification("Données réinitialisées avec succès depuis la base de données !", "info");
     }
@@ -1281,12 +1373,14 @@ Pour débloquer votre formule :
     if (currentUserId) {
       setIsLoadingDb(true);
       const estData = await getEstablishmentData(currentUserId);
-      setSubjects(estData.subjects);
-      setTeachers(estData.teachers);
-      setClasses(estData.classes);
-      setTimetable(estData.savedTimetable);
-      setUnscheduled(estData.savedUnscheduled);
-      setGenerationScore(estData.savedScore);
+      if (estData) {
+        setSubjects(estData.subjects);
+        setTeachers(estData.teachers);
+        setClasses(estData.classes);
+        setTimetable(estData.savedTimetable);
+        setUnscheduled(estData.savedUnscheduled);
+        setGenerationScore(estData.savedScore);
+      }
       setIsLoadingDb(false);
       triggerNotification("Données actualisées depuis la base de données Supabase !", "info");
     }
@@ -1314,7 +1408,7 @@ Pour débloquer votre formule :
   const handleAutoGenerate = async () => {
     if (generationCount >= maxGenerations) {
       triggerNotification(`Limite de générations d'emplois du temps atteinte pour votre offre (${maxGenerations} max). Veuillez passer à la formule supérieure.`, "error");
-      setIsClientSubModalOpen(true);
+      openUpgradeModal("Quota de Générations Atteint", `Vous avez atteint votre quota de ${maxGenerations} générations autorisées pour votre plan actuel.`);
       return;
     }
     setIsGenerating(true);
@@ -1339,14 +1433,25 @@ Pour débloquer votre formule :
         });
 
         if (!response.ok) {
-          throw new Error("L'action serveur de génération a renvoyé une erreur.");
+          const errData = await response.json().catch(() => ({}));
+          if (response.status === 403) {
+            triggerNotification(errData.error || "Limite ou accès non autorisé pour votre plan. Veuillez passer à un plan supérieur.", "error");
+            openUpgradeModal("Quota ou Accès Verrouillé", errData.error || "Cette opération dépasse les limites autorisées pour votre offre actuelle.");
+            setIsGenerating(false);
+            return;
+          }
+          throw new Error(errData.error || "L'action serveur de génération a renvoyé une erreur.");
         }
 
         const data = await response.json();
         setTimetable(data.timetable);
         setUnscheduled(data.unscheduled);
         setGenerationScore(data.score);
-        setGenerationCount(prev => prev + 1);
+        if (data.quotaUsage?.current !== undefined) {
+          setGenerationCount(data.quotaUsage.current);
+        } else {
+          setGenerationCount(prev => prev + 1);
+        }
 
         if (currentUserId) {
           await dbSaveTimetable(
@@ -1394,7 +1499,7 @@ Pour débloquer votre formule :
   const handleQueryAiSuggestions = async () => {
     if (!currentPlan.features.geminiAI) {
       triggerNotification("Les fonctionnalités d'intelligence artificielle Gemini ne sont pas incluses dans votre formule actuelle.", "error");
-      setIsClientSubModalOpen(true);
+      openUpgradeModal("Conseiller Directeur IA Gemini Pro", "L'analyse pédagogique et les conseils automatisés par IA sont réservés aux formules Premium et School.");
       return;
     }
     setIsLoadingAi(true);
@@ -1425,7 +1530,7 @@ Pour débloquer votre formule :
   const handleAnalyzeProblem = async () => {
     if (!currentPlan.features.geminiAI) {
       triggerNotification("Les fonctionnalités d'intelligence artificielle Gemini ne sont pas incluses dans votre formule actuelle.", "error");
-      setIsClientSubModalOpen(true);
+      openUpgradeModal("Diagnostic de Planning par IA", "Le diagnostic intelligent et les propositions de réaffectation par IA sont réservés aux formules Premium et School.");
       return;
     }
     if (!problemQuery.trim()) {
@@ -1467,7 +1572,7 @@ Pour débloquer votre formule :
   const handleExecuteAi = async (actionType: 'apply-suggestions' | 'solve-problem') => {
     if (!currentPlan.features.geminiAI) {
       triggerNotification("Les fonctionnalités d'intelligence artificielle Gemini ne sont pas incluses dans votre formule actuelle.", "error");
-      setIsClientSubModalOpen(true);
+      openUpgradeModal("Résolution Automatisée par IA", "L'application des changements de planning par IA nécessite la formule Premium ou School.");
       return;
     }
     setIsExecutingAi(true);
@@ -1499,7 +1604,16 @@ Pour débloquer votre formule :
         setGenerationScore(data.score);
         setAiExecutionReasoning(data.reasoning);
 
-        syncToLocalStorage(subjects, teachers, classes, data.timetable, data.unscheduled, data.score);
+        if (currentUserId && !isLoadingDb) {
+          dbSaveTimetable(
+            currentUserId,
+            `Mise à jour Agent IA - ${new Date().toLocaleDateString('fr-FR')}`,
+            data.timetable,
+            data.unscheduled,
+            data.score,
+            { subjects, teachers, classes, activeDays, totalSlots }
+          );
+        }
         triggerNotification("L'emploi du temps a été mis à jour par l'Agent IA !", "success");
 
         if (actionType === 'apply-suggestions') {
@@ -1585,7 +1699,16 @@ Pour débloquer votre formule :
             return item;
           });
           setTimetable(updatedTable);
-          syncToLocalStorage(subjects, teachers, classes, updatedTable, unscheduled, generationScore);
+          if (currentUserId && !isLoadingDb) {
+            dbSaveTimetable(
+              currentUserId,
+              `Ajustement manuel - ${new Date().toLocaleDateString('fr-FR')}`,
+              updatedTable,
+              unscheduled,
+              generationScore,
+              { subjects, teachers, classes, activeDays, totalSlots }
+            );
+          }
           triggerNotification(pairedPartnerId ? "Créneau scindé (G1 + G2) déplacé avec succès !" : "Créneau déplacé avec succès !");
         } else {
           triggerNotification(val.reason || "Déplacement invalide.", "error");
@@ -1631,7 +1754,16 @@ Pour débloquer votre formule :
         const newScore = totalTarget > 0 ? Math.round((updatedTable.length / totalTarget) * 100) : 100;
         setGenerationScore(newScore);
 
-        syncToLocalStorage(subjects, teachers, classes, updatedTable, updatedUnscheduled, newScore);
+        if (currentUserId && !isLoadingDb) {
+          dbSaveTimetable(
+            currentUserId,
+            `Placement corbeille - ${new Date().toLocaleDateString('fr-FR')}`,
+            updatedTable,
+            updatedUnscheduled,
+            newScore,
+            { subjects, teachers, classes, activeDays, totalSlots }
+          );
+        }
         triggerNotification("Heure placée avec succès depuis la corbeille !");
       } else {
         triggerNotification(val.reason || "Impossible de placer cette heure ici.", "error");
@@ -1703,7 +1835,16 @@ Pour débloquer votre formule :
       const newScore = totalTarget > 0 ? Math.round((updatedTable.length / totalTarget) * 100) : 100;
       setGenerationScore(newScore);
 
-      syncToLocalStorage(subjects, teachers, classes, updatedTable, updatedUnscheduled, newScore);
+      if (currentUserId && !isLoadingDb) {
+        dbSaveTimetable(
+          currentUserId,
+          `Retrait séance - ${new Date().toLocaleDateString('fr-FR')}`,
+          updatedTable,
+          updatedUnscheduled,
+          newScore,
+          { subjects, teachers, classes, activeDays, totalSlots }
+        );
+      }
       triggerNotification("Séance retirée.", "info");
     }
   };
@@ -1743,9 +1884,16 @@ Pour débloquer votre formule :
 
       const totalTarget = classes.reduce((sum, c) => sum + c.assignments.reduce((s, a) => s + a.hoursPerWeek, 0), 0);
       const newScore = totalTarget > 0 ? Math.round((updatedTable.length / totalTarget) * 100) : 100;
-      setGenerationScore(newScore);
-
-      syncToLocalStorage(subjects, teachers, classes, updatedTable, updatedUnscheduled, newScore);
+      if (currentUserId && !isLoadingDb) {
+        dbSaveTimetable(
+          currentUserId,
+          `Retrait bloc - ${new Date().toLocaleDateString('fr-FR')}`,
+          updatedTable,
+          updatedUnscheduled,
+          newScore,
+          { subjects, teachers, classes, activeDays, totalSlots }
+        );
+      }
       triggerNotification(`Séance de ${count}h retirée.`, "info");
     }
   };
@@ -2342,7 +2490,7 @@ Pour débloquer votre formule :
       // Check plan limits
       if (teachers.length >= currentPlan.maxTeachers) {
         triggerNotification(`Limite d'enseignants atteinte pour votre offre (${currentPlan.maxTeachers} enseignants max). Veuillez passer à la formule supérieure.`, "error");
-        setIsClientSubModalOpen(true);
+        openUpgradeModal("Quota d'Enseignants Atteint", `Votre formule actuelle est limitée à ${currentPlan.maxTeachers} enseignants maximum. Passez au plan supérieur pour ajouter d'autres professeurs.`);
         return;
       }
 
@@ -2669,7 +2817,7 @@ Pour débloquer votre formule :
       // Check plan limits
       if (classes.length >= currentPlan.maxClasses) {
         triggerNotification(`Limite de classes atteinte pour votre offre (${currentPlan.maxClasses} classes max). Veuillez passer à la formule supérieure.`, "error");
-        setIsClientSubModalOpen(true);
+        openUpgradeModal("Quota de Classes Atteint", `Votre formule actuelle est limitée à ${currentPlan.maxClasses} classes maximum. Passez au plan supérieur pour ajouter d'autres classes.`);
         return;
       }
 
@@ -2818,12 +2966,12 @@ Pour débloquer votre formule :
   const handleExcelExport = () => {
     if (!currentPlan.features.excelExport) {
       triggerNotification("L'export Excel n'est pas inclus dans votre formule actuelle. Veuillez passer à la formule supérieure.", "error");
-      setIsClientSubModalOpen(true);
+      openUpgradeModal("Exportation Excel & Tableur", "L'exportation des emplois du temps au format tableur Excel (.xlsx) est réservée aux formules Premium et School.");
       return;
     }
     if (exportCount >= maxExports) {
       triggerNotification(`Limite d'exportations atteinte (${exportCount}/${maxExports}). Veuillez passer à une formule supérieure pour continuer à exporter.`, "error");
-      setIsClientSubModalOpen(true);
+      openUpgradeModal("Quota d'Exportations Atteint", `Vous avez atteint votre quota de ${maxExports} exportations autorisées.`);
       return;
     }
     if (timetable.length === 0) {
@@ -2838,12 +2986,12 @@ Pour débloquer votre formule :
   const handlePdfExport = () => {
     if (!currentPlan.features.pdfExport) {
       triggerNotification("L'export PDF n'est pas inclus dans votre formule actuelle. Veuillez passer à la formule supérieure.", "error");
-      setIsClientSubModalOpen(true);
+      openUpgradeModal("Exportation PDF Officielle", "L'exportation PDF nécessite une formule valide.");
       return;
     }
     if (exportCount >= maxExports) {
       triggerNotification(`Limite d'exportations atteinte (${exportCount}/${maxExports}). Veuillez passer à une formule supérieure pour continuer à exporter.`, "error");
-      setIsClientSubModalOpen(true);
+      openUpgradeModal("Quota d'Exportations Atteint", `Vous avez atteint votre quota de ${maxExports} exportations autorisées.`);
       return;
     }
     const targetId = selectedClassId || (classes.length > 0 ? classes[0].id : '');
@@ -2856,7 +3004,7 @@ Pour débloquer votre formule :
       triggerNotification("Aucun créneau planifié pour cette classe.", "error");
       return;
     }
-    exportTimetableToPdf(targetId, timetable, classes, teachers, subjects, schoolName, schoolSlogan, schoolBreaks);
+    exportTimetableToPdf(targetId, timetable, classes, teachers, subjects, schoolName, schoolSlogan, schoolBreaks, schoolLogo);
     setExportCount(prev => prev + 1);
     triggerNotification(`Emploi du temps PDF exporté !`);
   };
@@ -2864,12 +3012,12 @@ Pour débloquer votre formule :
   const handleWordExport = () => {
     if (!currentPlan.features.wordExport) {
       triggerNotification("L'export Word n'est pas inclus dans votre formule actuelle. Veuillez passer à la formule supérieure.", "error");
-      setIsClientSubModalOpen(true);
+      openUpgradeModal("Exportation Fiche Word Modifiable", "L'exportation des plannings au format Word (.docx) est réservée aux formules Premium et School.");
       return;
     }
     if (exportCount >= maxExports) {
       triggerNotification(`Limite d'exportations atteinte (${exportCount}/${maxExports}). Veuillez passer à une formule supérieure pour continuer à exporter.`, "error");
-      setIsClientSubModalOpen(true);
+      openUpgradeModal("Quota d'Exportations Atteint", `Vous avez atteint votre quota de ${maxExports} exportations autorisées.`);
       return;
     }
     const targetId = selectedClassId || (classes.length > 0 ? classes[0].id : '');
@@ -2890,12 +3038,12 @@ Pour débloquer votre formule :
   const handleTeacherPdfExport = (targetTeacherId?: string) => {
     if (!currentPlan.features.pdfExport) {
       triggerNotification("L'export PDF n'est pas inclus dans votre formule actuelle. Veuillez passer à la formule supérieure.", "error");
-      setIsClientSubModalOpen(true);
+      openUpgradeModal("Exportation PDF Professeurs", "L'exportation PDF nécessite une formule valide.");
       return;
     }
     if (exportCount >= maxExports) {
       triggerNotification(`Limite d'exportations atteinte (${exportCount}/${maxExports}). Veuillez passer à une formule supérieure pour continuer à exporter.`, "error");
-      setIsClientSubModalOpen(true);
+      openUpgradeModal("Quota d'Exportations Atteint", `Vous avez atteint votre quota de ${maxExports} exportations autorisées.`);
       return;
     }
     const tId = targetTeacherId || selectedTeacherId;
@@ -2904,11 +3052,11 @@ Pour débloquer votre formule :
         triggerNotification("Aucun enseignant à exporter.", "error");
         return;
       }
-      exportAllTeachersTimetableToPdf(timetable, classes, teachers, subjects, schoolName, schoolSlogan);
+      exportAllTeachersTimetableToPdf(timetable, classes, teachers, subjects, schoolName, schoolSlogan, schoolLogo);
       setExportCount(prev => prev + 1);
       triggerNotification(`PDF généré pour les ${teachers.length} enseignants de l'établissement !`);
     } else {
-      exportTeacherTimetableToPdf(tId, timetable, classes, teachers, subjects, schoolName, schoolSlogan);
+      exportTeacherTimetableToPdf(tId, timetable, classes, teachers, subjects, schoolName, schoolSlogan, schoolLogo);
       setExportCount(prev => prev + 1);
       const tName = teachers.find(t => t.id === tId)?.name || 'Enseignant';
       triggerNotification(`Emploi du temps PDF pour ${tName} généré !`);
@@ -2918,12 +3066,12 @@ Pour débloquer votre formule :
   const handleTeacherExcelExport = (targetTeacherId?: string) => {
     if (!currentPlan.features.excelExport) {
       triggerNotification("L'export Excel n'est pas inclus dans votre formule actuelle. Veuillez passer à la formule supérieure.", "error");
-      setIsClientSubModalOpen(true);
+      openUpgradeModal("Exportation Excel Professeurs", "L'exportation des plannings enseignants au format Excel (.xlsx) est réservée aux formules Premium et School.");
       return;
     }
     if (exportCount >= maxExports) {
       triggerNotification(`Limite d'exportations atteinte (${exportCount}/${maxExports}). Veuillez passer à une formule supérieure pour continuer à exporter.`, "error");
-      setIsClientSubModalOpen(true);
+      openUpgradeModal("Quota d'Exportations Atteint", `Vous avez atteint votre quota de ${maxExports} exportations autorisées.`);
       return;
     }
     const tId = targetTeacherId || selectedTeacherId;
@@ -2952,12 +3100,12 @@ Pour débloquer votre formule :
   const handleTeacherWordExport = (targetTeacherId?: string) => {
     if (!currentPlan.features.wordExport) {
       triggerNotification("L'export Word n'est pas inclus dans votre formule actuelle. Veuillez passer à la formule supérieure.", "error");
-      setIsClientSubModalOpen(true);
+      openUpgradeModal("Exportation Fiches Word Professeurs", "L'exportation des fiches enseignants au format Word (.docx) est réservée aux formules Premium et School.");
       return;
     }
     if (exportCount >= maxExports) {
       triggerNotification(`Limite d'exportations atteinte (${exportCount}/${maxExports}). Veuillez passer à une formule supérieure pour continuer à exporter.`, "error");
-      setIsClientSubModalOpen(true);
+      openUpgradeModal("Quota d'Exportations Atteint", `Vous avez atteint votre quota de ${maxExports} exportations autorisées.`);
       return;
     }
     const tId = targetTeacherId || selectedTeacherId;
@@ -3041,8 +3189,6 @@ Pour débloquer votre formule :
       <div className="dark">
         <LandingPage
           onOpenLogin={handleOpenAuthModal}
-          onDirectDemoClient={() => handleLoginClient('client@ecole.com')}
-          onDirectDemoAdmin={() => handleLoginAdmin('admin@izischool.com')}
           onPurchaseLicenseRequest={handlePurchaseLicenseRequest}
           plans={saasPlans}
           theme={theme}
@@ -3132,7 +3278,7 @@ Pour débloquer votre formule :
               <button
                 onClick={handleRequestAdminAccess}
                 className="px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-900/30 border border-purple-400/30"
-                title="Accès réservé aux administrateurs de la plateforme SaaS (PIN Requis)"
+                title="Accès réservé aux administrateurs de la plateforme SaaS (Rôle Administrateur Requis)"
               >
                 <Shield className="w-4 h-4 text-purple-400" />
                 <span>Espace Administration SaaS</span>
@@ -3259,13 +3405,13 @@ Pour débloquer votre formule :
               {/* Générations */}
               <div className={`rounded-xl px-2.5 py-1 font-mono text-[11px] flex items-center gap-1.5 shadow-sm shrink-0 border ${isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-slate-950/70 border-white/10 text-white'}`} title="Nombre de générations d'emplois du temps effectuées">
                 <span className="w-2 h-2 rounded-full bg-purple-400 shrink-0" />
-                <span className={isLight ? 'text-slate-500 font-medium' : 'text-gray-400'}>Générations :</span> <span className={`font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{generationCount} / {maxGenerations >= 9999 ? 'Illimité' : maxGenerations}</span>
+                <span className={isLight ? 'text-slate-500 font-medium' : 'text-gray-400'}>Générations :</span> <span className={`font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{maxGenerations >= 9999 ? 'Illimité' : `${generationCount} / ${maxGenerations}`}</span>
               </div>
 
               {/* Indication des exports faits et restants */}
               <div className={`rounded-xl px-2.5 py-1 font-mono text-[11px] flex items-center gap-1.5 shadow-sm shrink-0 border ${isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-slate-950/70 border-white/10 text-white'}`} title="Nombre d'exports de documents réalisés">
                 <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
-                <span className={isLight ? 'text-slate-500 font-medium' : 'text-gray-400'}>Export PDF-Word-Excel :</span> <span className={`font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{exportCount} / {maxExports >= 9999 ? 'Illimité' : maxExports}</span>
+                <span className={isLight ? 'text-slate-500 font-medium' : 'text-gray-400'}>Export PDF-Word-Excel :</span> <span className={`font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{maxExports >= 9999 ? 'Illimité' : `${exportCount} / ${maxExports}`}</span>
               </div>
 
               {/* Taux de Remplissage */}
@@ -3651,7 +3797,14 @@ Pour débloquer votre formule :
 
                 {/* --- MODULE PLANIFICATION (PLURI-PROF / QUOTAS / AFFECTATION) --- */}
                 <button
-                  onClick={() => setActiveTab('planning')}
+                  onClick={() => {
+                    if (!currentPlan.features.pedagogicalPlanning) {
+                      openUpgradeModal("Module de Planification & Répartition Pédagogique", "L'équilibrage automatique des quotas et l'attribution équitable des heures d'enseignement sont réservés aux formules Premium et School.");
+                      return;
+                    }
+                    setActiveTab('planning');
+                  }}
+                  title={!currentPlan.features.pedagogicalPlanning ? "Nécessite un plan supérieur" : "Module de Planification & Répartition Pédagogique"}
                   className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer relative ${activeTab === 'planning'
                       ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 text-white shadow-lg shadow-purple-500/25 border border-purple-400/30'
                       : isLight
@@ -3661,9 +3814,13 @@ Pour débloquer votre formule :
                 >
                   <SlidersHorizontal className={`w-4 h-4 shrink-0 ${activeTab === 'planning' ? 'text-white' : isLight ? 'text-purple-600' : 'text-purple-400'}`} />
                   <span className="hidden sm:inline lg:inline">Planification</span>
-                  <span className={`hidden sm:inline text-[9px] font-mono px-1.5 py-0.2 rounded font-black ${activeTab === 'planning' ? 'bg-white/20 text-white' : isLight ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
-                    VIP
-                  </span>
+                  {!currentPlan.features.pedagogicalPlanning ? (
+                    <VipLockBadge tooltip="Module réservé aux formules Premium & School" text="VIP" />
+                  ) : (
+                    <span className={`hidden sm:inline text-[9px] font-mono px-1.5 py-0.2 rounded font-black ${activeTab === 'planning' ? 'bg-white/20 text-white' : isLight ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
+                      VIP
+                    </span>
+                  )}
                 </button>
 
                 <button
@@ -3680,7 +3837,14 @@ Pour débloquer votre formule :
                 </button>
 
                 <button
-                  onClick={() => setActiveTab('ai')}
+                  onClick={() => {
+                    if (!currentPlan.features.geminiAI) {
+                      openUpgradeModal("Conseiller Directeur IA Gemini Pro", "L'assistant IA d'aide à la décision et de diagnostic des plannings est réservé aux formules Premium et School.");
+                      return;
+                    }
+                    setActiveTab('ai');
+                  }}
+                  title={!currentPlan.features.geminiAI ? "Nécessite le plan Premium ou School" : "Conseiller & Diagnostics IA Gemini"}
                   className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'ai'
                       ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25 border border-emerald-400/30'
                       : isLight
@@ -3692,6 +3856,9 @@ Pour débloquer votre formule :
                   <span className={activeTab === 'ai' ? 'text-white' : isLight ? 'text-emerald-600 font-bold' : 'text-emerald-400 font-bold'}>
                     Conseils IA Gemini
                   </span>
+                  {!currentPlan.features.geminiAI && (
+                    <VipLockBadge tooltip="Assistant IA réservé aux formules Premium & School" text="VIP" />
+                  )}
                 </button>
 
                 <button
@@ -4291,12 +4458,22 @@ Pour débloquer votre formule :
                             <button
                               onClick={handleAutoGenerate}
                               disabled={isGenerating || classes.length === 0}
-                              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/25 hover:-translate-y-0.5 cursor-pointer w-full md:w-auto"
+                              title={generationCount >= maxGenerations ? "Nécessite un plan supérieur (Quota de générations atteint)" : "Lancer le moteur de génération automatique"}
+                              className={`flex items-center justify-center gap-2 px-4 py-2.5 disabled:opacity-50 text-xs font-bold rounded-xl transition-all shadow-lg hover:-translate-y-0.5 cursor-pointer w-full md:w-auto ${
+                                generationCount >= maxGenerations
+                                  ? 'bg-slate-800 text-amber-300 border border-amber-500/40 shadow-none'
+                                  : 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white shadow-indigo-500/25'
+                              }`}
                             >
                               {isGenerating ? (
                                 <>
                                   <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
                                   <span className="whitespace-nowrap">Moteur...</span>
+                                </>
+                              ) : generationCount >= maxGenerations ? (
+                                <>
+                                  <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+                                  <span className="whitespace-nowrap">Générer (Quota Atteint)</span>
                                 </>
                               ) : (
                                 <>
@@ -4308,42 +4485,48 @@ Pour débloquer votre formule :
 
                             <button
                               onClick={handleExcelExport}
-                              className={`flex items-center justify-center gap-2 px-4 py-2.5 border text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto ${currentPlan.features.excelExport
+                              title={!currentPlan.features.excelExport ? "Nécessite un plan supérieur" : exportCount >= maxExports ? "Nécessite un plan supérieur (Quota d'exports atteint)" : "Exporter au format Excel (.xlsx)"}
+                              className={`flex items-center justify-center gap-2 px-4 py-2.5 border text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto ${currentPlan.features.excelExport && exportCount < maxExports
                                   ? 'bg-white/5 hover:bg-white/10 border-white/10 text-white'
                                   : 'bg-slate-950/60 border-amber-500/30 text-gray-400 hover:text-white'
                                 }`}
                             >
                               <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
                               <span className="whitespace-nowrap">Export Excel</span>
-                              {!currentPlan.features.excelExport && (
-                                <span className="flex items-center gap-1 text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono">
-                                  <Lock className="w-2.5 h-2.5" /> Premium
-                                </span>
-                              )}
+                              {!currentPlan.features.excelExport ? (
+                                <VipLockBadge tooltip="Export Excel réservé aux formules Premium & School" text="VIP" />
+                              ) : exportCount >= maxExports ? (
+                                <VipLockBadge tooltip="Quota d'exportations mensuel atteint" text="QUOTA" />
+                              ) : null}
                             </button>
 
                             <button
                               onClick={handlePdfExport}
+                              title={exportCount >= maxExports ? "Nécessite un plan supérieur (Quota d'exports atteint)" : "Exporter la classe actuelle en PDF"}
                               className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto"
                             >
                               <Download className="w-4 h-4 text-red-400 shrink-0" />
                               <span className="whitespace-nowrap">Export PDF</span>
+                              {exportCount >= maxExports && (
+                                <VipLockBadge tooltip="Quota d'exportations mensuel atteint" text="QUOTA" />
+                              )}
                             </button>
 
                             <button
                               onClick={handleWordExport}
-                              className={`flex items-center justify-center gap-2 px-4 py-2.5 border text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto ${currentPlan.features.wordExport
+                              title={!currentPlan.features.wordExport ? "Nécessite un plan supérieur" : exportCount >= maxExports ? "Nécessite un plan supérieur (Quota d'exports atteint)" : "Exporter la fiche classe au format Word"}
+                              className={`flex items-center justify-center gap-2 px-4 py-2.5 border text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto ${currentPlan.features.wordExport && exportCount < maxExports
                                   ? 'bg-white/5 hover:bg-white/10 border-white/10 text-white'
                                   : 'bg-slate-950/60 border-amber-500/30 text-gray-400 hover:text-white'
                                 }`}
                             >
                               <FileText className="w-4 h-4 text-blue-400 shrink-0" />
                               <span className="whitespace-nowrap">Export Word</span>
-                              {!currentPlan.features.wordExport && (
-                                <span className="flex items-center gap-1 text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono">
-                                  <Lock className="w-2.5 h-2.5" /> Premium
-                                </span>
-                              )}
+                              {!currentPlan.features.wordExport ? (
+                                <VipLockBadge tooltip="Export Word réservé aux formules Premium & School" text="VIP" />
+                              ) : exportCount >= maxExports ? (
+                                <VipLockBadge tooltip="Quota d'exportations mensuel atteint" text="QUOTA" />
+                              ) : null}
                             </button>
                           </div>
                         </div>
@@ -4533,12 +4716,22 @@ Pour débloquer votre formule :
                             <button
                               onClick={handleAutoGenerate}
                               disabled={isGenerating || classes.length === 0}
-                              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/25 hover:-translate-y-0.5 cursor-pointer w-full md:w-auto"
+                              title={generationCount >= maxGenerations ? "Nécessite un plan supérieur (Quota de générations atteint)" : "Lancer le moteur de génération automatique"}
+                              className={`flex items-center justify-center gap-2 px-4 py-2.5 disabled:opacity-50 text-xs font-bold rounded-xl transition-all shadow-lg hover:-translate-y-0.5 cursor-pointer w-full md:w-auto ${
+                                generationCount >= maxGenerations
+                                  ? 'bg-slate-800 text-amber-300 border border-amber-500/40 shadow-none'
+                                  : 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white shadow-indigo-500/25'
+                              }`}
                             >
                               {isGenerating ? (
                                 <>
                                   <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
                                   <span className="whitespace-nowrap">Moteur...</span>
+                                </>
+                              ) : generationCount >= maxGenerations ? (
+                                <>
+                                  <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+                                  <span className="whitespace-nowrap">Quota Atteint</span>
                                 </>
                               ) : (
                                 <>
@@ -4550,6 +4743,7 @@ Pour débloquer votre formule :
 
                             <button
                               onClick={() => handleTeacherPdfExport(selectedTeacherId)}
+                              title={exportCount >= maxExports ? "Nécessite un plan supérieur (Quota d'exports atteint)" : "Exporter les plannings enseignants en PDF"}
                               className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto"
                             >
                               <Download className="w-4 h-4 text-red-400 shrink-0" />
@@ -4559,11 +4753,17 @@ Pour débloquer votre formule :
                                   : `Export PDF`
                                 }
                               </span>
+                              {exportCount >= maxExports && (
+                                <span title="Nécessite un plan supérieur" className="flex items-center gap-1 text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono">
+                                  <Lock className="w-2.5 h-2.5 text-amber-400" /> Quota
+                                </span>
+                              )}
                             </button>
 
                             <button
                               onClick={() => handleTeacherExcelExport(selectedTeacherId)}
-                              className={`flex items-center justify-center gap-2 px-4 py-2.5 border text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto ${currentPlan.features.excelExport
+                              title={!currentPlan.features.excelExport ? "Nécessite un plan supérieur" : exportCount >= maxExports ? "Nécessite un plan supérieur (Quota d'exports atteint)" : "Exporter les plannings enseignants en Excel"}
+                              className={`flex items-center justify-center gap-2 px-4 py-2.5 border text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto ${currentPlan.features.excelExport && exportCount < maxExports
                                   ? 'bg-white/5 hover:bg-white/10 border-white/10 text-white'
                                   : 'bg-slate-950/60 border-amber-500/30 text-gray-400 hover:text-white'
                                 }`}
@@ -4575,16 +4775,17 @@ Pour débloquer votre formule :
                                   : `Export Excel`
                                 }
                               </span>
-                              {!currentPlan.features.excelExport && (
-                                <span className="flex items-center gap-1 text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono">
-                                  <Lock className="w-2.5 h-2.5" /> Premium
-                                </span>
-                              )}
+                              {!currentPlan.features.excelExport ? (
+                                <VipLockBadge tooltip="Export Excel réservé aux formules Premium & School" text="VIP" />
+                              ) : exportCount >= maxExports ? (
+                                <VipLockBadge tooltip="Quota d'exportations mensuel atteint" text="QUOTA" />
+                              ) : null}
                             </button>
 
                             <button
                               onClick={() => handleTeacherWordExport(selectedTeacherId)}
-                              className={`flex items-center justify-center gap-2 px-4 py-2.5 border text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto ${currentPlan.features.wordExport
+                              title={!currentPlan.features.wordExport ? "Nécessite un plan supérieur" : exportCount >= maxExports ? "Nécessite un plan supérieur (Quota d'exports atteint)" : "Exporter les plannings enseignants en Word"}
+                              className={`flex items-center justify-center gap-2 px-4 py-2.5 border text-xs font-bold rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer shadow-md w-full md:w-auto ${currentPlan.features.wordExport && exportCount < maxExports
                                   ? 'bg-white/5 hover:bg-white/10 border-white/10 text-white'
                                   : 'bg-slate-950/60 border-amber-500/30 text-gray-400 hover:text-white'
                                 }`}
@@ -4596,11 +4797,11 @@ Pour débloquer votre formule :
                                   : `Export Word`
                                 }
                               </span>
-                              {!currentPlan.features.wordExport && (
-                                <span className="flex items-center gap-1 text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono">
-                                  <Lock className="w-2.5 h-2.5" /> Premium
-                                </span>
-                              )}
+                              {!currentPlan.features.wordExport ? (
+                                <VipLockBadge tooltip="Export Word réservé aux formules Premium & School" text="VIP" />
+                              ) : exportCount >= maxExports ? (
+                                <VipLockBadge tooltip="Quota d'exportations mensuel atteint" text="QUOTA" />
+                              ) : null}
                             </button>
                           </div>
                         </div>
@@ -4904,9 +5105,22 @@ Pour débloquer votre formule :
 
                       {/* LEFT: FORM (5 COLS) */}
                       <div className="lg:col-span-5 p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl">
-                        <h3 className="text-xs font-mono tracking-wider text-indigo-400 uppercase mb-4 font-bold">
-                          {editingClassId ? "Modifier la Classe" : "Ajouter une Classe"}
-                        </h3>
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-xs font-mono tracking-wider text-indigo-400 uppercase font-bold">
+                            {editingClassId ? "Modifier la Classe" : "Ajouter une Classe"}
+                          </h3>
+                          <span
+                            title={classes.length >= currentPlan.maxClasses && !editingClassId ? "Nécessite un plan supérieur" : undefined}
+                            className={`text-[10px] font-mono px-2 py-0.5 rounded-md font-bold flex items-center gap-1 ${
+                              classes.length >= currentPlan.maxClasses && !editingClassId
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                : 'bg-white/5 text-gray-400 border border-white/10'
+                            }`}
+                          >
+                            {classes.length >= currentPlan.maxClasses && !editingClassId && <Lock className="w-2.5 h-2.5 text-amber-400" />}
+                            Classes: {classes.length} / {currentPlan.maxClasses >= 999 ? '∞' : currentPlan.maxClasses}
+                          </span>
+                        </div>
 
                         <form onSubmit={handleSaveClass} className="space-y-4">
                           <div>
@@ -5430,10 +5644,24 @@ Pour débloquer votre formule :
                             )}
                             <button
                               type="submit"
-                              className="flex-[2] py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/25 transition-all hover:-translate-y-0.5 flex items-center justify-center gap-1.5 cursor-pointer"
+                              title={!editingClassId && classes.length >= currentPlan.maxClasses ? "Nécessite un plan supérieur (Quota de classes atteint)" : undefined}
+                              className={`flex-[2] py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                                !editingClassId && classes.length >= currentPlan.maxClasses
+                                  ? 'bg-slate-800 text-amber-300 border border-amber-500/40 hover:bg-slate-750'
+                                  : 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white shadow-lg shadow-indigo-500/25 hover:-translate-y-0.5'
+                              }`}
                             >
-                              <Check className="w-4 h-4" />
-                              <span>{editingClassId ? "Appliquer Modifications" : "Enregistrer cette Classe"}</span>
+                              {!editingClassId && classes.length >= currentPlan.maxClasses ? (
+                                <>
+                                  <Lock className="w-4 h-4 text-amber-400" />
+                                  <span>Quota Atteint ({currentPlan.maxClasses} max)</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Check className="w-4 h-4" />
+                                  <span>{editingClassId ? "Appliquer Modifications" : "Enregistrer cette Classe"}</span>
+                                </>
+                              )}
                             </button>
                           </div>
                         </form>
@@ -5627,9 +5855,22 @@ Pour débloquer votre formule :
 
                       {/* LEFT: FORM */}
                       <div className="lg:col-span-5 p-6 rounded-2xl bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-xl">
-                        <h3 className="text-xs font-mono tracking-wider text-indigo-400 uppercase mb-4 font-bold">
-                          {editingTeacherId ? "Modifier l'Enseignant" : "Ajouter un Enseignant"}
-                        </h3>
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-xs font-mono tracking-wider text-indigo-400 uppercase font-bold">
+                            {editingTeacherId ? "Modifier l'Enseignant" : "Ajouter un Enseignant"}
+                          </h3>
+                          <span
+                            title={teachers.length >= currentPlan.maxTeachers && !editingTeacherId ? "Nécessite un plan supérieur" : undefined}
+                            className={`text-[10px] font-mono px-2 py-0.5 rounded-md font-bold flex items-center gap-1 ${
+                              teachers.length >= currentPlan.maxTeachers && !editingTeacherId
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                : 'bg-white/5 text-gray-400 border border-white/10'
+                            }`}
+                          >
+                            {teachers.length >= currentPlan.maxTeachers && !editingTeacherId && <Lock className="w-2.5 h-2.5 text-amber-400" />}
+                            Profs: {teachers.length} / {currentPlan.maxTeachers >= 999 ? '∞' : currentPlan.maxTeachers}
+                          </span>
+                        </div>
 
                         <form onSubmit={handleSaveTeacher} className="space-y-4">
                           <div>
@@ -5800,10 +6041,24 @@ Pour débloquer votre formule :
                             )}
                             <button
                               type="submit"
-                              className="flex-[2] py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/25 transition-all hover:-translate-y-0.5 flex items-center justify-center gap-1.5 cursor-pointer"
+                              title={!editingTeacherId && teachers.length >= currentPlan.maxTeachers ? "Nécessite un plan supérieur (Quota d'enseignants atteint)" : undefined}
+                              className={`flex-[2] py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                                !editingTeacherId && teachers.length >= currentPlan.maxTeachers
+                                  ? 'bg-slate-800 text-amber-300 border border-amber-500/40 hover:bg-slate-750'
+                                  : 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white shadow-lg shadow-indigo-500/25 hover:-translate-y-0.5'
+                              }`}
                             >
-                              <Check className="w-4 h-4" />
-                              <span>{editingTeacherId ? "Mettre à jour" : "Enregistrer ce Professeur"}</span>
+                              {!editingTeacherId && teachers.length >= currentPlan.maxTeachers ? (
+                                <>
+                                  <Lock className="w-4 h-4 text-amber-400" />
+                                  <span>Quota Atteint ({currentPlan.maxTeachers} max)</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Check className="w-4 h-4" />
+                                  <span>{editingTeacherId ? "Mettre à jour" : "Enregistrer ce Professeur"}</span>
+                                </>
+                              )}
                             </button>
                           </div>
                         </form>
@@ -6089,8 +6344,8 @@ Pour débloquer votre formule :
                         updated.forEach((c) => dbUpdateClass(c.id, c));
                       }
                     }}
-                    isPremiumOrSchool={currentClient.planId === 'plan_premium' || currentClient.planId === 'plan_school'}
-                    onOpenUpgrade={() => setIsClientSubModalOpen(true)}
+                    isPremiumOrSchool={Boolean(currentPlan.features.pedagogicalPlanning)}
+                    onOpenUpgrade={() => openUpgradeModal("Module de Planification Pédagogique", "L'affectation équitable et les exports de répartition nécessitent la formule Premium ou School.")}
                     isLight={isLight}
                     schoolName={schoolName}
                     onNavigateToTimetable={() => setActiveTab('timetable')}
@@ -6225,7 +6480,7 @@ Pour débloquer votre formule :
                               onClick={() => {
                                 if (!currentPlan.features.pdfExport) {
                                   triggerNotification("L'export PDF des rapports statistiques requiert la formule supérieure.", "error");
-                                  setIsClientSubModalOpen(true);
+                                  openUpgradeModal("Rapport PDF Statistiques", "L'exportation des rapports d'établissement au format PDF nécessite la formule supérieure.");
                                   return;
                                 }
                                 setChefDetailModalType('weekly_load');
@@ -6239,10 +6494,7 @@ Pour débloquer votre formule :
                               <Download className={`w-3.5 h-3.5 ${isLight ? 'text-red-600' : 'text-red-400'}`} />
                               <span>Rapport PDF (Stats)</span>
                               {!currentPlan.features.pdfExport && (
-                                <span className={`flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded font-mono ml-0.5 ${isLight ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                  }`}>
-                                  <Lock className="w-2.5 h-2.5" /> VIP
-                                </span>
+                                <VipLockBadge tooltip="Export PDF des rapports réservé aux offres supérieures" text="VIP" />
                               )}
                             </button>
 
@@ -6251,7 +6503,7 @@ Pour débloquer votre formule :
                               onClick={() => {
                                 if (!currentPlan.features.excelExport) {
                                   triggerNotification("L'export Excel (.xlsx) des statistiques requiert la formule supérieure.", "error");
-                                  setIsClientSubModalOpen(true);
+                                  openUpgradeModal("Export Statistiques Excel", "L'exportation des données analytiques et indicateurs en format Excel (.xlsx) nécessite la formule Premium ou School.");
                                   return;
                                 }
                                 setChefDetailModalType('weekly_load');
@@ -6260,15 +6512,12 @@ Pour débloquer votre formule :
                                   ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200'
                                   : 'bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border border-emerald-500/30'
                                 }`}
-                              title="Télécharger toutes les données analytiques au format Excel (.xlsx)"
+                              title={!currentPlan.features.excelExport ? "Nécessite le plan Premium ou School" : "Télécharger toutes les données analytiques au format Excel (.xlsx)"}
                             >
                               <FileSpreadsheet className={`w-3.5 h-3.5 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
                               <span>Données Excel (Stats)</span>
                               {!currentPlan.features.excelExport && (
-                                <span className={`flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded font-mono ml-0.5 ${isLight ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                  }`}>
-                                  <Lock className="w-2.5 h-2.5" /> VIP
-                                </span>
+                                <VipLockBadge tooltip="Export Excel des données analytiques réservé aux formules Premium & School" text="VIP" />
                               )}
                             </button>
                           </div>
@@ -6666,17 +6915,25 @@ Pour débloquer votre formule :
                       </div>
 
                       <button
-                        onClick={handleQueryAiSuggestions}
+                        onClick={() => {
+                          if (!currentPlan.features.geminiAI) {
+                            triggerNotification("L'Assistant IA requiert un plan supérieur (Premium ou School).", "error");
+                            openUpgradeModal("Conseiller Directeur IA Gemini Pro", "Les requêtes et analyses automatisées par intelligence artificielle nécessitent la formule Premium ou School.");
+                            return;
+                          }
+                          handleQueryAiSuggestions();
+                        }}
                         disabled={isLoadingAi || isExecutingAi}
+                        title={!currentPlan.features.geminiAI ? "Nécessite un plan supérieur" : "Interroger l'Assistant Directeur"}
                         className={`px-5 py-3 rounded-xl font-semibold text-sm shadow-lg transition-all flex items-center gap-2 cursor-pointer shrink-0 ${!currentPlan.features.geminiAI
-                            ? 'bg-slate-800 text-gray-500 border border-slate-700 cursor-not-allowed shadow-none'
+                            ? 'bg-slate-800 text-amber-300 border border-amber-500/40 shadow-none'
                             : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-emerald-950/50 hover:-translate-y-0.5 disabled:opacity-50'
                           }`}
                       >
                         {!currentPlan.features.geminiAI ? (
                           <>
-                            <Lock className="w-5 h-5 text-gray-500" />
-                            <span>Assistant Verrouillé (Upgrade requis)</span>
+                            <Lock className="w-5 h-5 text-amber-400" />
+                            <span>Assistant Verrouillé (Nécessite un plan supérieur)</span>
                           </>
                         ) : (
                           <>
@@ -6771,17 +7028,25 @@ Pour débloquer votre formule :
                             </button>
                           )}
                           <button
-                            onClick={handleAnalyzeProblem}
+                            onClick={() => {
+                              if (!currentPlan.features.geminiAI) {
+                                triggerNotification("L'Assistant IA requiert un plan supérieur (Premium ou School).", "error");
+                                openUpgradeModal("Assistant Directeur IA Gemini Pro", "Le diagnostic chirurgical et la résolution automatique des contraintes par IA nécessitent la formule Premium ou School.");
+                                return;
+                              }
+                              handleAnalyzeProblem();
+                            }}
                             disabled={isAnalyzingProblem || isExecutingAi || (!problemQuery.trim() && currentPlan.features.geminiAI)}
+                            title={!currentPlan.features.geminiAI ? "Nécessite un plan supérieur" : "Diagnostiquer & Suggérer une solution"}
                             className={`px-5 py-2.5 rounded-xl text-xs font-semibold tracking-wide shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-2 cursor-pointer ${!currentPlan.features.geminiAI
-                                ? 'bg-slate-800 text-gray-500 border border-slate-700 cursor-not-allowed shadow-none'
+                                ? 'bg-slate-800 text-amber-300 border border-amber-500/40 shadow-none'
                                 : 'bg-indigo-600 hover:bg-indigo-500 text-white'
                               }`}
                           >
                             {!currentPlan.features.geminiAI ? (
                               <>
-                                <Lock className="w-4 h-4 text-gray-500" />
-                                <span>Résolution IA verrouillée (Upgrade requis)</span>
+                                <Lock className="w-4 h-4 text-amber-400" />
+                                <span>Résolution IA verrouillée (Nécessite un plan supérieur)</span>
                               </>
                             ) : (
                               <>
@@ -6901,7 +7166,7 @@ Pour débloquer votre formule :
 
                             <div>
                               <label className={`block text-xs font-medium mb-1.5 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
-                                {"Type d'embleme / Logo"}
+                                {"Type d'emblème / Logo institutionnel"}
                               </label>
                               <div className="flex gap-3 mb-3">
                                 <button
@@ -6916,21 +7181,14 @@ Pour débloquer votre formule :
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    if (!currentPlan.features.customBranding) {
-                                      triggerNotification("L'importation de logo personnalisé par URL est disponible avec le Plan School.", "error");
-                                      setIsClientSubModalOpen(true);
-                                      return;
-                                    }
-                                    setSchoolLogoType('url');
-                                  }}
+                                  onClick={() => setSchoolLogoType('url')}
                                   className={`flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${schoolLogoType === 'url'
                                       ? isLight ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-indigo-500/20 border-indigo-500 text-white'
                                       : isLight ? 'bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-900' : 'bg-slate-950/50 border-white/10 text-gray-400 hover:text-white'
                                     }`}
                                 >
-                                  {!currentPlan.features.customBranding && <Lock className="w-3 h-3 text-amber-500" />}
-                                  {"URL d'image externe"}
+                                  <Upload className="w-3.5 h-3.5" />
+                                  {"Photo depuis le PC"}
                                 </button>
                               </div>
 
@@ -6962,17 +7220,143 @@ Pour débloquer votre formule :
                                   ))}
                                 </div>
                               ) : (
-                                <input
-                                  type="text"
-                                  value={schoolLogo}
-                                  onChange={(e) => setSchoolLogo(e.target.value)}
-                                  placeholder="https://domaine.com/logo.png"
-                                  className={`w-full rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-colors shadow-inner font-mono text-xs border ${isLight
-                                      ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-500'
-                                      : 'bg-slate-950/80 border-white/10 text-white focus:border-indigo-500'
-                                    }`}
-                                />
+                                <div className="space-y-3">
+                                  {/* Hidden file input */}
+                                  <input
+                                    type="file"
+                                    ref={logoFileInputRef}
+                                    accept="image/png, image/jpeg, image/jpg, image/webp, image/svg+xml"
+                                    onChange={(e) => {
+                                      if (e.target.files && e.target.files[0]) {
+                                        processAndFormatLogoFile(e.target.files[0]);
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+
+                                  {schoolLogo ? (
+                                    <div className={`p-4 rounded-xl border flex flex-col sm:flex-row items-center gap-4 ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-white/10'}`}>
+                                      <div className="relative group p-2 rounded-lg bg-white border border-slate-200 shadow-sm flex items-center justify-center shrink-0 min-w-[100px] h-20">
+                                        <img
+                                          src={schoolLogo}
+                                          alt="Logo Établissement"
+                                          className="max-h-16 max-w-[140px] object-contain rounded"
+                                        />
+                                      </div>
+                                      <div className="flex-1 text-center sm:text-left space-y-1">
+                                        <div className="flex items-center justify-center sm:justify-start gap-1.5 text-xs font-bold text-emerald-600">
+                                          <Check className="w-4 h-4 text-emerald-500" />
+                                          <span>Photo enregistrée et formatée (Format En-tête HD)</span>
+                                        </div>
+                                        <p className="text-[11px] text-gray-400">
+                                          Dimension ajustée automatiquement pour s&apos;intégrer sans déformation sur tous vos exports PDF et Word.
+                                        </p>
+                                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => logoFileInputRef.current?.click()}
+                                            className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                                          >
+                                            <Upload className="w-3.5 h-3.5" />
+                                            <span>Changer de photo</span>
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setSchoolLogo('');
+                                              triggerNotification("Photo supprimée.", "info");
+                                            }}
+                                            className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer border border-rose-500/20"
+                                          >
+                                            <X className="w-3.5 h-3.5" />
+                                            <span>Supprimer</span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div
+                                      onDragOver={(e) => {
+                                        e.preventDefault();
+                                        setIsDraggingLogo(true);
+                                      }}
+                                      onDragLeave={(e) => {
+                                        e.preventDefault();
+                                        setIsDraggingLogo(false);
+                                      }}
+                                      onDrop={(e) => {
+                                        e.preventDefault();
+                                        setIsDraggingLogo(false);
+                                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                          processAndFormatLogoFile(e.dataTransfer.files[0]);
+                                        }
+                                      }}
+                                      onClick={() => logoFileInputRef.current?.click()}
+                                      className={`p-6 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2.5 text-center transition-all cursor-pointer ${
+                                        isDraggingLogo
+                                          ? 'border-indigo-500 bg-indigo-500/10 scale-[1.01]'
+                                          : isLight
+                                            ? 'border-indigo-200 bg-indigo-50/40 hover:bg-indigo-50/80 hover:border-indigo-400 text-slate-700'
+                                            : 'border-white/15 bg-slate-950/40 hover:bg-slate-950/80 hover:border-indigo-500/50 text-gray-300'
+                                      }`}
+                                    >
+                                      <div className="p-3 rounded-2xl bg-indigo-600/10 text-indigo-500 border border-indigo-500/20">
+                                        <Upload className="w-6 h-6 animate-bounce" />
+                                      </div>
+                                      <div>
+                                        <p className="text-xs font-bold">
+                                          Cliquez ou glissez la photo de votre établissement depuis votre PC
+                                        </p>
+                                        <p className="text-[10px] text-gray-400 mt-0.5">
+                                          Formats acceptés : PNG, JPG, WEBP • Redimensionnement automatique optimisé en-tête (400x150 max)
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
                               )}
+                            </div>
+
+                            {/* APERÇU EN-TÊTE OFFICIEL POUR DOCUMENTS */}
+                            <div className={`p-4 rounded-xl border space-y-2 ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/40 border-white/10'}`}>
+                              <div className="flex items-center justify-between">
+                                <span className={`text-[11px] font-bold uppercase tracking-wider font-mono flex items-center gap-1.5 ${isLight ? 'text-indigo-900' : 'text-indigo-400'}`}>
+                                  <FileImage className="w-3.5 h-3.5 text-indigo-500" />
+                                  <span>Aperçu du rendu sur l&apos;en-tête des documents</span>
+                                </span>
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-bold">
+                                  Standard PDF & Word
+                                </span>
+                              </div>
+                              
+                              <div className="p-3.5 rounded-lg bg-white border border-slate-200 text-slate-900 shadow-sm flex items-center justify-between gap-4 select-none">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  {schoolLogoType === 'url' && schoolLogo ? (
+                                    <img
+                                      src={schoolLogo}
+                                      alt="Logo En-tête"
+                                      className="h-10 max-w-[100px] object-contain shrink-0 border border-slate-100 p-0.5 rounded"
+                                    />
+                                  ) : (
+                                    <div className="p-2 rounded bg-indigo-50 text-indigo-600 border border-indigo-200 shrink-0">
+                                      {renderLogoIcon()}
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <div className="font-extrabold text-xs text-slate-900 uppercase tracking-tight truncate">
+                                      {schoolName || "Nom de l'établissement"}
+                                    </div>
+                                    <div className="text-[10px] text-slate-500 truncate">
+                                      {schoolSlogan || "Devise / Slogan institutionnel"}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <div className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded border border-indigo-100">
+                                    Emploi du Temps Officiel
+                                  </div>
+                                </div>
+                              </div>
                             </div>
 
                             <div className="pt-2">
@@ -7261,7 +7645,10 @@ Pour débloquer votre formule :
         {/* --- CLIENT SUBSCRIPTION MODAL --- */}
         <ClientSubscriptionModal
           isOpen={isClientSubModalOpen}
-          onClose={() => setIsClientSubModalOpen(false)}
+          onClose={() => {
+            setIsClientSubModalOpen(false);
+            setRestrictedFeaturePrompt(null);
+          }}
           currentClient={currentClient}
           plans={saasPlans}
           licenseKeys={saasLicenseKeys}
@@ -7271,92 +7658,13 @@ Pour débloquer votre formule :
           exportCount={exportCount}
           maxExports={maxExports}
           theme={theme}
+          restrictedFeaturePrompt={restrictedFeaturePrompt}
           onApplyLicenseKey={handleApplyLicenseKey}
           onSimulatePayment={handleSimulatePayment}
           onRequestUpgradeOrRenewal={handleCreateActivationRequest}
         />
 
-        {/* --- ADMIN PIN VERIFICATION MODAL --- */}
-        <AnimatePresence>
-          {isAdminPinModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="w-full max-w-md p-6 rounded-2xl bg-slate-900 border border-white/10 shadow-2xl space-y-5"
-              >
-                <div className="flex items-center gap-3 pb-3 border-b border-white/10">
-                  <div className="p-3 rounded-xl bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                    <Shield className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-white">
-                      {"Accès Sécurisé Administrateur SaaS"}
-                    </h3>
-                    <p className="text-xs text-gray-400">
-                      {"Veuillez vous authentifier pour accéder à la console globale SaaS."}
-                    </p>
-                  </div>
-                </div>
 
-                <form onSubmit={handleVerifyAdminPin} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-300 mb-1.5">
-                      {"Code PIN de sécurité Administrateur"}
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="password"
-                        autoFocus
-                        value={adminPinInput}
-                        onChange={(e) => {
-                          setAdminPinInput(e.target.value);
-                          setAdminPinError('');
-                        }}
-                        placeholder="Entrez le code PIN (ex: 1234)"
-                        className="w-full bg-slate-950 border border-white/10 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition-colors font-mono tracking-widest"
-                      />
-                      <Lock className="w-4 h-4 text-gray-500 absolute right-3.5 top-3" />
-                    </div>
-                    {adminPinError ? (
-                      <p className="text-xs text-rose-400 mt-2 font-medium flex items-center gap-1.5">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        {adminPinError}
-                      </p>
-                    ) : (
-                      <p className="text-[11px] text-gray-500 mt-2 font-mono">
-                        {"Code PIN Administrateur par défaut : "}
-                        <strong className="text-purple-400">1234</strong>
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsAdminPinModalOpen(false);
-                        setAdminPinInput('');
-                        setAdminPinError('');
-                      }}
-                      className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 text-xs font-bold transition-all cursor-pointer"
-                    >
-                      {"Annuler"}
-                    </button>
-                    <button
-                      type="submit"
-                      className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-purple-900/30 transition-all cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      <Unlock className="w-4 h-4" />
-                      <span>{"Déverrouiller et Accéder"}</span>
-                    </button>
-                  </div>
-                </form>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
 
         {/* MODAL GRAPHIQUE GLOBAL & DÉTAILS EXPLIQUÉS POUR LE CHEF */}
         <ChefAnalyticsDetailModal

@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
+import { verifyUserPlanAccess } from '@/lib/supabase/apiAuth';
 
 export async function POST(req: NextRequest) {
   try {
+    const authRes = await verifyUserPlanAccess();
+    if (!authRes.success) {
+      return NextResponse.json({ error: authRes.error }, { status: authRes.status });
+    }
+
+    const { plan, isSubscriptionActive } = authRes.context;
+    if (!isSubscriptionActive || !plan.features?.geminiAI) {
+      return NextResponse.json(
+        { error: 'Les fonctionnalités d\'intelligence artificielle Gemini ne sont pas incluses dans votre formule d\'abonnement active.' },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     const { subjects, teachers, classes, timetable, unscheduled } = body;
 

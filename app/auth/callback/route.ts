@@ -4,8 +4,11 @@ import { createClient } from '@/utils/supabase/server';
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
-  // if "next" is in param, use it as the redirect URL
-  const next = searchParams.get('next') ?? '/user';
+  const rawNext = searchParams.get('next') ?? '/user';
+  // Validation stricte anti-Open-Redirect : doit commencer par / sans // ni caractères d'échappement
+  const safeNext = (rawNext.startsWith('/') && !rawNext.startsWith('//') && !rawNext.startsWith('/\\') && !rawNext.includes('\\'))
+    ? rawNext
+    : '/user';
 
   if (code) {
     const supabase = await createClient();
@@ -20,11 +23,19 @@ export async function GET(request: Request) {
           .eq('id', user.id)
           .maybeSingle();
 
-        if (profile?.role === 'admin') {
+        const isMasterAdmin = user.email?.toLowerCase() === 'diongpaco@gmail.com';
+        if (isMasterAdmin || profile?.role === 'admin') {
+          if (isMasterAdmin && profile?.role !== 'admin') {
+            try {
+              await supabase.from('profiles').upsert({ id: user.id, email: user.email, role: 'admin' }, { onConflict: 'id' });
+            } catch (e) {
+              console.error(e);
+            }
+          }
           return NextResponse.redirect(`${origin}/admin`);
         }
       }
-      return NextResponse.redirect(`${origin}${next}`);
+      return NextResponse.redirect(`${origin}${safeNext}`);
     } else {
       console.error('OAuth exchange code error:', error);
     }

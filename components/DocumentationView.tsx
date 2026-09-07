@@ -94,9 +94,10 @@ export default function DocumentationView({
           <button
             type="button"
             onClick={onClose}
-            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border transition-all cursor-pointer text-xs font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border-rose-500/30 hover:border-rose-500/50 hover:scale-105 active:scale-95 shadow-md shadow-rose-500/5"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all cursor-pointer text-xs font-bold bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border-red-500/30 shadow-md"
+            title="Fermer la documentation"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4 stroke-[2.5]" />
             <span>Fermer</span>
           </button>
         </div>

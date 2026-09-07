@@ -24,11 +24,47 @@ export interface EstablishmentSettingsData {
 }
 
 // -------------------------------------------------------------
+// SECURITY HELPERS & AUTH BOUNDARY CHECKS
+// -------------------------------------------------------------
+
+async function getAuthenticatedUser() {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
+}
+
+export async function verifyAdminRole(): Promise<boolean> {
+  const user = await getAuthenticatedUser();
+  if (!user) return false;
+  if (user.email?.toLowerCase() === 'diongpaco@gmail.com') return true;
+  const supabase = createClient();
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle();
+  return profile?.role === 'admin';
+}
+
+export async function resolveAuthorizedUserId(requestedUserId?: string): Promise<string | null> {
+  const authUser = await getAuthenticatedUser();
+  if (!authUser) return null;
+  if (requestedUserId && requestedUserId !== authUser.id) {
+    const isAdmin = await verifyAdminRole();
+    if (isAdmin) return requestedUserId;
+    return null;
+  }
+  return authUser.id;
+}
+
+// -------------------------------------------------------------
 // CLIENT / ESTABLISHMENT CRUD SERVICES
 // -------------------------------------------------------------
 
-export async function getEstablishmentData(userId: string) {
+export async function getEstablishmentData(requestedUserId: string) {
   const supabase = createClient();
+  const userId = await resolveAuthorizedUserId(requestedUserId);
+  if (!userId) return null;
 
   // Execute all queries in parallel for ultra-fast load time
   const [
@@ -145,8 +181,11 @@ export async function getEstablishmentData(userId: string) {
   };
 }
 
-export async function saveEstablishmentSettings(userId: string, data: Partial<EstablishmentSettingsData>) {
+export async function saveEstablishmentSettings(requestedUserId: string, data: Partial<EstablishmentSettingsData>) {
   const supabase = createClient();
+  const userId = await resolveAuthorizedUserId(requestedUserId);
+  if (!userId) return;
+
   const updatePayload: any = { updated_at: new Date().toISOString() };
 
   if (data.schoolName !== undefined) updatePayload.school_name = data.schoolName;
@@ -157,9 +196,8 @@ export async function saveEstablishmentSettings(userId: string, data: Partial<Es
   if (data.activeDays !== undefined) updatePayload.active_days = data.activeDays;
   if (data.startHour !== undefined) updatePayload.start_hour = data.startHour;
   if (data.endHour !== undefined) updatePayload.end_hour = data.endHour;
-  if (data.planId !== undefined) updatePayload.plan_id = data.planId;
-  if (data.status !== undefined) updatePayload.status = data.status;
   if (data.schoolBreaks !== undefined) updatePayload.school_breaks = data.schoolBreaks;
+  // NOTE: data.planId et data.status sont explicitement exclus pour empêcher le mass assignment et l'élévation de privilèges
 
   const { error } = await supabase
     .from('establishment_settings')
@@ -168,8 +206,11 @@ export async function saveEstablishmentSettings(userId: string, data: Partial<Es
   if (error) console.error('Error saving establishment settings:', error);
 }
 
-export async function dbAddSubject(userId: string, name: string): Promise<Subject | null> {
+export async function dbAddSubject(requestedUserId: string, name: string): Promise<Subject | null> {
   const supabase = createClient();
+  const userId = await resolveAuthorizedUserId(requestedUserId);
+  if (!userId) return null;
+
   const { data, error } = await supabase
     .from('subjects')
     .insert({ user_id: userId, name })
@@ -185,12 +226,18 @@ export async function dbAddSubject(userId: string, name: string): Promise<Subjec
 
 export async function dbDeleteSubject(id: string): Promise<boolean> {
   const supabase = createClient();
-  const { error } = await supabase.from('subjects').delete().eq('id', id);
+  const authUser = await getAuthenticatedUser();
+  if (!authUser) return false;
+
+  const { error } = await supabase.from('subjects').delete().eq('id', id).eq('user_id', authUser.id);
   return !error;
 }
 
-export async function dbAddTeacher(userId: string, teacher: Omit<Teacher, 'id'>): Promise<Teacher | null> {
+export async function dbAddTeacher(requestedUserId: string, teacher: Omit<Teacher, 'id'>): Promise<Teacher | null> {
   const supabase = createClient();
+  const userId = await resolveAuthorizedUserId(requestedUserId);
+  if (!userId) return null;
+
   const { data, error } = await supabase
     .from('teachers')
     .insert({
@@ -220,6 +267,9 @@ export async function dbAddTeacher(userId: string, teacher: Omit<Teacher, 'id'>)
 
 export async function dbUpdateTeacher(id: string, teacher: Partial<Teacher>): Promise<boolean> {
   const supabase = createClient();
+  const authUser = await getAuthenticatedUser();
+  if (!authUser) return false;
+
   const payload: any = {};
   if (teacher.name !== undefined) payload.name = teacher.name;
   if (teacher.subjectIds !== undefined) payload.subject_ids = teacher.subjectIds;
@@ -227,18 +277,24 @@ export async function dbUpdateTeacher(id: string, teacher: Partial<Teacher>): Pr
   if (teacher.color !== undefined) payload.color = teacher.color;
   if (teacher.unavailability !== undefined) payload.unavailability = teacher.unavailability;
 
-  const { error } = await supabase.from('teachers').update(payload).eq('id', id);
+  const { error } = await supabase.from('teachers').update(payload).eq('id', id).eq('user_id', authUser.id);
   return !error;
 }
 
 export async function dbDeleteTeacher(id: string): Promise<boolean> {
   const supabase = createClient();
-  const { error } = await supabase.from('teachers').delete().eq('id', id);
+  const authUser = await getAuthenticatedUser();
+  if (!authUser) return false;
+
+  const { error } = await supabase.from('teachers').delete().eq('id', id).eq('user_id', authUser.id);
   return !error;
 }
 
-export async function dbAddClass(userId: string, classGroup: Omit<ClassGroup, 'id'>): Promise<ClassGroup | null> {
+export async function dbAddClass(requestedUserId: string, classGroup: Omit<ClassGroup, 'id'>): Promise<ClassGroup | null> {
   const supabase = createClient();
+  const userId = await resolveAuthorizedUserId(requestedUserId);
+  if (!userId) return null;
+
   const { data, error } = await supabase
     .from('classes')
     .insert({
@@ -264,23 +320,29 @@ export async function dbAddClass(userId: string, classGroup: Omit<ClassGroup, 'i
 
 export async function dbUpdateClass(id: string, classGroup: Partial<ClassGroup>): Promise<boolean> {
   const supabase = createClient();
+  const authUser = await getAuthenticatedUser();
+  if (!authUser) return false;
+
   const payload: any = {};
   if (classGroup.name !== undefined) payload.name = classGroup.name;
   if (classGroup.assignments !== undefined) payload.assignments = classGroup.assignments;
   if (classGroup.unavailability !== undefined) payload.unavailability = classGroup.unavailability;
 
-  const { error } = await supabase.from('classes').update(payload).eq('id', id);
+  const { error } = await supabase.from('classes').update(payload).eq('id', id).eq('user_id', authUser.id);
   return !error;
 }
 
 export async function dbDeleteClass(id: string): Promise<boolean> {
   const supabase = createClient();
-  const { error } = await supabase.from('classes').delete().eq('id', id);
+  const authUser = await getAuthenticatedUser();
+  if (!authUser) return false;
+
+  const { error } = await supabase.from('classes').delete().eq('id', id).eq('user_id', authUser.id);
   return !error;
 }
 
 export async function dbSaveTimetable(
-  userId: string,
+  requestedUserId: string,
   title: string,
   timetable: TimetableEntry[],
   unscheduled: any[],
@@ -288,6 +350,9 @@ export async function dbSaveTimetable(
   inputs: any
 ): Promise<boolean> {
   const supabase = createClient();
+  const userId = await resolveAuthorizedUserId(requestedUserId);
+  if (!userId) return false;
+
   const { error } = await supabase.from('timetables').insert({
     user_id: userId,
     title,
@@ -308,6 +373,10 @@ export async function dbSaveTimetable(
 // -------------------------------------------------------------
 
 export async function getSaaSAdminLivePlatformData() {
+  if (!(await verifyAdminRole())) {
+    console.warn("Accès refusé aux données d'administration SaaS : rôle admin requis.");
+    return null;
+  }
   const supabase = createClient();
 
   // 1. Fetch SaaS Plans
@@ -335,7 +404,8 @@ export async function getSaaSAdminLivePlatformData() {
       geminiAI: false,
       prioritySupport: false,
       multiUser: false,
-      customBranding: false
+      customBranding: true,
+      pedagogicalPlanning: false
     },
     popular: p.popular,
     description: p.description,
@@ -437,10 +507,11 @@ export async function getSaaSAdminLivePlatformData() {
       r.status === 'delivered'
     );
     const totalPaidFCFA = userReqs.reduce((sum, r) => sum + (r.amount_fcfa || 0), 0);
-    const lastPaymentMethod = userReqs[0]?.payment_method || (userSettings?.plan_id && userSettings?.plan_id !== 'plan_free' ? 'Wave' : 'Gratuit');
+    const lastPaymentMethod = userReqs[0]?.payment_method || (userSettings?.plan_id && userSettings?.plan_id !== 'plan_free' && userSettings?.plan_id !== 'plan_trial' ? 'Wave' : 'Gratuit');
 
     const profileAny = profile as any;
-    const effectivePlanId = userSettings?.plan_id || profileAny.plan_id || 'plan_free';
+    const rawPlanId = userSettings?.plan_id || profileAny.plan_id;
+    const effectivePlanId = (rawPlanId === 'plan_free' || !rawPlanId) ? 'plan_trial' : rawPlanId;
     const effectiveStatus = (userSettings?.status as any) || (profileAny.subscription_status as any) || 'active';
 
     return {
@@ -506,6 +577,12 @@ export async function dbAdminGenerateLicenseKeys(
   durationDays: number,
   keys: string[]
 ): Promise<{ success: boolean; message: string; count?: number }> {
+  if (!(await verifyAdminRole())) {
+    return {
+      success: false,
+      message: "Accès refusé : Privilèges Administrateur requis."
+    };
+  }
   const supabase = createClient();
   const { data, error } = await supabase.rpc('admin_generate_license_keys', {
     p_plan_id: planId,
@@ -529,6 +606,7 @@ export async function dbAdminGenerateLicenseKeys(
 }
 
 export async function dbCreateLicenseKey(planId: string, durationDays: number): Promise<SaaSLicenseKey | null> {
+  if (!(await verifyAdminRole())) return null;
   const supabase = createClient();
   const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
   const key = `SCH-${planId.replace('plan_', '').toUpperCase()}-2026-${randomStr}`;
@@ -547,6 +625,7 @@ export async function dbCreateLicenseKey(planId: string, durationDays: number): 
 }
 
 export async function dbUpdateGlobalSettings(settings: SaaSGlobalSettings): Promise<boolean> {
+  if (!(await verifyAdminRole())) return false;
   const supabase = createClient();
   const { error } = await supabase
     .from('saas_settings')
@@ -594,6 +673,9 @@ export async function dbAdminCreateClientUser(params: {
   amountFCFA?: number;
   notes?: string;
 }): Promise<{ success: boolean; message: string; userId?: string; client?: SaaSClient }> {
+  if (!(await verifyAdminRole())) {
+    return { success: false, message: "Accès refusé : Privilèges Administrateur requis." };
+  }
   const supabase = createClient();
   const { data, error } = await supabase.rpc('admin_create_client_user', {
     p_email: params.email,
@@ -664,6 +746,9 @@ export async function dbAdminResetUserPassword(
   userId: string,
   newPassword: string
 ): Promise<{ success: boolean; message: string }> {
+  if (!(await verifyAdminRole())) {
+    return { success: false, message: "Accès refusé : Privilèges Administrateur requis." };
+  }
   const supabase = createClient();
   const { data, error } = await supabase.rpc('admin_reset_user_password', {
     p_user_id: userId,
@@ -762,6 +847,9 @@ export async function dbAdminDeliverActivationRequest(
   requestId: string,
   assignedKey?: string
 ): Promise<{ success: boolean; message: string }> {
+  if (!(await verifyAdminRole())) {
+    return { success: false, message: "Accès refusé : Privilèges Administrateur requis." };
+  }
   const supabase = createClient();
   const { data, error } = await supabase.rpc('admin_deliver_activation_request', {
     p_request_id: requestId,
@@ -784,6 +872,124 @@ export async function dbAdminDeliverActivationRequest(
 
 
 
+// -------------------------------------------------------------
+// LECTURE PUBLIQUE DES PLANS SAAS (sans accès admin requis)
+// Accessible pour les clients connectés afin d'afficher le catalogue
+// -------------------------------------------------------------
 
+export async function dbGetPublicPlans(): Promise<SaaSPlan[]> {
+  const supabase = createClient();
+  const { data: plansData, error } = await supabase
+    .from('saas_plans')
+    .select('*')
+    .order('monthly_price_fcfa', { ascending: true });
 
+  if (error || !plansData || plansData.length === 0) {
+    console.warn('dbGetPublicPlans: aucun plan en base, retour tableau vide.', error);
+    return [];
+  }
 
+  return plansData.map(p => ({
+    id: p.id,
+    name: p.name,
+    code: p.code,
+    monthlyPriceFCFA: p.monthly_price_fcfa,
+    monthlyPriceEUR: p.monthly_price_eur,
+    annualPriceFCFA: p.annual_price_fcfa,
+    annualPriceEUR: p.annual_price_eur,
+    maxClasses: p.max_classes,
+    maxTeachers: p.max_teachers,
+    maxGenerations: p.max_generations,
+    maxExports: p.max_exports,
+    features: p.features || {
+      pdfExport: true,
+      excelExport: false,
+      wordExport: false,
+      geminiAI: false,
+      prioritySupport: false,
+      multiUser: false,
+      customBranding: true,
+      pedagogicalPlanning: false
+    },
+    popular: p.popular,
+    description: p.description,
+    badgeText: p.badge_text,
+    wavePaymentUrl: p.wave_payment_url
+  }));
+}
+
+// -------------------------------------------------------------
+// VÉRIFICATION ET INCRÉMENTATION DES QUOTAS VIA RPC DB
+// Toute la logique de comptage est côté base de données (SECURITY DEFINER)
+// -------------------------------------------------------------
+
+export async function dbCheckAndIncrementGenerationQuota(
+  userId: string
+): Promise<{ allowed: boolean; current: number; max: number; message?: string }> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('check_and_increment_generation_quota', {
+    p_user_id: userId
+  });
+
+  if (error) {
+    console.error('Erreur quota génération RPC:', error);
+    // En cas d'erreur technique, on bloque par sécurité
+    return { allowed: false, current: 0, max: 0, message: "Erreur de vérification du quota. Veuillez réessayer." };
+  }
+
+  return {
+    allowed: data?.allowed ?? false,
+    current: data?.current ?? 0,
+    max: data?.max ?? 0,
+    message: data?.message
+  };
+}
+
+export async function dbCheckAndIncrementExportQuota(
+  userId: string
+): Promise<{ allowed: boolean; current: number; max: number; message?: string }> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('check_and_increment_export_quota', {
+    p_user_id: userId
+  });
+
+  if (error) {
+    console.error('Erreur quota export RPC:', error);
+    return { allowed: false, current: 0, max: 0, message: "Erreur de vérification du quota d'export. Veuillez réessayer." };
+  }
+
+  return {
+    allowed: data?.allowed ?? false,
+    current: data?.current ?? 0,
+    max: data?.max ?? 0,
+    message: data?.message
+  };
+}
+
+export async function dbGetUserQuotaUsage(userId: string): Promise<{
+  generationCount: number;
+  exportCount: number;
+  maxGenerations: number;
+  maxExports: number;
+  period: string;
+  planId: string;
+} | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('get_user_quota_usage', {
+    p_user_id: userId
+  });
+
+  if (error) {
+    console.error('Erreur lecture quota RPC:', error);
+    return null;
+  }
+
+  return data ? {
+    generationCount: data.generationCount ?? 0,
+    exportCount: data.exportCount ?? 0,
+    maxGenerations: data.maxGenerations ?? 4,
+    maxExports: data.maxExports ?? 4,
+    period: data.period ?? '',
+    planId: data.planId ?? 'plan_trial'
+  } : null;
+}
