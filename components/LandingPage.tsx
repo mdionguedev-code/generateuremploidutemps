@@ -279,7 +279,7 @@ export default function LandingPage({
           
           {/* HERO SECTION */}
           <section className="pt-6 sm:pt-4 md:pt-4 pb-16 md:pb-24 px-6 md:px-12 max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
-            <div className="lg:w-1/2 flex flex-col gap-6 relative z-10 text-left">
+            <div className="lg:w-1/2 flex flex-col items-center lg:items-start text-center lg:text-left gap-6 relative z-10">
               <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 w-max">
                 <span className="material-symbols-outlined text-[#4be277] text-[16px]">bolt</span>
                 <span className="text-xs font-medium text-[#bccbb9]">Propulsé par l&apos;IA</span>
@@ -287,11 +287,11 @@ export default function LandingPage({
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#dae2fd] leading-tight tracking-tight">
                 Automatisez vos emplois du temps en <span className="text-gradient-primary">quelques secondes</span>.
               </h1>
-              <p className="text-base sm:text-lg text-[#bccbb9] max-w-xl leading-relaxed">
+              <p className="text-base sm:text-lg text-[#bccbb9] max-w-xl leading-relaxed mx-auto lg:mx-0">
                 Simplifiez la planification de votre rentrée scolaire. Notre moteur d&apos;intelligence artificielle résout instantanément les contraintes les plus complexes pour générer des emplois du temps optimisés, harmonieux et sans aucun conflit.
               </p>
               
-              <div className="flex flex-wrap items-center gap-4 mt-2">
+              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 mt-2 w-full">
                 <button onClick={onOpenLogin} className="btn-primary hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2 cursor-pointer">
                   Commencer gratuitement
                   <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
@@ -307,7 +307,7 @@ export default function LandingPage({
               </div>
 
               {/* STATS RATING */}
-              <div className="flex items-center gap-4 mt-4">
+              <div className="flex items-center justify-center lg:justify-start gap-4 mt-4 w-full">
                 <div className="flex -space-x-2">
                   <div className="w-8 h-8 rounded-full bg-[#2d3449] border-2 border-[#0b1326] flex items-center justify-center text-xs text-white font-bold">MD</div>
                   <div className="w-8 h-8 rounded-full bg-[#2d3449] border-2 border-[#0b1326] flex items-center justify-center text-xs text-white font-bold">AL</div>
@@ -340,10 +340,10 @@ export default function LandingPage({
               </p>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 text-left">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               
               {/* Feature 1 */}
-              <div className="glass-panel glass-panel-hover p-8 relative overflow-hidden group">
+              <div className="glass-panel glass-panel-hover p-8 relative overflow-hidden group flex flex-col items-center md:items-start text-center md:text-left">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-[#4be277]/10 rounded-full blur-[40px] group-hover:bg-[#4be277]/20 transition-all"></div>
                 <div className="w-12 h-12 bg-white/5 border border-white/10 rounded-lg flex items-center justify-center mb-6 text-[#4be277]">
                   <span className="material-symbols-outlined">auto_awesome</span>
@@ -355,7 +355,7 @@ export default function LandingPage({
               </div>
 
               {/* Feature 2 */}
-              <div className="glass-panel glass-panel-hover p-8 relative overflow-hidden group">
+              <div className="glass-panel glass-panel-hover p-8 relative overflow-hidden group flex flex-col items-center md:items-start text-center md:text-left">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-[#d0bcff]/10 rounded-full blur-[40px] group-hover:bg-[#d0bcff]/20 transition-all"></div>
                 <div className="w-12 h-12 bg-white/5 border border-white/10 rounded-lg flex items-center justify-center mb-6 text-[#d0bcff]">
                   <span className="material-symbols-outlined">pan_tool</span>
@@ -367,7 +367,7 @@ export default function LandingPage({
               </div>
 
               {/* Feature 3 */}
-              <div className="glass-panel glass-panel-hover p-8 relative overflow-hidden group">
+              <div className="glass-panel glass-panel-hover p-8 relative overflow-hidden group flex flex-col items-center md:items-start text-center md:text-left">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-[#ffba61]/10 rounded-full blur-[40px] group-hover:bg-[#ffba61]/20 transition-all"></div>
                 <div className="w-12 h-12 bg-white/5 border border-white/10 rounded-lg flex items-center justify-center mb-6 text-[#ffba61]">
                   <span className="material-symbols-outlined">rule_settings</span>
@@ -379,7 +379,7 @@ export default function LandingPage({
               </div>
 
               {/* Feature 4 */}
-              <div className="glass-panel glass-panel-hover p-8 relative overflow-hidden group">
+              <div className="glass-panel glass-panel-hover p-8 relative overflow-hidden group flex flex-col items-center md:items-start text-center md:text-left">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-[#22c55e]/10 rounded-full blur-[40px] group-hover:bg-[#22c55e]/20 transition-all"></div>
                 <div className="w-12 h-12 bg-white/5 border border-white/10 rounded-lg flex items-center justify-center mb-6 text-[#6bff8f]">
                   <span className="material-symbols-outlined">bar_chart</span>
