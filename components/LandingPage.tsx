@@ -269,7 +269,8 @@ export default function LandingPage({
               Connexion
             </button>
             <button onClick={onOpenLogin} className="btn-primary hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
-              Commencer gratuitement
+              <span className="lg:hidden">Connexion</span>
+              <span className="hidden lg:inline">Commencer gratuitement</span>
             </button>
           </div>
         </nav>
@@ -285,7 +286,7 @@ export default function LandingPage({
                 <span className="text-xs font-medium text-[#bccbb9]">Propulsé par l&apos;IA</span>
               </div>
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#dae2fd] leading-tight tracking-tight">
-                Automatisez vos emplois du temps en <span className="text-gradient-primary">quelques secondes</span>.
+                Automatisez vos Emplois du temps en <span className="text-gradient-primary">Quelques secondes</span>.
               </h1>
               <p className="text-base sm:text-lg text-[#bccbb9] max-w-xl leading-relaxed mx-auto lg:mx-0">
                 Simplifiez la planification de votre rentrée scolaire. Notre moteur d&apos;intelligence artificielle résout instantanément les contraintes les plus complexes pour générer des emplois du temps optimisés, harmonieux et sans aucun conflit.
@@ -330,8 +331,8 @@ export default function LandingPage({
           </section>
 
           {/* --- FEATURES SECTION --- */}
-          <section className="py-24 px-6 md:px-12 max-w-7xl mx-auto text-center relative z-10" id="features">
-            <div className="max-w-2xl mx-auto mb-16">
+          <section className="py-12 md:py-24 px-6 md:px-12 max-w-7xl mx-auto text-center relative z-10" id="features">
+            <div className="max-w-2xl mx-auto mb-10 md:mb-16">
               <h2 className="text-3xl md:text-5xl font-extrabold text-[#dae2fd] mb-4">
                 La complexité, <span className="text-gradient-primary">rendue simple.</span>
               </h2>
@@ -394,11 +395,11 @@ export default function LandingPage({
           </section>
 
           {/* --- HOW IT WORKS SECTION (5 ÉTAPES DU SAAS) --- */}
-          <section className="py-24 px-6 md:px-12 max-w-7xl mx-auto relative z-10 border-t border-white/5" id="how-it-works">
+          <section className="py-12 md:py-24 px-6 md:px-12 max-w-7xl mx-auto relative z-10 border-t border-white/5" id="how-it-works">
             <h2 className="text-3xl md:text-4xl font-bold text-[#dae2fd] text-center mb-4">
               Comment ça fonctionne en <span className="text-[#4be277]">5 étapes</span>
             </h2>
-            <p className="text-sm md:text-base text-gray-400 text-center max-w-2xl mx-auto mb-20">
+            <p className="text-sm md:text-base text-gray-400 text-center max-w-2xl mx-auto mb-12 md:mb-20">
               Un parcours guidé de bout en bout pour concevoir l'emploi du temps parfait de votre établissement scolaire en quelques minutes.
             </p>
             
@@ -413,7 +414,7 @@ export default function LandingPage({
               </div>
               
               {/* Step 1: Jours & Horaires */}
-              <div className="step-item flex flex-col md:flex-row items-center justify-between mb-20 relative" data-index="0">
+              <div className="step-item flex flex-col md:flex-row items-center justify-between mb-12 md:mb-20 relative" data-index="0">
                 <div className={`md:w-5/12 text-right pr-0 md:pr-12 mb-6 md:mb-0 transition-all duration-1000 ease-out transform ${
                   visibleSteps[0] ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-12'
                 }`}>
@@ -449,7 +450,7 @@ export default function LandingPage({
               </div>
  
               {/* Step 2: Matières */}
-              <div className="step-item flex flex-col md:flex-row-reverse items-center justify-between mb-20 relative" data-index="1">
+              <div className="step-item flex flex-col md:flex-row-reverse items-center justify-between mb-12 md:mb-20 relative" data-index="1">
                 <div className={`md:w-5/12 text-left pl-0 md:pl-12 mb-6 md:mb-0 transition-all duration-1000 ease-out transform ${
                   visibleSteps[1] ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-12'
                 }`}>
@@ -487,7 +488,7 @@ export default function LandingPage({
               </div>
  
               {/* Step 3: Professeurs */}
-              <div className="step-item flex flex-col md:flex-row items-center justify-between mb-20 relative" data-index="2">
+              <div className="step-item flex flex-col md:flex-row items-center justify-between mb-12 md:mb-20 relative" data-index="2">
                 <div className={`md:w-5/12 text-right pr-0 md:pr-12 mb-6 md:mb-0 transition-all duration-1000 ease-out transform ${
                   visibleSteps[2] ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-12'
                 }`}>
@@ -527,7 +528,7 @@ export default function LandingPage({
               </div>
  
               {/* Step 4: Classes & Affectations */}
-              <div className="step-item flex flex-col md:flex-row-reverse items-center justify-between mb-20 relative" data-index="3">
+              <div className="step-item flex flex-col md:flex-row-reverse items-center justify-between mb-12 md:mb-20 relative" data-index="3">
                 <div className={`md:w-5/12 text-left pl-0 md:pl-12 mb-6 md:mb-0 transition-all duration-1000 ease-out transform ${
                   visibleSteps[3] ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-12'
                 }`}>
@@ -602,7 +603,7 @@ export default function LandingPage({
           </section>
 
           {/* --- TESTIMONIALS SECTION --- */}
-          <section className="py-24 px-0 relative z-10 border-t border-white/5 overflow-hidden" id="testimonials">
+          <section className="py-12 md:py-24 px-0 relative z-10 border-t border-white/5 overflow-hidden" id="testimonials">
             {/* Inject infinite marquee keyframes inline */}
             <style dangerouslySetInnerHTML={{__html: `
               @keyframes marqueeContinuous {
@@ -623,7 +624,7 @@ export default function LandingPage({
               }
             `}} />
 
-            <h2 className="text-3xl md:text-4xl font-bold text-[#dae2fd] text-center mb-12 px-6">
+            <h2 className="text-3xl md:text-4xl font-bold text-[#dae2fd] text-center mb-8 md:mb-12 px-6">
               Ils nous font <span className="text-gradient-primary">confiance</span>
             </h2>
             
@@ -674,15 +675,15 @@ export default function LandingPage({
           </section>
 
           {/* --- PRICING SECTION --- */}
-          <section className="py-24 px-6 md:px-12 max-w-7xl mx-auto relative z-10 border-t border-white/5" id="pricing">
+          <section className="py-12 md:py-24 px-6 md:px-12 max-w-7xl mx-auto relative z-10 border-t border-white/5" id="pricing">
             <h2 className="text-3xl md:text-4xl font-bold text-[#dae2fd] text-center mb-4">
               Des tarifs <span className="text-gradient-primary">adaptés</span>
             </h2>
-            <p className="text-center text-sm text-[#bccbb9] mb-12">
+            <p className="text-center text-sm text-[#bccbb9] mb-8 md:mb-12">
               Choisissez l&apos;offre qui correspond le mieux aux besoins de votre établissement.
             </p>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto items-stretch mt-12">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto items-stretch mt-8 md:mt-12">
               
               {/* Plan 1: Gratuit */}
               <div className="glass-panel p-6 flex flex-col justify-between text-left relative hover:-translate-y-2 hover:border-[#4be277]/50 hover:shadow-[0_10px_30px_rgba(75,226,119,0.15)] transition-all duration-300">
