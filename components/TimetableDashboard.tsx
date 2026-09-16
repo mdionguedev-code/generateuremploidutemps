@@ -121,6 +121,7 @@ import {
   dbUpdateClass,
   dbDeleteClass,
   dbSaveTimetable,
+  dbDeleteAllTimetables,
   getSaaSAdminLivePlatformData,
   dbCreateLicenseKey,
   dbUpdateGlobalSettings,
@@ -614,6 +615,88 @@ export default function TimetableDashboard({
       subscription.unsubscribe();
     };
   }, []);
+
+  // 3. Synchronisation en temps réel via Supabase Realtime Channel
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`establishment-realtime-${currentUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'subjects',
+          filter: `user_id=eq.${currentUserId}`
+        },
+        async () => {
+          const estData = await getEstablishmentData(currentUserId);
+          if (estData) {
+            setSubjects(estData.subjects);
+            setTimetable(estData.savedTimetable);
+            setGenerationScore(estData.savedScore);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'teachers',
+          filter: `user_id=eq.${currentUserId}`
+        },
+        async () => {
+          const estData = await getEstablishmentData(currentUserId);
+          if (estData) {
+            setTeachers(estData.teachers);
+            setTimetable(estData.savedTimetable);
+            setGenerationScore(estData.savedScore);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'classes',
+          filter: `user_id=eq.${currentUserId}`
+        },
+        async () => {
+          const estData = await getEstablishmentData(currentUserId);
+          if (estData) {
+            setClasses(estData.classes);
+            setTimetable(estData.savedTimetable);
+            setGenerationScore(estData.savedScore);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'timetables',
+          filter: `user_id=eq.${currentUserId}`
+        },
+        async () => {
+          const estData = await getEstablishmentData(currentUserId);
+          if (estData) {
+            setTimetable(estData.savedTimetable);
+            setUnscheduled(estData.savedUnscheduled);
+            setGenerationScore(estData.savedScore);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId]);
 
   // NOTE: Les données SaaS ne sont pas stockées en localStorage
   // Elles sont systématiquement chargées depuis Supabase au montage
@@ -1409,8 +1492,9 @@ Pour débloquer votre formule :
 
   // Wipe All Data from Database
   const handleWipeAll = async () => {
-    if (window.confirm("Attention: Cela effacera toutes vos fiches (Matières, Professeurs, Classes) de la base de données. Confirmer ?")) {
+    if (window.confirm("Attention: Cela effacera toutes vos fiches (Matières, Professeurs, Classes) et l'emploi du temps de la base de données. Confirmer ?")) {
       if (currentUserId) {
+        await dbDeleteAllTimetables(currentUserId);
         for (const c of classes) await dbDeleteClass(c.id);
         for (const t of teachers) await dbDeleteTeacher(t.id);
         for (const s of subjects) await dbDeleteSubject(s.id);
@@ -1421,7 +1505,7 @@ Pour débloquer votre formule :
       setTimetable([]);
       setUnscheduled([]);
       setGenerationScore(0);
-      triggerNotification("Toutes les données ont été effacées de la base de données.", "info");
+      triggerNotification("Toutes les données et l'emploi du temps ont été effacés de la base de données.", "info");
     }
   };
 
@@ -1523,6 +1607,10 @@ Pour débloquer votre formule :
       openUpgradeModal("Conseiller Directeur IA Gemini Pro", "L'analyse pédagogique et les conseils automatisés par IA sont réservés aux formules Premium et School.");
       return;
     }
+    if (timetable.length === 0 || classes.length === 0) {
+      triggerNotification("Aucun emploi du temps n'a encore été généré. Veuillez d'abord configurer vos classes et générer l'emploi du temps à l'Étape 5.", "error");
+      return;
+    }
     setIsLoadingAi(true);
     setAiSuggestions("L'assistant Gemini analyse vos conflits de planning, les temps d'attente des professeurs et les plages horaires...");
 
@@ -1535,13 +1623,13 @@ Pour débloquer votre formule :
 
       const data = await response.json();
       if (data.error) {
-        setAiSuggestions(`Désolé, l'assistant IA a rencontré un problème : ${data.error}`);
+        setAiSuggestions(data.error);
       } else {
-        setAiSuggestions(data.text);
+        setAiSuggestions(data.text || "Intelligence non disponible pour le moment, veillez réessayer ultérieurement.");
       }
     } catch (err: any) {
       console.error(err);
-      setAiSuggestions("Erreur de connexion avec l'IA. Veuillez vérifier que la clé API Gemini est définie ou réessayez.");
+      setAiSuggestions("Intelligence non disponible pour le moment, veillez réessayer ultérieurement.");
     } finally {
       setIsLoadingAi(false);
     }
@@ -1552,6 +1640,10 @@ Pour débloquer votre formule :
     if (!currentPlan.features.geminiAI) {
       triggerNotification("Les fonctionnalités d'intelligence artificielle Gemini ne sont pas incluses dans votre formule actuelle.", "error");
       openUpgradeModal("Diagnostic de Planning par IA", "Le diagnostic intelligent et les propositions de réaffectation par IA sont réservés aux formules Premium et School.");
+      return;
+    }
+    if (timetable.length === 0 || classes.length === 0) {
+      triggerNotification("Aucun emploi du temps n'a encore été généré. Veuillez d'abord configurer vos classes et générer l'emploi du temps à l'Étape 5.", "error");
       return;
     }
     if (!problemQuery.trim()) {
@@ -1578,13 +1670,13 @@ Pour débloquer votre formule :
 
       const data = await response.json();
       if (data.error) {
-        setProblemAnalysis(`Impossible de formuler un diagnostic : ${data.error}`);
+        setProblemAnalysis(data.error);
       } else {
-        setProblemAnalysis(data.text);
+        setProblemAnalysis(data.text || "Intelligence non disponible pour le moment, veillez réessayer ultérieurement.");
       }
     } catch (err: any) {
       console.error(err);
-      setProblemAnalysis("Erreur de connexion avec l'IA. Veuillez vérifier votre clé API.");
+      setProblemAnalysis("Intelligence non disponible pour le moment, veillez réessayer ultérieurement.");
     } finally {
       setIsAnalyzingProblem(false);
     }
@@ -1594,6 +1686,10 @@ Pour débloquer votre formule :
     if (!currentPlan.features.geminiAI) {
       triggerNotification("Les fonctionnalités d'intelligence artificielle Gemini ne sont pas incluses dans votre formule actuelle.", "error");
       openUpgradeModal("Résolution Automatisée par IA", "L'application des changements de planning par IA nécessite la formule Premium ou School.");
+      return;
+    }
+    if (timetable.length === 0 || classes.length === 0) {
+      triggerNotification("Aucun emploi du temps n'a encore été généré. Veuillez d'abord configurer vos classes et générer l'emploi du temps à l'Étape 5.", "error");
       return;
     }
     setIsExecutingAi(true);
@@ -1771,8 +1867,8 @@ Pour débloquer votre formule :
         setUnscheduled(updatedUnscheduled);
 
         // Recalculate score
-        const totalTarget = classes.reduce((sum, c) => sum + c.assignments.reduce((s, a) => s + a.hoursPerWeek, 0), 0);
-        const newScore = totalTarget > 0 ? Math.round((updatedTable.length / totalTarget) * 100) : 100;
+        const totalTarget = classes.reduce((sum, c) => sum + c.assignments.reduce((s, a) => s + (a.hoursPerWeek || 0), 0), 0);
+        const newScore = (totalTarget > 0 && updatedTable.length > 0) ? Math.min(100, Math.round((updatedTable.length / totalTarget) * 100)) : 0;
         setGenerationScore(newScore);
 
         if (currentUserId && !isLoadingDb) {
@@ -1852,8 +1948,8 @@ Pour débloquer votre formule :
       setTimetable(updatedTable);
       setUnscheduled(updatedUnscheduled);
 
-      const totalTarget = classes.reduce((sum, c) => sum + c.assignments.reduce((s, a) => s + a.hoursPerWeek, 0), 0);
-      const newScore = totalTarget > 0 ? Math.round((updatedTable.length / totalTarget) * 100) : 100;
+      const totalTarget = classes.reduce((sum, c) => sum + c.assignments.reduce((s, a) => s + (a.hoursPerWeek || 0), 0), 0);
+      const newScore = (totalTarget > 0 && updatedTable.length > 0) ? Math.min(100, Math.round((updatedTable.length / totalTarget) * 100)) : 0;
       setGenerationScore(newScore);
 
       if (currentUserId && !isLoadingDb) {
@@ -2461,6 +2557,24 @@ Pour débloquer votre formule :
             dbUpdateClass(c.id, { assignments: c.assignments.filter(a => a.subjectId !== id) });
           }
         });
+
+        // Mettre à jour ou supprimer l'emploi du temps en base
+        const totalTarget = updatedCls.reduce((sum, c) => sum + c.assignments.reduce((s, a) => s + (a.hoursPerWeek || 0), 0), 0);
+        if (updatedTable.length === 0 || totalTarget === 0 || updatedCls.length === 0) {
+          await dbDeleteAllTimetables(currentUserId);
+          setGenerationScore(0);
+        } else {
+          const newScore = Math.min(100, Math.round((updatedTable.length / totalTarget) * 100));
+          setGenerationScore(newScore);
+          await dbSaveTimetable(
+            currentUserId,
+            `Mise à jour suite à suppression matière - ${new Date().toLocaleDateString('fr-FR')}`,
+            updatedTable,
+            unscheduled,
+            newScore,
+            { subjects: updatedSubs, teachers: updatedTeachs, classes: updatedCls, activeDays, totalSlots }
+          );
+        }
       }
 
       triggerNotification("Matière supprimée de la base de données.", "info");
@@ -2596,6 +2710,24 @@ Pour débloquer votre formule :
             dbUpdateClass(c.id, { assignments: c.assignments.filter(a => a.teacherId !== id) });
           }
         });
+
+        // Mettre à jour ou supprimer l'emploi du temps en base
+        const totalTarget = updatedCls.reduce((sum, c) => sum + c.assignments.reduce((s, a) => s + (a.hoursPerWeek || 0), 0), 0);
+        if (updatedTable.length === 0 || totalTarget === 0 || updatedCls.length === 0 || updatedTeachs.length === 0) {
+          await dbDeleteAllTimetables(currentUserId);
+          setGenerationScore(0);
+        } else {
+          const newScore = Math.min(100, Math.round((updatedTable.length / totalTarget) * 100));
+          setGenerationScore(newScore);
+          await dbSaveTimetable(
+            currentUserId,
+            `Mise à jour suite à suppression enseignant - ${new Date().toLocaleDateString('fr-FR')}`,
+            updatedTable,
+            unscheduled,
+            newScore,
+            { subjects, teachers: updatedTeachs, classes: updatedCls, activeDays, totalSlots }
+          );
+        }
       }
 
       triggerNotification("Fiche enseignant supprimée de la base.", "info");
@@ -2924,6 +3056,25 @@ Pour débloquer votre formule :
       setClasses(updated);
       setTimetable(updatedTable);
 
+      if (currentUserId) {
+        const totalTarget = updated.reduce((sum, c) => sum + c.assignments.reduce((s, a) => s + (a.hoursPerWeek || 0), 0), 0);
+        if (updatedTable.length === 0 || totalTarget === 0 || updated.length === 0) {
+          await dbDeleteAllTimetables(currentUserId);
+          setGenerationScore(0);
+        } else {
+          const newScore = Math.min(100, Math.round((updatedTable.length / totalTarget) * 100));
+          setGenerationScore(newScore);
+          await dbSaveTimetable(
+            currentUserId,
+            `Mise à jour suite à suppression classe - ${new Date().toLocaleDateString('fr-FR')}`,
+            updatedTable,
+            unscheduled,
+            newScore,
+            { subjects, teachers, classes: updated, activeDays, totalSlots }
+          );
+        }
+      }
+
       triggerNotification("Fiche classe supprimée de la base de données.", "info");
     }
   };
@@ -2967,17 +3118,25 @@ Pour débloquer votre formule :
 
     const counts: { [subjectId: string]: number } = {};
     timetable.forEach(entry => {
-      counts[entry.subjectId] = (counts[entry.subjectId] || 0) + 1;
+      if (entry && entry.subjectId) {
+        counts[entry.subjectId] = (counts[entry.subjectId] || 0) + 1;
+      }
     });
-    const subjectHoursData = Object.entries(counts).map(([subId, hours]) => {
-      const subName = subjects.find(s => s.id === subId)?.name || subId;
-      return {
-        name: subName,
-        value: hours
-      };
-    }).sort((a, b) => b.value - a.value);
+    const subjectHoursData = Object.entries(counts)
+      .map(([subId, hours]) => {
+        const found = subjects.find(s => s.id === subId);
+        if (!found) return null; // Ne jamais afficher d'identifiant UUID brut
+        return {
+          name: found.name,
+          value: hours
+        };
+      })
+      .filter((item): item is { name: string; value: number } => item !== null)
+      .sort((a, b) => b.value - a.value);
 
-    const topSubject = subjectHoursData[0] || { name: "Aucune", value: 0 };
+    const topSubject = (subjectHoursData.length > 0 && subjectHoursData[0].value > 0)
+      ? subjectHoursData[0]
+      : { name: "Aucune", value: 0 };
 
     const classChartData = statistics.classStats.map(c => ({
       name: c.name,
@@ -6724,12 +6883,14 @@ Pour débloquer votre formule :
                             <BookOpen className="w-16 h-16" />
                           </div>
                           <p className="text-sm font-medium z-10 relative !text-white">Matière Dominante</p>
-                          <h3 className="text-2xl font-bold z-10 relative truncate max-w-[150px] overflow-hidden whitespace-nowrap block !text-white" title={topSubject.name}>{topSubject.name || '-'}</h3>
+                          <h3 className="text-2xl font-bold z-10 relative truncate max-w-[150px] overflow-hidden whitespace-nowrap block !text-white" title={topSubject.value > 0 ? topSubject.name : '—'}>
+                            {topSubject.value > 0 ? topSubject.name : '—'}
+                          </h3>
                           <div className="flex items-center justify-between text-[11px] z-10 relative opacity-100 !text-white mt-1 font-medium">
-                            <span>{topSubject.value}h hebdo</span>
+                            <span>{topSubject.value > 0 ? `${topSubject.value}h hebdo` : '0h planifiée'}</span>
                           </div>
                           <div className="absolute bottom-0 left-0 w-full h-1 bg-white/20">
-                            <div className="h-full bg-white/50 rounded-r-full" style={{ width: `${totalPlannedHours > 0 ? (topSubject.value / totalPlannedHours) * 100 : 0}%` }} />
+                            <div className="h-full bg-white/50 rounded-r-full" style={{ width: `${(totalPlannedHours > 0 && topSubject.value > 0) ? (topSubject.value / totalPlannedHours) * 100 : 0}%` }} />
                           </div>
                         </div>
 
@@ -6898,57 +7059,67 @@ Pour débloquer votre formule :
                           </div>
 
                           <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center">
-                            {/* The Donut Chart */}
-                            <div className="sm:col-span-5 h-44 flex justify-center relative">
-                              <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                  <Pie
-                                    data={subjectHoursData}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={45}
-                                    outerRadius={62}
-                                    paddingAngle={3}
-                                    dataKey="value"
-                                  >
-                                    {subjectHoursData.map((entry, index) => (
-                                      <Cell key={`cell-pie-${index}`} fill={SUBJECT_COLORS[index % SUBJECT_COLORS.length]} />
-                                    ))}
-                                  </Pie>
-                                  <Tooltip formatter={(value) => [`${value}h`, 'Volume Total']} />
-                                </PieChart>
-                              </ResponsiveContainer>
-                              {/* Centered Total label inside Donut */}
-                              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                <span className={`text-[10px] uppercase font-bold ${isLight ? 'text-slate-400' : 'text-gray-500'}`}>Total</span>
-                                <span className={`text-base font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>{totalPlannedHours}h</span>
+                            {subjectHoursData.length === 0 || totalPlannedHours === 0 ? (
+                              <div className="sm:col-span-12 py-10 text-center space-y-2">
+                                <BookOpen className="w-8 h-8 mx-auto text-amber-500/40" />
+                                <p className={`text-xs font-semibold ${isLight ? 'text-slate-600' : 'text-gray-300'}`}>
+                                  Aucun cours planifié pour le moment.
+                                </p>
+                                <p className={`text-[11px] ${isLight ? 'text-slate-400' : 'text-gray-500'}`}>
+                                  Renseignez vos classes et générez l&apos;emploi du temps à l&apos;Étape 5 pour afficher la répartition horaire.
+                                </p>
                               </div>
-                            </div>
+                            ) : (
+                              <>
+                                {/* The Donut Chart */}
+                                <div className="sm:col-span-5 h-44 flex justify-center relative">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                      <Pie
+                                        data={subjectHoursData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={45}
+                                        outerRadius={62}
+                                        paddingAngle={3}
+                                        dataKey="value"
+                                      >
+                                        {subjectHoursData.map((entry, index) => (
+                                          <Cell key={`cell-pie-${index}`} fill={SUBJECT_COLORS[index % SUBJECT_COLORS.length]} />
+                                        ))}
+                                      </Pie>
+                                      <Tooltip formatter={(value) => [`${value}h`, 'Volume Total']} />
+                                    </PieChart>
+                                  </ResponsiveContainer>
+                                  {/* Centered Total label inside Donut */}
+                                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                    <span className={`text-[10px] uppercase font-bold ${isLight ? 'text-slate-400' : 'text-gray-500'}`}>Total</span>
+                                    <span className={`text-base font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>{totalPlannedHours}h</span>
+                                  </div>
+                                </div>
 
-                            {/* Custom visual legend */}
-                            <div className="sm:col-span-7 space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
-                              {subjectHoursData.length === 0 ? (
-                                <p className={`text-xs italic ${isLight ? 'text-slate-500 font-normal' : 'text-gray-500'}`}>Aucune matière planifiée.</p>
-                              ) : (
-                                subjectHoursData.map((s, idx) => {
-                                  const percent = totalPlannedHours > 0 ? Math.round((s.value / totalPlannedHours) * 100) : 0;
-                                  return (
-                                    <div key={idx} className="flex items-center justify-between text-xs font-medium">
-                                      <div className="flex items-center gap-1.5 truncate max-w-[120px]">
-                                        <span
-                                          className="w-2.5 h-2.5 rounded-full shrink-0"
-                                          style={{ backgroundColor: SUBJECT_COLORS[idx % SUBJECT_COLORS.length] }}
-                                        />
-                                        <span className={`truncate ${isLight ? 'text-slate-700' : 'text-gray-300'}`} title={s.name}>{s.name}</span>
+                                {/* Custom visual legend */}
+                                <div className="sm:col-span-7 space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                                  {subjectHoursData.map((s, idx) => {
+                                    const percent = totalPlannedHours > 0 ? Math.round((s.value / totalPlannedHours) * 100) : 0;
+                                    return (
+                                      <div key={idx} className="flex items-center justify-between text-xs font-medium">
+                                        <div className="flex items-center gap-1.5 truncate max-w-[120px]">
+                                          <span
+                                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                                            style={{ backgroundColor: SUBJECT_COLORS[idx % SUBJECT_COLORS.length] }}
+                                          />
+                                          <span className={`truncate ${isLight ? 'text-slate-700' : 'text-gray-300'}`} title={s.name}>{s.name}</span>
+                                        </div>
+                                        <span className={`font-mono text-[10px] ${isLight ? 'text-slate-500' : 'text-gray-500'}`}>
+                                          {s.value}h ({percent}%)
+                                        </span>
                                       </div>
-                                      <span className={`font-mono text-[10px] ${isLight ? 'text-slate-500' : 'text-gray-500'}`}>
-                                        {s.value}h ({percent}%)
-                                      </span>
-                                    </div>
-                                  );
-                                })
-                              )}
-                            </div>
+                                    );
+                                  })}
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
 
@@ -7073,12 +7244,18 @@ Pour débloquer votre formule :
                             openUpgradeModal("Conseiller Directeur IA Gemini Pro", "Les requêtes et analyses automatisées par intelligence artificielle nécessitent la formule Premium ou School.");
                             return;
                           }
+                          if (timetable.length === 0 || classes.length === 0) {
+                            triggerNotification("Aucun emploi du temps n'a encore été généré. Veuillez d'abord configurer vos classes et générer l'emploi du temps à l'Étape 5.", "error");
+                            return;
+                          }
                           handleQueryAiSuggestions();
                         }}
-                        disabled={isLoadingAi || isExecutingAi}
-                        title={!currentPlan.features.geminiAI ? "Nécessite un plan supérieur" : "Interroger l'Assistant Directeur"}
+                        disabled={isLoadingAi || isExecutingAi || timetable.length === 0}
+                        title={!currentPlan.features.geminiAI ? "Nécessite un plan supérieur" : (timetable.length === 0 || classes.length === 0) ? "Générez d'abord l'emploi du temps à l'Étape 5" : "Interroger l'Assistant Directeur"}
                         className={`px-5 py-3 rounded-xl font-semibold text-sm shadow-lg transition-all flex items-center gap-2 cursor-pointer shrink-0 ${!currentPlan.features.geminiAI
                             ? 'bg-slate-800 text-amber-300 border border-amber-500/40 shadow-none'
+                            : (timetable.length === 0 || classes.length === 0)
+                            ? 'bg-slate-800 text-gray-400 border border-white/10 cursor-not-allowed opacity-80'
                             : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-emerald-950/50 hover:-translate-y-0.5 disabled:opacity-50'
                           }`}
                       >
@@ -7090,7 +7267,7 @@ Pour débloquer votre formule :
                         ) : (
                           <>
                             {isLoadingAi ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-                            <span>{isLoadingAi ? "Assistant en cours de réflexion..." : "Interroger l'Assistant Directeur"}</span>
+                            <span>{isLoadingAi ? "Assistant en cours de réflexion..." : (timetable.length === 0 || classes.length === 0) ? "Emploi du temps requis" : "Interroger l'Assistant Directeur"}</span>
                           </>
                         )}
                       </button>
@@ -7133,13 +7310,23 @@ Pour débloquer votre formule :
                           )}
                         </div>
                       ) : (
-                        <div className="py-12 text-center max-w-md mx-auto">
-                          <Sparkles className="w-10 h-10 text-emerald-500 mx-auto opacity-40 mb-3 animate-bounce" />
-                          <h4 className="text-white font-bold mb-1">{"Aucune suggestion active"}</h4>
-                          <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
-                            {"Cliquez sur le bouton ci-dessus pour lancer une analyse approfondie de l'emploi du temps actuel par Gemini."}
-                          </p>
-                        </div>
+                        timetable.length === 0 || classes.length === 0 ? (
+                          <div className="py-10 text-center max-w-lg mx-auto space-y-2">
+                            <AlertCircle className="w-10 h-10 text-amber-400/80 mx-auto mb-2" />
+                            <h4 className={`font-bold text-sm ${isLight ? 'text-slate-800' : 'text-white'}`}>{"Données réelles requises pour l'IA"}</h4>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600' : 'text-gray-400'}`}>
+                              {"L'assistant IA de diagnostic doit impérativement se baser sur un emploi du temps généré. Veuillez configurer vos classes et enseignants, puis générer l'emploi du temps à l'Étape 5 pour débloquer les analyses réelles."}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="py-12 text-center max-w-md mx-auto">
+                            <Sparkles className="w-10 h-10 text-emerald-500 mx-auto opacity-40 mb-3 animate-bounce" />
+                            <h4 className={`font-bold mb-1 ${isLight ? 'text-slate-800' : 'text-white'}`}>{"Aucune suggestion active"}</h4>
+                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
+                              {"Cliquez sur le bouton ci-dessus pour lancer une analyse approfondie de l'emploi du temps actuel par Gemini."}
+                            </p>
+                          </div>
+                        )
                       )}
                     </div>
 
@@ -7162,11 +7349,13 @@ Pour débloquer votre formule :
                           placeholder={
                             !currentPlan.features.geminiAI
                               ? "Fonctionnalité d'analyse de contraintes IA verrouillée. Veuillez passer au plan Premium ou School."
-                              : 'Exemple : "M. Diongue ne doit absolument pas travailler le vendredi après-midi, déplacez toutes ses sessions du vendredi vers des créneaux libres des autres jours sans enfreindre les autres contraintes."'
+                              : (timetable.length === 0 || classes.length === 0)
+                                ? "Veuillez d'abord configurer vos classes et générer l'emploi du temps à l'Étape 5 pour soumettre une contrainte ou analyser un problème."
+                                : 'Exemple : "M. Diongue ne doit absolument pas travailler le vendredi après-midi, déplacez toutes ses sessions du vendredi vers des créneaux libres des autres jours sans enfreindre les autres contraintes."'
                           }
                           rows={3}
                           className="w-full bg-slate-900/20 bg-slate-950/45 border border-white/10 rounded-xl p-3.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors resize-none leading-relaxed"
-                          disabled={isAnalyzingProblem || isExecutingAi || !currentPlan.features.geminiAI}
+                          disabled={isAnalyzingProblem || isExecutingAi || !currentPlan.features.geminiAI || timetable.length === 0 || classes.length === 0}
                         />
 
                         <div className="flex justify-end gap-3">
@@ -7186,12 +7375,22 @@ Pour débloquer votre formule :
                                 openUpgradeModal("Assistant Directeur IA Gemini Pro", "Le diagnostic chirurgical et la résolution automatique des contraintes par IA nécessitent la formule Premium ou School.");
                                 return;
                               }
+                              if (timetable.length === 0 || classes.length === 0) {
+                                triggerNotification("Aucun emploi du temps n'a encore été généré. Veuillez d'abord configurer vos classes et générer l'emploi du temps à l'Étape 5.", "error");
+                                return;
+                              }
                               handleAnalyzeProblem();
                             }}
-                            disabled={isAnalyzingProblem || isExecutingAi || (!problemQuery.trim() && currentPlan.features.geminiAI)}
-                            title={!currentPlan.features.geminiAI ? "Nécessite un plan supérieur" : "Diagnostiquer & Suggérer une solution"}
-                            className={`px-5 py-2.5 rounded-xl text-xs font-semibold tracking-wide shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-2 cursor-pointer ${!currentPlan.features.geminiAI
-                                ? 'bg-slate-800 text-amber-300 border border-amber-500/40 shadow-none'
+                            disabled={isAnalyzingProblem || isExecutingAi || (!problemQuery.trim() && currentPlan.features.geminiAI) || timetable.length === 0 || classes.length === 0}
+                            title={
+                              !currentPlan.features.geminiAI
+                                ? "Nécessite un plan supérieur"
+                                : (timetable.length === 0 || classes.length === 0)
+                                  ? "Générez un emploi du temps à l'Étape 5 pour activer le diagnostic"
+                                  : "Diagnostiquer & Suggérer une solution"
+                            }
+                            className={`px-5 py-2.5 rounded-xl text-xs font-semibold tracking-wide shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-2 cursor-pointer ${!currentPlan.features.geminiAI || timetable.length === 0 || classes.length === 0
+                                ? 'bg-slate-800 text-gray-400 border border-white/10 shadow-none cursor-not-allowed'
                                 : 'bg-indigo-600 hover:bg-indigo-500 text-white'
                               }`}
                           >
@@ -7199,6 +7398,11 @@ Pour débloquer votre formule :
                               <>
                                 <Lock className="w-4 h-4 text-amber-400" />
                                 <span>Résolution IA verrouillée (Nécessite un plan supérieur)</span>
+                              </>
+                            ) : (timetable.length === 0 || classes.length === 0) ? (
+                              <>
+                                <AlertCircle className="w-4 h-4 text-amber-400" />
+                                <span>Générer un emploi du temps requis</span>
                               </>
                             ) : (
                               <>

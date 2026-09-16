@@ -27,39 +27,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Local fallback recommendations generator if GEMINI_API_KEY is not working or not configured,
-    // ensuring the app is always functional and helpful.
-    const hasApiKey = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY';
+    // L'IA doit impérativement se baser sur un emploi du temps réel généré
+    if (!Array.isArray(timetable) || timetable.length === 0 || classes.length === 0) {
+      return NextResponse.json(
+        { error: "Aucun emploi du temps n'a encore été généré. Veuillez d'abord configurer vos matières, enseignants et classes, puis générer votre emploi du temps à l'Étape 5 pour obtenir un diagnostic et des conseils réels." },
+        { status: 400 }
+      );
+    }
 
-    const localSummarySuggestions = (): string => {
-      let advice = `### 💡 Analyse Locale de l'Assistant IziSchool AI\n\n`;
-      
-      if (unscheduled && unscheduled.length > 0) {
-        advice += `⚠️ **Alerte de charge :** Il y a **${unscheduled.length} heures** non planifiées dans l'emploi du temps actuel. \n`;
-        advice += `- Recommandation : Essayez d'alléger les quotas d'heures ou d'ouvrir des plages horaires pour les classes suivantes : *${Array.from(new Set(unscheduled.map((u: any) => u.classId))).join(', ')}*.\n\n`;
-      } else {
-        advice += `✨ **Félicitations !** Toutes les heures d'enseignements sont planifiées à 100% sans aucun conflit physique détecté !\n\n`;
-      }
-
-      // Check for teachers fatigue (consecutive hours or spread)
-      advice += `#### 📅 Recommandations d'optimisation :\n`;
-      advice += `1. **Réduire les temps morts :** Les cours d'enseignants s'enchaînent bien. Pour minimiser la fatigue des élèves, préférez regrouper les matières scientifiques (Maths, SPS) en début de matinée.\n`;
-      advice += `2. **Cohérence pédagogique :** Les blocs de 2h ont été priorisés avec succès. Vos enseignants de matières à fort volume horaire disposent de séances continues idéales.\n`;
-      advice += `3. **Équilibre hebdomadaire :** Évitez de placer plus de 6 heures de cours le samedi pour préserver le week-end des équipes pédagogiques.`;
-
-      return advice;
-    };
+    // Vérification de la clé API Gemini
+    const apiKey = process.env.GEMINI_API_KEY;
+    const hasApiKey = apiKey && apiKey.trim() !== '' && apiKey !== 'MY_GEMINI_API_KEY';
 
     if (!hasApiKey) {
-      // Return local suggestions gracefully
       return NextResponse.json({
-        text: localSummarySuggestions() + "\n\n*(Note: Configurez votre clé API Gemini dans le panneau Settings > Secrets de AI Studio pour des suggestions personnalisées en temps réel par notre grand modèle de langage).* "
+        text: "Intelligence non disponible pour le moment, veillez réessayer ultérieurement."
       });
     }
 
     // Initialize Gemini SDK correctly
     const ai = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
+      apiKey: apiKey,
       httpOptions: {
         headers: {
           'User-Agent': 'aistudio-build',
@@ -68,20 +56,20 @@ export async function POST(req: NextRequest) {
     });
 
     const prompt = `
-En tant qu'expert conseiller pédagogique et architecte d'emplois du temps pour le SaaS scolaire "IziSchool AI", analyse ces données scolaires et suggère des optimisations intelligentes pour l'emploi du temps.
-Réduis de manière proactive les temps morts (trous dans la journée) pour les enseignants et les classes.
+En tant qu'expert conseiller pédagogique et architecte d'emplois du temps pour le SaaS scolaire "IziSchool AI", analyse ces données scolaires réelles et suggère des optimisations intelligentes pour l'emploi du temps généré.
+Base ton analyse EXCLUSIVEMENT sur les séances réelles déjà planifiées et les contraintes effectives. Ne formule aucune hypothèse sans données réelles.
 
-DONNÉES :
-- Matières existantes : ${JSON.stringify(subjects)}
-- Enseignants et quotas d'heures hebdomadaires : ${JSON.stringify(teachers.map((t: any) => ({ name: t.name, quota: t.weeklyQuota, subjects: t.subjectIds, unavailabilitiesCount: t.unavailability?.length || 0 })))}
-- Classes et assignations de matières/profs : ${JSON.stringify(classes.map((c: any) => ({ name: c.name, assignments: c.assignments })))}
-- Status actuel de la planification : ${timetable.length} séances planifiées.
-- Éléments non planifiés (conflits insolubles) : ${JSON.stringify(unscheduled)}
+DONNÉES RÉELLES DE L'EMPLOI DU TEMPS :
+- Matières existantes : ${JSON.stringify(subjects.map((s: any) => s.name))}
+- Enseignants et quotas réels : ${JSON.stringify(teachers.map((t: any) => ({ name: t.name, quota: t.weeklyQuota, unavailabilitiesCount: t.unavailability?.length || 0 })))}
+- Classes et maquettes réelles : ${JSON.stringify(classes.map((c: any) => ({ name: c.name, targetHours: (c.assignments || []).reduce((sum: number, a: any) => sum + (a.hoursPerWeek || 0), 0) })))}
+- Séances actuellement planifiées : ${timetable.length} cours effectifs.
+- Séances non planifiées / conflits : ${JSON.stringify(unscheduled || [])}
 
 Règles de style :
-Donne ton avis et tes suggestions concises au chef d'établissement sous forme de liste Markdown élégante et structurée.
-Parle en français. Sois très précis, professionnel et direct dans tes conseils d'optimisation des flux d'élèves et de préservation du bien-être des profs.
-Inclut un plan d'action de 3 points clés réels basé sur les données ci-dessus.
+1. Donne ton avis et tes suggestions concises au chef d'établissement sous forme de liste Markdown élégante et structurée.
+2. Parle en français. Sois très précis, professionnel et direct dans tes conseils d'optimisation des flux d'élèves et de préservation du bien-être des profs.
+3. Inclut un plan d'action de 3 points clés réels basé strictement sur les données ci-dessus.
 `;
 
     // Modern SDK call
@@ -90,14 +78,13 @@ Inclut un plan d'action de 3 points clés réels basé sur les données ci-dessu
       contents: prompt,
     });
 
-    const adviceText = response.text || "Aucune recommandation générée pour le moment.";
+    const adviceText = response.text || "Intelligence non disponible pour le moment, veillez réessayer ultérieurement.";
 
     return NextResponse.json({ text: adviceText });
   } catch (error: any) {
     console.error('Error generating AI suggestions:', error);
-    return NextResponse.json(
-      { error: `Erreur interne API IA: ${error?.message || error}` },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      text: "Intelligence non disponible pour le moment, veillez réessayer ultérieurement."
+    });
   }
 }

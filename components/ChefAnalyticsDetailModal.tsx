@@ -252,6 +252,31 @@ export default function ChefAnalyticsDetailModal({
 
   // --- INTERPRÉTATION STATISTIQUE & DIAGNOSTIC DE DIRECTION ---
   const getChefInterpretation = useMemo(() => {
+    // Vérification état initial : aucune analyse sans données réelles
+    const hasData = (chartType === 'teachers' && safeTeachers.length > 0) ||
+                    (chartType === 'classes' && safeClasses.length > 0) ||
+                    (chartType === 'subjects' && safeSubjects.length > 0) ||
+                    (chartType === 'weekly_load' && safeTimetable.length > 0 && safeClasses.length > 0);
+
+    if (!hasData) {
+      return {
+        title: "En attente de données réelles",
+        summary: "Aucune donnée réelle n'est actuellement planifiée pour cette section. Veuillez configurer vos matières, professeurs et classes à l'Étape 5 pour afficher le diagnostic.",
+        kpis: [
+          { label: "État", value: "Initial", hint: "Données requises", status: 'neutral' },
+          { label: "Progression", value: "0%", hint: "Grille non calculée", status: 'neutral' }
+        ],
+        highlights: [
+          "Aucun emploi du temps actif calculé en base de données.",
+          "Les indicateurs se mettront à jour automatiquement dès la première génération."
+        ],
+        recommendations: [
+          "Renseignez les fiches de vos matières, enseignants et classes dans les étapes précédentes.",
+          "Générez ensuite l'emploi du temps à l'Étape 5 pour visualiser les analyses pédagogiques."
+        ]
+      };
+    }
+
     if (chartType === 'teachers') {
       const totalContract = safeTeachers.reduce((acc, t) => acc + Number(t?.weeklyQuota || 18), 0);
       const totalAssigned = teacherStats.reduce((acc, t) => acc + (t?.assignedHours || 0), 0);
@@ -1776,7 +1801,9 @@ export default function ChefAnalyticsDetailModal({
                       <span className="text-emerald-500 font-mono">{d.slotsCount} cours programmés</span>
                     </div>
                     <div className={`text-[11px] ${isLight ? "text-gray-500" : "text-gray-400"}`}>
-                      Capacité totale établissement : {d.capacity} créneaux
+                      {safeClasses.length > 0
+                        ? `Capacité totale établissement : ${d.capacity} créneaux`
+                        : "Aucune classe active (Capacité non définie)"}
                     </div>
                   </div>
                 ))}

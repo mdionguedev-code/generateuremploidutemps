@@ -1087,7 +1087,9 @@ export function generateTimetable(
     0
   );
   const scheduledHours = timetable.length;
-  const score = totalTargetHours > 0 ? Math.round((scheduledHours / totalTargetHours) * 100) : 100;
+  const score = (totalTargetHours > 0 && scheduledHours > 0)
+    ? Math.min(100, Math.round((scheduledHours / totalTargetHours) * 100))
+    : 0;
 
   return {
     timetable,

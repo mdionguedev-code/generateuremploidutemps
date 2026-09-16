@@ -147,10 +147,55 @@ export async function getEstablishmentData(requestedUserId: string) {
 
   if (dbTimetables && dbTimetables.length > 0) {
     const tableData = dbTimetables[0].data;
-    if (tableData?.result?.timetable) {
-      savedTimetable = tableData.result.timetable;
-      savedUnscheduled = tableData.result.unscheduled || [];
-      savedScore = tableData.result.score || 0;
+    if (tableData?.result?.timetable && Array.isArray(tableData.result.timetable)) {
+      // Si l'utilisateur n'a aucune classe, aucune matière ou aucun enseignant, l'emploi du temps est obsolète
+      if (classes.length === 0 || subjects.length === 0 || teachers.length === 0) {
+        savedTimetable = [];
+        savedUnscheduled = [];
+        savedScore = 0;
+        // Supprimer l'enregistrement orphelin en base
+        supabase.from('timetables').delete().eq('user_id', userId).then(() => {});
+      } else {
+        const subjectIdSet = new Set(subjects.map(s => s.id));
+        const teacherIdSet = new Set(teachers.map(t => t.id));
+        const classIdSet = new Set(classes.map(c => c.id));
+
+        // Filtrer strictement les séances orphelines dont la classe, la matière ou le prof a été supprimé
+        const validEntries = tableData.result.timetable.filter((entry: any) =>
+          entry &&
+          subjectIdSet.has(entry.subjectId) &&
+          teacherIdSet.has(entry.teacherId) &&
+          classIdSet.has(entry.classId)
+        );
+
+        if (validEntries.length === 0) {
+          savedTimetable = [];
+          savedUnscheduled = [];
+          savedScore = 0;
+          supabase.from('timetables').delete().eq('user_id', userId).then(() => {});
+        } else {
+          savedTimetable = validEntries;
+          savedUnscheduled = Array.isArray(tableData.result.unscheduled) ? tableData.result.unscheduled : [];
+
+          // Calculer le taux de remplissage réel basé sur les besoins réels des classes existantes
+          const totalTargetHours = classes.reduce((sum, c) => sum + (c.assignments || []).reduce((s, a) => s + (a.hoursPerWeek || 0), 0), 0);
+          savedScore = totalTargetHours > 0 ? Math.min(100, Math.round((validEntries.length / totalTargetHours) * 100)) : 0;
+
+          // Si des séances ont été nettoyées, mettre à jour la base
+          if (validEntries.length !== tableData.result.timetable.length) {
+            supabase.from('timetables').update({
+              data: {
+                ...tableData,
+                result: {
+                  ...tableData.result,
+                  timetable: validEntries,
+                  score: savedScore
+                }
+              }
+            }).eq('id', dbTimetables[0].id).then(() => {});
+          }
+        }
+      }
     }
   }
 
@@ -365,6 +410,15 @@ export async function dbSaveTimetable(
       }
     }
   });
+  return !error;
+}
+
+export async function dbDeleteAllTimetables(requestedUserId: string): Promise<boolean> {
+  const supabase = createClient();
+  const userId = await resolveAuthorizedUserId(requestedUserId);
+  if (!userId) return false;
+
+  const { error } = await supabase.from('timetables').delete().eq('user_id', userId);
   return !error;
 }
 

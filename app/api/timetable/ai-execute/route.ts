@@ -29,6 +29,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // L'exécution IA doit impérativement se baser sur un emploi du temps réel
+    if (!Array.isArray(timetable) || timetable.length === 0 || classes.length === 0) {
+      return NextResponse.json(
+        { error: "Impossible d'appliquer des modifications IA sans emploi du temps généré." },
+        { status: 400 }
+      );
+    }
+
     const hasApiKey = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY';
     const rawTextSource = action === 'apply-suggestions' ? (suggestions || '') : (problem || '');
     const activeTextSource = String(rawTextSource).replace(/[`$]/g, '').slice(0, 500);
@@ -270,7 +278,7 @@ Retournez un objet JSON contenant :
     });
     
     const scheduledHours = finalTimetable.length;
-    const score = totalTargetHours > 0 ? Math.round((scheduledHours / totalTargetHours) * 100) : 100;
+    const score = (totalTargetHours > 0 && scheduledHours > 0) ? Math.round((scheduledHours / totalTargetHours) * 100) : 0;
 
     return NextResponse.json({
       timetable: finalTimetable,
