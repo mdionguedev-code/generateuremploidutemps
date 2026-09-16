@@ -300,8 +300,18 @@ export default function LicensePurchaseModal({
           <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute bottom-0 left-0 w-60 h-60 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
 
+          {/* Bouton de Fermeture Rouge Standard à l'extrême droite */}
+          <button
+            type="button"
+            onClick={handleClose}
+            className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer z-30 shadow-md flex items-center justify-center hover:scale-105 active:scale-95"
+            title="Fermer la fenêtre"
+          >
+            <X className="w-4.5 h-4.5 stroke-[2.5]" />
+          </button>
+
           {/* Header */}
-          <div className="flex items-center justify-between pb-3 border-b border-white/10 relative z-10 shrink-0">
+          <div className="flex items-center justify-between pb-3 border-b border-white/10 relative z-10 shrink-0 pr-12">
             <div className="flex items-center gap-2.5">
               <span className="p-2 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white shadow-lg shrink-0">
                 <CreditCard className="w-4.5 h-4.5" />
@@ -318,13 +328,6 @@ export default function LicensePurchaseModal({
                 </p>
               </div>
             </div>
-            <button
-              onClick={handleClose}
-              className="p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer shadow-md flex items-center justify-center shrink-0"
-              title="Fermer la fenêtre"
-            >
-              <X className="w-4.5 h-4.5 stroke-[2.5]" />
-            </button>
           </div>
 
           {/* Stepper progress indicator */}

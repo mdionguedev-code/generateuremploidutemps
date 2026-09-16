@@ -191,8 +191,18 @@ export default function ClientSubscriptionModal({
       >
         <div className={`absolute top-0 right-0 w-80 h-80 rounded-full blur-3xl pointer-events-none ${isLight ? "bg-indigo-500/5 opacity-50" : "bg-indigo-500/10"}`} />
 
+        {/* Bouton de Fermeture Rouge Standard à l'extrême droite */}
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer z-30 shadow-md flex items-center justify-center hover:scale-105 active:scale-95"
+          title="Fermer la fenêtre"
+        >
+          <X className="w-4.5 h-4.5 stroke-[2.5]" />
+        </button>
+
         {/* MODAL HEADER */}
-        <div className={`flex items-center justify-between pb-3.5 border-b relative z-10 shrink-0 ${isLight ? "border-gray-200/80" : "border-white/10"}`}>
+        <div className={`flex items-center justify-between pb-3.5 border-b relative z-10 shrink-0 pr-12 ${isLight ? "border-gray-200/80" : "border-white/10"}`}>
           <div className="flex items-center gap-3">
             <span className={`p-2.5 rounded-2xl flex items-center justify-center shadow-md shrink-0 ${isLight ? "bg-indigo-600 text-white" : "bg-gradient-to-tr from-indigo-500 to-purple-600 text-white"}`}>
               <Shield className="w-5 h-5" />
@@ -209,14 +219,6 @@ export default function ClientSubscriptionModal({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer shadow-md flex items-center justify-center shrink-0"
-            title="Fermer la fenêtre"
-          >
-            <X className="w-4.5 h-4.5 stroke-[2.5]" />
-          </button>
         </div>
 
         {/* MODAL NAVIGATION TABS */}

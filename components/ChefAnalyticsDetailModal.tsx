@@ -1888,18 +1888,21 @@ export default function ChefAnalyticsDetailModal({
       {isUpgradePromptOpen && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in">
           <div className={`border rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 relative ${isLight ? "bg-white border-amber-300 text-gray-900" : "bg-slate-900 border-amber-500/30 text-white"}`}>
-            <div className={`flex items-center justify-between border-b pb-3 ${isLight ? "border-gray-200" : "border-white/10"}`}>
+            {/* Bouton de Fermeture Rouge Standard à l'extrême droite */}
+            <button
+              type="button"
+              onClick={() => setIsUpgradePromptOpen(false)}
+              className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer z-30 shadow-md flex items-center justify-center hover:scale-105 active:scale-95"
+              title="Fermer"
+            >
+              <X className="w-4.5 h-4.5 stroke-[2.5]" />
+            </button>
+
+            <div className={`flex items-center justify-between border-b pb-3 pr-10 ${isLight ? "border-gray-200" : "border-white/10"}`}>
               <div className="flex items-center gap-2 text-amber-500 font-bold text-sm">
                 <Crown className="w-5 h-5 text-amber-500" />
                 <span>Fonctionnalité Premium &amp; School</span>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsUpgradePromptOpen(false)}
-                className={`p-1 rounded-lg ${isLight ? "bg-gray-100 text-gray-500 hover:text-gray-900" : "bg-white/5 text-gray-400 hover:text-white"}`}
-              >
-                <X className="w-4 h-4" />
-              </button>
             </div>
 
             <div className={`space-y-3 text-xs leading-relaxed ${isLight ? "text-gray-700" : "text-gray-300"}`}>

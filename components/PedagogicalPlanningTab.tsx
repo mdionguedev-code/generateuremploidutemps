@@ -31,6 +31,7 @@ import {
 import { Teacher, ClassGroup, Subject, ClassAssignment } from '@/lib/types';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
+import ConfirmModal from '@/components/ConfirmModal';
 
 interface PedagogicalPlanningTabProps {
   teachers: Teacher[];
@@ -157,6 +158,40 @@ export default function PedagogicalPlanningTab({
   // Feedback Toasts
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);
+
+  // Boite de dialogue de confirmation stylisée (Design Système du Site)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title?: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    variant?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void | Promise<void>;
+  }>({
+    isOpen: false,
+    message: '',
+    onConfirm: () => {}
+  });
+
+  const showConfirm = (options: {
+    title?: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    variant?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void | Promise<void>;
+  }) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: options.title || "Confirmation requise",
+      message: options.message,
+      confirmText: options.confirmText || "Confirmer",
+      cancelText: options.cancelText || "Annuler",
+      variant: options.variant || "danger",
+      onConfirm: options.onConfirm
+    });
+  };
 
   // Initialisation à partir des props
   useEffect(() => {
@@ -633,13 +668,19 @@ export default function PedagogicalPlanningTab({
   };
 
   const handleDeleteSubjectClick = async (sub: Subject) => {
-    if (window.confirm(`Supprimer définitivement la matière "${sub.name}" de la base de données ?`)) {
-      if (onDeleteSubject) {
-        await onDeleteSubject(sub.id, sub.name);
+    showConfirm({
+      title: "Supprimer la matière",
+      message: `Supprimer définitivement la matière "${sub.name}" de la base de données ?`,
+      confirmText: "Supprimer la matière",
+      variant: "danger",
+      onConfirm: async () => {
+        if (onDeleteSubject) {
+          await onDeleteSubject(sub.id, sub.name);
+        }
+        setSuccessToast(`Matière "${sub.name}" supprimée.`);
+        setTimeout(() => setSuccessToast(null), 3000);
       }
-      setSuccessToast(`Matière "${sub.name}" supprimée.`);
-      setTimeout(() => setSuccessToast(null), 3000);
-    }
+    });
   };
 
   const handleDirectAddClass = async (e?: React.FormEvent) => {
@@ -666,24 +707,36 @@ export default function PedagogicalPlanningTab({
   };
 
   const handleDeleteClassClick = async (cls: ClassGroup) => {
-    if (window.confirm(`Supprimer définitivement la classe "${cls.name}" de la base de données ?`)) {
-      if (onDeleteClass) {
-        await onDeleteClass(cls.id, cls.name);
+    showConfirm({
+      title: "Supprimer la classe",
+      message: `Supprimer définitivement la classe "${cls.name}" de la base de données ?`,
+      confirmText: "Supprimer la classe",
+      variant: "danger",
+      onConfirm: async () => {
+        if (onDeleteClass) {
+          await onDeleteClass(cls.id, cls.name);
+        }
+        setSuccessToast(`Classe "${cls.name}" supprimée.`);
+        setTimeout(() => setSuccessToast(null), 3000);
       }
-      setSuccessToast(`Classe "${cls.name}" supprimée.`);
-      setTimeout(() => setSuccessToast(null), 3000);
-    }
+    });
   };
 
   const handleDeleteTeacherClick = async (teacher: Teacher) => {
-    if (window.confirm(`Supprimer définitivement l'enseignant "${teacher.name}" de la base de données ?`)) {
-      if (onDeleteTeacher) {
-        await onDeleteTeacher(teacher.id, teacher.name);
-        setLocalTeachers(prev => prev.filter(t => t.id !== teacher.id));
+    showConfirm({
+      title: "Supprimer l'enseignant",
+      message: `Supprimer définitivement l'enseignant "${teacher.name}" de la base de données ?`,
+      confirmText: "Supprimer l'enseignant",
+      variant: "danger",
+      onConfirm: async () => {
+        if (onDeleteTeacher) {
+          await onDeleteTeacher(teacher.id, teacher.name);
+          setLocalTeachers(prev => prev.filter(t => t.id !== teacher.id));
+        }
+        setSuccessToast(`Enseignant "${teacher.name}" supprimé.`);
+        setTimeout(() => setSuccessToast(null), 3000);
       }
-      setSuccessToast(`Enseignant "${teacher.name}" supprimé.`);
-      setTimeout(() => setSuccessToast(null), 3000);
-    }
+    });
   };
 
   // --- EXPORT PDF DE LA RÉPARTITION (100% SÉCURISÉ) ---
@@ -2099,21 +2152,22 @@ export default function PedagogicalPlanningTab({
       {/* ===================================================================== */}
       {isAddTeacherModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className={`w-full max-w-md p-6 rounded-3xl border space-y-4 shadow-2xl ${
+          <div className={`relative w-full max-w-md p-6 rounded-3xl border space-y-4 shadow-2xl ${
             isLight ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-white/10 text-white"
           }`}>
-            <div className="flex items-center justify-between border-b pb-3 border-white/10">
+            <button
+              type="button"
+              onClick={() => setIsAddTeacherModalOpen(false)}
+              className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer z-30 shadow-md flex items-center justify-center hover:scale-105 active:scale-95"
+              title="Fermer"
+            >
+              <X className="w-4.5 h-4.5 stroke-[2.5]" />
+            </button>
+            <div className="flex items-center justify-between border-b pb-3 border-white/10 pr-10">
               <h3 className="text-sm font-black flex items-center gap-2">
                 <GraduationCap className="w-4 h-4 text-indigo-500" />
                 <span>Ajouter un Enseignant</span>
               </h3>
-              <button
-                type="button"
-                onClick={() => setIsAddTeacherModalOpen(false)}
-                className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
             </div>
 
             <form onSubmit={handleCreateTeacherSubmit} className="space-y-4 text-xs">
@@ -2270,21 +2324,22 @@ export default function PedagogicalPlanningTab({
       {/* ===================================================================== */}
       {isAddClassModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className={`w-full max-w-md p-6 rounded-3xl border space-y-4 shadow-2xl ${
+          <div className={`relative w-full max-w-md p-6 rounded-3xl border space-y-4 shadow-2xl ${
             isLight ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-white/10 text-white"
           }`}>
-            <div className="flex items-center justify-between border-b pb-3 border-white/10">
+            <button
+              type="button"
+              onClick={() => setIsAddClassModalOpen(false)}
+              className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer z-30 shadow-md flex items-center justify-center hover:scale-105 active:scale-95"
+              title="Fermer"
+            >
+              <X className="w-4.5 h-4.5 stroke-[2.5]" />
+            </button>
+            <div className="flex items-center justify-between border-b pb-3 border-white/10 pr-10">
               <h3 className="text-sm font-black flex items-center gap-2">
                 <BookOpen className="w-4 h-4 text-indigo-500" />
                 <span>Créer une Classe / Division</span>
               </h3>
-              <button
-                type="button"
-                onClick={() => setIsAddClassModalOpen(false)}
-                className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
             </div>
 
             <form onSubmit={handleCreateClassSubmit} className="space-y-4 text-xs">
@@ -2329,21 +2384,22 @@ export default function PedagogicalPlanningTab({
       {/* ===================================================================== */}
       {isAddSubjectModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className={`w-full max-w-sm p-6 rounded-3xl border space-y-4 shadow-2xl ${
+          <div className={`relative w-full max-w-sm p-6 rounded-3xl border space-y-4 shadow-2xl ${
             isLight ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-white/10 text-white"
           }`}>
-            <div className="flex items-center justify-between border-b pb-3 border-white/10">
+            <button
+              type="button"
+              onClick={() => setIsAddSubjectModalOpen(false)}
+              className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer z-30 shadow-md flex items-center justify-center hover:scale-105 active:scale-95"
+              title="Fermer"
+            >
+              <X className="w-4.5 h-4.5 stroke-[2.5]" />
+            </button>
+            <div className="flex items-center justify-between border-b pb-3 border-white/10 pr-10">
               <h3 className="text-sm font-black flex items-center gap-2">
                 <Plus className="w-4 h-4 text-indigo-500" />
                 <span>Ajouter une Matière</span>
               </h3>
-              <button
-                type="button"
-                onClick={() => setIsAddSubjectModalOpen(false)}
-                className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
             </div>
 
             <form onSubmit={handleCreateSubjectSubmit} className="space-y-4 text-xs">
@@ -2387,22 +2443,23 @@ export default function PedagogicalPlanningTab({
       {/* MODAL 4: DUPLICATION DE GRILLE HORAIRE VERS D'AUTRES CLASSES           */}
       {/* ===================================================================== */}
       {isDuplicateModalOpen && duplicateSourceClassId && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`w-full max-w-md p-6 rounded-3xl border space-y-4 shadow-2xl ${
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className={`relative w-full max-w-md p-6 rounded-3xl border space-y-4 shadow-2xl ${
             isLight ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-white/10 text-white"
           }`}>
-            <div className="flex items-center justify-between border-b pb-3 border-white/10">
+            <button
+              type="button"
+              onClick={() => setIsDuplicateModalOpen(false)}
+              className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer z-30 shadow-md flex items-center justify-center hover:scale-105 active:scale-95"
+              title="Fermer"
+            >
+              <X className="w-4.5 h-4.5 stroke-[2.5]" />
+            </button>
+            <div className="flex items-center justify-between border-b pb-3 border-white/10 pr-10">
               <h3 className="text-sm font-black flex items-center gap-2">
                 <Copy className="w-4 h-4 text-indigo-500" />
                 <span>Dupliquer la grille horaire</span>
               </h3>
-              <button
-                type="button"
-                onClick={() => setIsDuplicateModalOpen(false)}
-                className="text-slate-400 hover:text-white text-xs font-bold"
-              >
-                ✕
-              </button>
             </div>
 
             <p className="text-xs text-slate-400">
@@ -2461,6 +2518,25 @@ export default function PedagogicalPlanningTab({
           </div>
         </div>
       )}
+
+      {/* BOÎTE DE DIALOGUE DE CONFIRMATION PERSONNALISÉE (DESIGN SYSTÈME DU SITE) */}
+      <ConfirmModal
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={async () => {
+          const action = confirmDialog.onConfirm;
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+          if (action) {
+            await action();
+          }
+        }}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        cancelText={confirmDialog.cancelText}
+        variant={confirmDialog.variant}
+        theme={isLight ? 'light' : 'dark'}
+      />
 
     </div>
   );

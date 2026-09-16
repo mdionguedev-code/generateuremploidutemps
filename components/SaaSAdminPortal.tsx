@@ -55,8 +55,10 @@ import {
   Paperclip,
   RotateCcw,
   AlertOctagon,
-  Trash
+  Trash,
+  X
 } from 'lucide-react';
+import ConfirmModal from './ConfirmModal';
 import {
   dbAdminCreateClientUser,
   dbAdminResetUserPassword,
@@ -167,6 +169,44 @@ export default function SaaSAdminPortal({
     messageText: string;
   } | null>(null);
   const [copiedDeliveryMessage, setCopiedDeliveryMessage] = useState(false);
+
+  // Boîte de dialogue de confirmation stylisée SaaS
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    variant?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
+
+  const showConfirm = (options: {
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    variant?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  }) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: options.title,
+      message: options.message,
+      confirmText: options.confirmText,
+      cancelText: options.cancelText,
+      variant: options.variant || 'danger',
+      onConfirm: () => {
+        options.onConfirm();
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
 
   // New client form state
   const [showDefaultPassword, setShowDefaultPassword] = useState(false);
@@ -588,9 +628,16 @@ export default function SaaSAdminPortal({
   };
 
   const handleDeleteClient = (clientId: string) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer définitivement cet établissement du SaaS ?")) {
-      onUpdateClients(clients.filter(c => c.id !== clientId));
-    }
+    const client = clients.find(c => c.id === clientId);
+    showConfirm({
+      title: "Suppression définitive de l'établissement",
+      message: `Êtes-vous sûr de vouloir supprimer définitivement ${client ? `« ${client.schoolName} »` : "cet établissement"} du SaaS ? Cette action supprimera son compte et révoquera ses accès.`,
+      confirmText: "Supprimer définitivement",
+      variant: "danger",
+      onConfirm: () => {
+        onUpdateClients(clients.filter(c => c.id !== clientId));
+      }
+    });
   };
 
   const handleSendActivationKey = async (client: SaaSClient, type: 'whatsapp' | 'email' | 'share') => {
@@ -2826,19 +2873,22 @@ Pour activer votre formule :
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-slate-900 border border-white/10 rounded-2xl p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-4"
+              className="relative bg-slate-900 border border-white/10 rounded-2xl p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-4"
             >
-              <div className="flex items-center justify-between pb-4 border-b border-white/10">
+              <button
+                type="button"
+                onClick={() => setIsAddClientModalOpen(false)}
+                className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer z-30 shadow-md flex items-center justify-center hover:scale-105 active:scale-95"
+                title="Fermer"
+              >
+                <X className="w-4.5 h-4.5 stroke-[2.5]" />
+              </button>
+
+              <div className="flex items-center justify-between pb-4 border-b border-white/10 pr-10">
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <Building2 className="w-5 h-5 text-indigo-400" />
                   Créer un Nouveau Compte Client Établissement
                 </h3>
-                <button
-                  onClick={() => setIsAddClientModalOpen(false)}
-                  className="text-gray-400 hover:text-white"
-                >
-                  ✕
-                </button>
               </div>
 
               {createdClientSuccess ? (
@@ -3155,19 +3205,22 @@ Pour activer votre formule :
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-slate-900 border border-purple-500/30 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4"
+              className="relative bg-slate-900 border border-purple-500/30 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4"
             >
-              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <button
+                type="button"
+                onClick={() => setIsResetPasswordModalOpen(false)}
+                className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer z-30 shadow-md flex items-center justify-center hover:scale-105 active:scale-95"
+                title="Fermer"
+              >
+                <X className="w-4.5 h-4.5 stroke-[2.5]" />
+              </button>
+
+              <div className="flex items-center justify-between pb-3 border-b border-white/10 pr-10">
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <Key className="w-5 h-5 text-purple-400" />
                   Réinitialiser le Mot de Passe Client
                 </h3>
-                <button
-                  onClick={() => setIsResetPasswordModalOpen(false)}
-                  className="text-gray-400 hover:text-white cursor-pointer"
-                >
-                  ✕
-                </button>
               </div>
 
               {resetPasswordSuccess ? (
@@ -3321,20 +3374,22 @@ Pour activer votre formule :
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-slate-900 border border-purple-500/40 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4"
+              className="relative bg-slate-900 border border-purple-500/40 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4"
             >
-              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <button
+                type="button"
+                onClick={() => setIsAdminPasswordModalOpen(false)}
+                className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer z-30 shadow-md flex items-center justify-center hover:scale-105 active:scale-95"
+                title="Fermer"
+              >
+                <X className="w-4.5 h-4.5 stroke-[2.5]" />
+              </button>
+
+              <div className="flex items-center justify-between pb-3 border-b border-white/10 pr-10">
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <KeyRound className="w-5 h-5 text-purple-400" />
                   Modifier mon Mot de Passe Administrateur
                 </h3>
-                <button
-                  type="button"
-                  onClick={() => setIsAdminPasswordModalOpen(false)}
-                  className="text-gray-400 hover:text-white cursor-pointer"
-                >
-                  ✕
-                </button>
               </div>
 
               {adminPasswordSuccess ? (
@@ -3466,19 +3521,22 @@ Pour activer votre formule :
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-slate-900 border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4"
+              className="relative bg-slate-900 border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4"
             >
-              <div className="flex items-center justify-between pb-4 border-b border-white/10">
+              <button
+                type="button"
+                onClick={() => setIsGenerateKeyModalOpen(false)}
+                className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer z-30 shadow-md flex items-center justify-center hover:scale-105 active:scale-95"
+                title="Fermer"
+              >
+                <X className="w-4.5 h-4.5 stroke-[2.5]" />
+              </button>
+
+              <div className="flex items-center justify-between pb-4 border-b border-white/10 pr-10">
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <Key className="w-5 h-5 text-amber-400" />
                   Générateur de Clés de Licence
                 </h3>
-                <button
-                  onClick={() => setIsGenerateKeyModalOpen(false)}
-                  className="text-gray-400 hover:text-white"
-                >
-                  ✕
-                </button>
               </div>
 
               <form onSubmit={handleGenerateKeys} className="space-y-4 text-xs">
@@ -3551,19 +3609,22 @@ Pour activer votre formule :
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-slate-900 border border-white/10 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4"
+              className="relative bg-slate-900 border border-white/10 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4"
             >
-              <div className="flex items-center justify-between pb-4 border-b border-white/10">
+              <button
+                type="button"
+                onClick={() => setEditingClient(null)}
+                className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer z-30 shadow-md flex items-center justify-center hover:scale-105 active:scale-95"
+                title="Fermer"
+              >
+                <X className="w-4.5 h-4.5 stroke-[2.5]" />
+              </button>
+
+              <div className="flex items-center justify-between pb-4 border-b border-white/10 pr-10">
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <Edit className="w-5 h-5 text-indigo-400" />
                   Modifier le Client: {editingClient.schoolName}
                 </h3>
-                <button
-                  onClick={() => setEditingClient(null)}
-                  className="text-gray-400 hover:text-white"
-                >
-                  ✕
-                </button>
               </div>
 
               <form onSubmit={handleSaveEditedClient} className="space-y-4 text-xs">
@@ -3701,9 +3762,18 @@ Pour activer votre formule :
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-slate-900 border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-6 text-white"
+              className="relative bg-slate-900 border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-6 text-white"
             >
-              <div className="flex items-center justify-between pb-4 border-b border-white/10">
+              <button
+                type="button"
+                onClick={() => setSelectedInvoice(null)}
+                className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer z-30 shadow-md flex items-center justify-center hover:scale-105 active:scale-95"
+                title="Fermer"
+              >
+                <X className="w-4.5 h-4.5 stroke-[2.5]" />
+              </button>
+
+              <div className="flex items-center justify-between pb-4 border-b border-white/10 pr-10">
                 <div className="flex items-center gap-2">
                   <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
                     <FileText className="w-5 h-5" />
@@ -3713,12 +3783,6 @@ Pour activer votre formule :
                     <p className="text-[10px] text-gray-400 font-mono">{selectedInvoice.invoiceRef}</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setSelectedInvoice(null)}
-                  className="text-gray-400 hover:text-white"
-                >
-                  ✕
-                </button>
               </div>
 
               <div className="p-4 rounded-xl bg-slate-950 border border-white/5 space-y-3 font-mono text-xs">
@@ -3767,19 +3831,22 @@ Pour activer votre formule :
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-slate-900 border border-white/10 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4 my-8"
+              className="relative bg-slate-900 border border-white/10 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4 my-8"
             >
-              <div className="flex items-center justify-between pb-4 border-b border-white/10">
+              <button
+                type="button"
+                onClick={() => setEditingPlanModal(null)}
+                className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer z-30 shadow-md flex items-center justify-center hover:scale-105 active:scale-95"
+                title="Fermer"
+              >
+                <X className="w-4.5 h-4.5 stroke-[2.5]" />
+              </button>
+
+              <div className="flex items-center justify-between pb-4 border-b border-white/10 pr-10">
                 <h3 className="text-base font-extrabold text-white flex items-center gap-2">
                   <Smartphone className="w-5 h-5 text-sky-400" />
                   Configuration Offre : {editingPlanModal.name}
                 </h3>
-                <button
-                  onClick={() => setEditingPlanModal(null)}
-                  className="text-gray-400 hover:text-white"
-                >
-                  ✕
-                </button>
               </div>
 
               <form
@@ -4004,9 +4071,18 @@ Pour activer votre formule :
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-3xl w-full shadow-2xl space-y-6 text-white"
+              className="relative bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-3xl w-full shadow-2xl space-y-6 text-white"
             >
-              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <button
+                type="button"
+                onClick={() => setAdminDetailModal(null)}
+                className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer z-30 shadow-md flex items-center justify-center hover:scale-105 active:scale-95"
+                title="Fermer"
+              >
+                <X className="w-4.5 h-4.5 stroke-[2.5]" />
+              </button>
+
+              <div className="flex items-center justify-between border-b border-white/10 pb-4 pr-10">
                 <div className="flex items-center gap-3">
                   <span className="p-2.5 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
                     <Maximize2 className="w-5 h-5" />
@@ -4020,12 +4096,6 @@ Pour activer votre formule :
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setAdminDetailModal(null)}
-                  className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white"
-                >
-                  <XCircle className="w-5 h-5" />
-                </button>
               </div>
 
               {adminDetailModal === 'mrr' ? (
@@ -4117,8 +4187,18 @@ Pour activer votre formule :
               <div className="absolute top-0 right-0 -mr-16 -mt-16 w-48 h-48 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
               <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
 
+              {/* Close Button at extreme top right */}
+              <button
+                type="button"
+                onClick={() => setDeliveryGuideModal(null)}
+                className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer z-30 shadow-md flex items-center justify-center hover:scale-105 active:scale-95"
+                title="Fermer"
+              >
+                <X className="w-4.5 h-4.5 stroke-[2.5]" />
+              </button>
+
               {/* Header */}
-              <div className="flex items-center justify-between border-b border-white/10 pb-4 relative z-10">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4 relative z-10 pr-10">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
                     <FileText className="w-5 h-5" />
@@ -4130,12 +4210,6 @@ Pour activer votre formule :
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setDeliveryGuideModal(null)}
-                  className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
-                >
-                  <XCircle className="w-5 h-5" />
-                </button>
               </div>
 
               {/* PDF Downloaded Success Badge */}
@@ -4253,20 +4327,22 @@ Pour activer votre formule :
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-slate-900 border border-rose-500/30 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4 text-xs"
+              className="relative bg-slate-900 border border-rose-500/30 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4 text-xs"
             >
-              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <button
+                type="button"
+                onClick={() => setIsResetDataModalOpen(false)}
+                className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 transition-all cursor-pointer z-30 shadow-md flex items-center justify-center hover:scale-105 active:scale-95"
+                title="Fermer"
+              >
+                <X className="w-4.5 h-4.5 stroke-[2.5]" />
+              </button>
+
+              <div className="flex items-center justify-between pb-3 border-b border-white/10 pr-10">
                 <h3 className="text-base font-extrabold text-white flex items-center gap-2">
                   <ShieldAlert className="w-5 h-5 text-rose-400" />
                   Confirmation de Réinitialisation des Données Admin
                 </h3>
-                <button
-                  type="button"
-                  onClick={() => setIsResetDataModalOpen(false)}
-                  className="text-gray-400 hover:text-white cursor-pointer"
-                >
-                  ✕
-                </button>
               </div>
 
               {resetDataSuccess ? (
@@ -4372,6 +4448,19 @@ Pour activer votre formule :
           </div>
         )}
       </AnimatePresence>
+
+      {/* MODAL DE CONFIRMATION STYLISÉE SAAS */}
+      <ConfirmModal
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        cancelText={confirmDialog.cancelText}
+        variant={confirmDialog.variant}
+        theme={theme}
+        onConfirm={confirmDialog.onConfirm}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+      />
 
     </div>
   );

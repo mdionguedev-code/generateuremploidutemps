@@ -59,6 +59,7 @@ import {
 import dynamic from 'next/dynamic';
 import LandingPage from '@/components/LandingPage';
 import WhatsAppSupportButton from '@/components/WhatsAppSupportButton';
+import ConfirmModal from '@/components/ConfirmModal';
 import type { ChefChartType } from '@/components/ChefAnalyticsDetailModal';
 
 const SaaSAdminPortal = dynamic(() => import('@/components/SaaSAdminPortal'), {
@@ -1289,6 +1290,40 @@ Pour débloquer votre formule :
   const [problemAnalysis, setProblemAnalysis] = useState<string>('');
   const [isAnalyzingProblem, setIsAnalyzingProblem] = useState<boolean>(false);
 
+  // --- Boite de dialogue de confirmation stylisée (Design Système du Site) ---
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title?: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    variant?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void | Promise<void>;
+  }>({
+    isOpen: false,
+    message: '',
+    onConfirm: () => {}
+  });
+
+  const showConfirm = (options: {
+    title?: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    variant?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void | Promise<void>;
+  }) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: options.title || "Confirmation requise",
+      message: options.message,
+      confirmText: options.confirmText || "Confirmer",
+      cancelText: options.cancelText || "Annuler",
+      variant: options.variant || "danger",
+      onConfirm: options.onConfirm
+    });
+  };
+
   // --- New Item Form States ---
   // Subject Form
   const [newSubName, setNewSubName] = useState('');
@@ -1433,23 +1468,28 @@ Pour débloquer votre formule :
   };
 
   const handleResetData = async () => {
-    if (!window.confirm("Êtes-vous sûr de vouloir réinitialiser les données de l'établissement aux données d'origine ?")) {
-      return;
-    }
-    if (currentUserId) {
-      setIsLoadingDb(true);
-      const estData = await getEstablishmentData(currentUserId);
-      if (estData) {
-        setSubjects(estData.subjects);
-        setTeachers(estData.teachers);
-        setClasses(estData.classes);
-        setTimetable(estData.savedTimetable);
-        setUnscheduled(estData.savedUnscheduled);
-        setGenerationScore(estData.savedScore);
+    showConfirm({
+      title: "Réinitialiser les données",
+      message: "Êtes-vous sûr de vouloir réinitialiser les données de l'établissement aux données d'origine enregistrées en base de données ?",
+      confirmText: "Réinitialiser",
+      variant: "warning",
+      onConfirm: async () => {
+        if (currentUserId) {
+          setIsLoadingDb(true);
+          const estData = await getEstablishmentData(currentUserId);
+          if (estData) {
+            setSubjects(estData.subjects);
+            setTeachers(estData.teachers);
+            setClasses(estData.classes);
+            setTimetable(estData.savedTimetable);
+            setUnscheduled(estData.savedUnscheduled);
+            setGenerationScore(estData.savedScore);
+          }
+          setIsLoadingDb(false);
+          triggerNotification("Données réinitialisées avec succès depuis la base de données !", "info");
+        }
       }
-      setIsLoadingDb(false);
-      triggerNotification("Données réinitialisées avec succès depuis la base de données !", "info");
-    }
+    });
   };
 
   // Auto set first active class/teacher to view when they change
@@ -1492,21 +1532,27 @@ Pour débloquer votre formule :
 
   // Wipe All Data from Database
   const handleWipeAll = async () => {
-    if (window.confirm("Attention: Cela effacera toutes vos fiches (Matières, Professeurs, Classes) et l'emploi du temps de la base de données. Confirmer ?")) {
-      if (currentUserId) {
-        await dbDeleteAllTimetables(currentUserId);
-        for (const c of classes) await dbDeleteClass(c.id);
-        for (const t of teachers) await dbDeleteTeacher(t.id);
-        for (const s of subjects) await dbDeleteSubject(s.id);
+    showConfirm({
+      title: "Effacement définitif de l'établissement",
+      message: "Attention: Cela effacera toutes vos fiches (Matières, Professeurs, Classes) et l'emploi du temps de la base de données. Confirmer ?",
+      confirmText: "Effacer définitivement",
+      variant: "danger",
+      onConfirm: async () => {
+        if (currentUserId) {
+          await dbDeleteAllTimetables(currentUserId);
+          for (const c of classes) await dbDeleteClass(c.id);
+          for (const t of teachers) await dbDeleteTeacher(t.id);
+          for (const s of subjects) await dbDeleteSubject(s.id);
+        }
+        setSubjects([]);
+        setTeachers([]);
+        setClasses([]);
+        setTimetable([]);
+        setUnscheduled([]);
+        setGenerationScore(0);
+        triggerNotification("Toutes les données et l'emploi du temps ont été effacés de la base de données.", "info");
       }
-      setSubjects([]);
-      setTeachers([]);
-      setClasses([]);
-      setTimetable([]);
-      setUnscheduled([]);
-      setGenerationScore(0);
-      triggerNotification("Toutes les données et l'emploi du temps ont été effacés de la base de données.", "info");
-    }
+    });
   };
 
   // --- AUTOMATIC CONSTRAINT GENERATION ENGINE CALL ---
@@ -1896,74 +1942,80 @@ Pour débloquer votre formule :
     const entry = timetable.find(e => e.id === entryId);
     if (!entry) return;
 
-    if (window.confirm("Enlever ce cours et le renvoyer dans la corbeille des heures non planifiées ?")) {
-      const pairedPartnerId = entry.pairedEntryId;
-      const updatedTable = timetable.filter(item => item.id !== entryId && (!pairedPartnerId || item.id !== pairedPartnerId));
+    showConfirm({
+      title: "Retirer la séance",
+      message: "Enlever ce cours et le renvoyer dans la corbeille des heures non planifiées ?",
+      confirmText: "Retirer la séance",
+      variant: "warning",
+      onConfirm: () => {
+        const pairedPartnerId = entry.pairedEntryId;
+        const updatedTable = timetable.filter(item => item.id !== entryId && (!pairedPartnerId || item.id !== pairedPartnerId));
 
-      // Send back to basket
-      const existingUnscheduledIdx = unscheduled.findIndex(
-        u => u.classId === entry.classId && u.teacherId === entry.teacherId && u.subjectId === entry.subjectId
-      );
+        // Send back to basket
+        const existingUnscheduledIdx = unscheduled.findIndex(
+          u => u.classId === entry.classId && u.teacherId === entry.teacherId && u.subjectId === entry.subjectId
+        );
 
-      let updatedUnscheduled = [...unscheduled];
-      if (existingUnscheduledIdx !== -1) {
-        updatedUnscheduled[existingUnscheduledIdx] = {
-          ...updatedUnscheduled[existingUnscheduledIdx],
-          hours: updatedUnscheduled[existingUnscheduledIdx].hours + 1
-        };
-      } else {
-        updatedUnscheduled.push({
-          classId: entry.classId,
-          teacherId: entry.teacherId,
-          subjectId: entry.subjectId,
-          hours: 1,
-          reason: "Retiré manuellement de l'emploi du temps."
-        });
-      }
+        let updatedUnscheduled = [...unscheduled];
+        if (existingUnscheduledIdx !== -1) {
+          updatedUnscheduled[existingUnscheduledIdx] = {
+            ...updatedUnscheduled[existingUnscheduledIdx],
+            hours: updatedUnscheduled[existingUnscheduledIdx].hours + 1
+          };
+        } else {
+          updatedUnscheduled.push({
+            classId: entry.classId,
+            teacherId: entry.teacherId,
+            subjectId: entry.subjectId,
+            hours: 1,
+            reason: "Retiré manuellement de l'emploi du temps."
+          });
+        }
 
-      // If paired partner, also update its unscheduled basket
-      if (pairedPartnerId) {
-        const partner = timetable.find(e => e.id === pairedPartnerId);
-        if (partner) {
-          const partIdx = updatedUnscheduled.findIndex(
-            u => u.classId === partner.classId && u.teacherId === partner.teacherId && u.subjectId === partner.subjectId
-          );
-          if (partIdx !== -1) {
-            updatedUnscheduled[partIdx] = {
-              ...updatedUnscheduled[partIdx],
-              hours: updatedUnscheduled[partIdx].hours + 1
-            };
-          } else {
-            updatedUnscheduled.push({
-              classId: partner.classId,
-              teacherId: partner.teacherId,
-              subjectId: partner.subjectId,
-              hours: 1,
-              reason: "Retiré manuellement de l'emploi du temps (paire scindée)."
-            });
+        // If paired partner, also update its unscheduled basket
+        if (pairedPartnerId) {
+          const partner = timetable.find(e => e.id === pairedPartnerId);
+          if (partner) {
+            const partIdx = updatedUnscheduled.findIndex(
+              u => u.classId === partner.classId && u.teacherId === partner.teacherId && u.subjectId === partner.subjectId
+            );
+            if (partIdx !== -1) {
+              updatedUnscheduled[partIdx] = {
+                ...updatedUnscheduled[partIdx],
+                hours: updatedUnscheduled[partIdx].hours + 1
+              };
+            } else {
+              updatedUnscheduled.push({
+                classId: partner.classId,
+                teacherId: partner.teacherId,
+                subjectId: partner.subjectId,
+                hours: 1,
+                reason: "Retiré manuellement de l'emploi du temps (paire scindée)."
+              });
+            }
           }
         }
+
+        setTimetable(updatedTable);
+        setUnscheduled(updatedUnscheduled);
+
+        const totalTarget = classes.reduce((sum, c) => sum + c.assignments.reduce((s, a) => s + (a.hoursPerWeek || 0), 0), 0);
+        const newScore = (totalTarget > 0 && updatedTable.length > 0) ? Math.min(100, Math.round((updatedTable.length / totalTarget) * 100)) : 0;
+        setGenerationScore(newScore);
+
+        if (currentUserId && !isLoadingDb) {
+          dbSaveTimetable(
+            currentUserId,
+            `Retrait séance - ${new Date().toLocaleDateString('fr-FR')}`,
+            updatedTable,
+            updatedUnscheduled,
+            newScore,
+            { subjects, teachers, classes, activeDays, totalSlots }
+          );
+        }
+        triggerNotification("Séance retirée.", "info");
       }
-
-      setTimetable(updatedTable);
-      setUnscheduled(updatedUnscheduled);
-
-      const totalTarget = classes.reduce((sum, c) => sum + c.assignments.reduce((s, a) => s + (a.hoursPerWeek || 0), 0), 0);
-      const newScore = (totalTarget > 0 && updatedTable.length > 0) ? Math.min(100, Math.round((updatedTable.length / totalTarget) * 100)) : 0;
-      setGenerationScore(newScore);
-
-      if (currentUserId && !isLoadingDb) {
-        dbSaveTimetable(
-          currentUserId,
-          `Retrait séance - ${new Date().toLocaleDateString('fr-FR')}`,
-          updatedTable,
-          updatedUnscheduled,
-          newScore,
-          { subjects, teachers, classes, activeDays, totalSlots }
-        );
-      }
-      triggerNotification("Séance retirée.", "info");
-    }
+    });
   };
 
   const handleDeleteBlockEntries = (entries: TimetableEntry[]) => {
@@ -1972,47 +2024,53 @@ Pour débloquer votre formule :
     const count = entries.length;
 
     const subName = subjects.find(s => s.id === sample.subjectId)?.name || sample.subjectId;
-    if (window.confirm(`Enlever ce cours de ${count}h de ${subName} et le renvoyer dans la corbeille ?`)) {
-      const idsToRemove = new Set(entries.map(e => e.id));
-      const updatedTable = timetable.filter(item => !idsToRemove.has(item.id));
+    showConfirm({
+      title: "Retirer le bloc de cours",
+      message: `Enlever ce cours de ${count}h de ${subName} et le renvoyer dans la corbeille ?`,
+      confirmText: `Retirer les ${count}h`,
+      variant: "warning",
+      onConfirm: () => {
+        const idsToRemove = new Set(entries.map(e => e.id));
+        const updatedTable = timetable.filter(item => !idsToRemove.has(item.id));
 
-      const existingUnscheduledIdx = unscheduled.findIndex(
-        u => u.classId === sample.classId && u.teacherId === sample.teacherId && u.subjectId === sample.subjectId
-      );
-
-      let updatedUnscheduled = [...unscheduled];
-      if (existingUnscheduledIdx !== -1) {
-        updatedUnscheduled[existingUnscheduledIdx] = {
-          ...updatedUnscheduled[existingUnscheduledIdx],
-          hours: updatedUnscheduled[existingUnscheduledIdx].hours + count
-        };
-      } else {
-        updatedUnscheduled.push({
-          classId: sample.classId,
-          teacherId: sample.teacherId,
-          subjectId: sample.subjectId,
-          hours: count,
-          reason: "Retiré manuellement de l'emploi du temps."
-        });
-      }
-
-      setTimetable(updatedTable);
-      setUnscheduled(updatedUnscheduled);
-
-      const totalTarget = classes.reduce((sum, c) => sum + c.assignments.reduce((s, a) => s + a.hoursPerWeek, 0), 0);
-      const newScore = totalTarget > 0 ? Math.round((updatedTable.length / totalTarget) * 100) : 100;
-      if (currentUserId && !isLoadingDb) {
-        dbSaveTimetable(
-          currentUserId,
-          `Retrait bloc - ${new Date().toLocaleDateString('fr-FR')}`,
-          updatedTable,
-          updatedUnscheduled,
-          newScore,
-          { subjects, teachers, classes, activeDays, totalSlots }
+        const existingUnscheduledIdx = unscheduled.findIndex(
+          u => u.classId === sample.classId && u.teacherId === sample.teacherId && u.subjectId === sample.subjectId
         );
+
+        let updatedUnscheduled = [...unscheduled];
+        if (existingUnscheduledIdx !== -1) {
+          updatedUnscheduled[existingUnscheduledIdx] = {
+            ...updatedUnscheduled[existingUnscheduledIdx],
+            hours: updatedUnscheduled[existingUnscheduledIdx].hours + count
+          };
+        } else {
+          updatedUnscheduled.push({
+            classId: sample.classId,
+            teacherId: sample.teacherId,
+            subjectId: sample.subjectId,
+            hours: count,
+            reason: "Retiré manuellement de l'emploi du temps."
+          });
+        }
+
+        setTimetable(updatedTable);
+        setUnscheduled(updatedUnscheduled);
+
+        const totalTarget = classes.reduce((sum, c) => sum + c.assignments.reduce((s, a) => s + a.hoursPerWeek, 0), 0);
+        const newScore = (totalTarget > 0 && updatedTable.length > 0) ? Math.min(100, Math.round((updatedTable.length / totalTarget) * 100)) : 0;
+        if (currentUserId && !isLoadingDb) {
+          dbSaveTimetable(
+            currentUserId,
+            `Retrait bloc - ${new Date().toLocaleDateString('fr-FR')}`,
+            updatedTable,
+            updatedUnscheduled,
+            newScore,
+            { subjects, teachers, classes, activeDays, totalSlots }
+          );
+        }
+        triggerNotification(`Séance de ${count}h retirée.`, "info");
       }
-      triggerNotification(`Séance de ${count}h retirée.`, "info");
-    }
+    });
   };
 
   // --- COMPUTES & RENDERS ---
@@ -2525,60 +2583,66 @@ Pour débloquer votre formule :
   };
 
   const handleDeleteSubject = async (id: string, name: string) => {
-    if (window.confirm(`Voulez-vous supprimer la matière "${name}" ? (Cela supprimera ses liens chez les profs/classes).`)) {
-      if (currentUserId) {
-        await dbDeleteSubject(id);
-      }
-      const updatedSubs = subjects.filter(s => s.id !== id);
-      const updatedTeachs = teachers.map(t => ({
-        ...t,
-        subjectIds: t.subjectIds.filter(sid => sid !== id)
-      }));
-      const updatedCls = classes.map(c => ({
-        ...c,
-        assignments: c.assignments.filter(a => a.subjectId !== id)
-      }));
-      const updatedTable = timetable.filter(e => e.subjectId !== id);
-
-      setSubjects(updatedSubs);
-      setTeachers(updatedTeachs);
-      setClasses(updatedCls);
-      setTimetable(updatedTable);
-
-      if (currentUserId) {
-        // Mettre à jour en direct les professeurs et classes liés dans Supabase
-        teachers.forEach(t => {
-          if (t.subjectIds.includes(id)) {
-            dbUpdateTeacher(t.id, { subjectIds: t.subjectIds.filter(sid => sid !== id) });
-          }
-        });
-        classes.forEach(c => {
-          if (c.assignments.some(a => a.subjectId === id)) {
-            dbUpdateClass(c.id, { assignments: c.assignments.filter(a => a.subjectId !== id) });
-          }
-        });
-
-        // Mettre à jour ou supprimer l'emploi du temps en base
-        const totalTarget = updatedCls.reduce((sum, c) => sum + c.assignments.reduce((s, a) => s + (a.hoursPerWeek || 0), 0), 0);
-        if (updatedTable.length === 0 || totalTarget === 0 || updatedCls.length === 0) {
-          await dbDeleteAllTimetables(currentUserId);
-          setGenerationScore(0);
-        } else {
-          const newScore = Math.min(100, Math.round((updatedTable.length / totalTarget) * 100));
-          setGenerationScore(newScore);
-          await dbSaveTimetable(
-            currentUserId,
-            `Mise à jour suite à suppression matière - ${new Date().toLocaleDateString('fr-FR')}`,
-            updatedTable,
-            unscheduled,
-            newScore,
-            { subjects: updatedSubs, teachers: updatedTeachs, classes: updatedCls, activeDays, totalSlots }
-          );
+    showConfirm({
+      title: "Supprimer la discipline",
+      message: `Voulez-vous supprimer la matière "${name}" ? (Cela supprimera également ses liens chez les professeurs et les classes).`,
+      confirmText: "Supprimer la matière",
+      variant: "danger",
+      onConfirm: async () => {
+        if (currentUserId) {
+          await dbDeleteSubject(id);
         }
-      }
+        const updatedSubs = subjects.filter(s => s.id !== id);
+        const updatedTeachs = teachers.map(t => ({
+          ...t,
+          subjectIds: t.subjectIds.filter(sid => sid !== id)
+        }));
+        const updatedCls = classes.map(c => ({
+          ...c,
+          assignments: c.assignments.filter(a => a.subjectId !== id)
+        }));
+        const updatedTable = timetable.filter(e => e.subjectId !== id);
 
-      triggerNotification("Matière supprimée de la base de données.", "info");
-    }
+        setSubjects(updatedSubs);
+        setTeachers(updatedTeachs);
+        setClasses(updatedCls);
+        setTimetable(updatedTable);
+
+        if (currentUserId) {
+          // Mettre à jour en direct les professeurs et classes liés dans Supabase
+          teachers.forEach(t => {
+            if (t.subjectIds.includes(id)) {
+              dbUpdateTeacher(t.id, { subjectIds: t.subjectIds.filter(sid => sid !== id) });
+            }
+          });
+          classes.forEach(c => {
+            if (c.assignments.some(a => a.subjectId === id)) {
+              dbUpdateClass(c.id, { assignments: c.assignments.filter(a => a.subjectId !== id) });
+            }
+          });
+
+          // Mettre à jour ou supprimer l'emploi du temps en base
+          const totalTarget = updatedCls.reduce((sum, c) => sum + c.assignments.reduce((s, a) => s + (a.hoursPerWeek || 0), 0), 0);
+          if (updatedTable.length === 0 || totalTarget === 0 || updatedCls.length === 0) {
+            await dbDeleteAllTimetables(currentUserId);
+            setGenerationScore(0);
+          } else {
+            const newScore = Math.min(100, Math.round((updatedTable.length / totalTarget) * 100));
+            setGenerationScore(newScore);
+            await dbSaveTimetable(
+              currentUserId,
+              `Mise à jour suite à suppression matière - ${new Date().toLocaleDateString('fr-FR')}`,
+              updatedTable,
+              unscheduled,
+              newScore,
+              { subjects: updatedSubs, teachers: updatedTeachs, classes: updatedCls, activeDays, totalSlots }
+            );
+          }
+        }
+
+        triggerNotification("Matière supprimée de la base de données.", "info");
+      }
+    });
   };
 
   // --- PROFESSEURS OPERATIONS ---
@@ -2688,50 +2752,56 @@ Pour débloquer votre formule :
   };
 
   const handleDeleteTeacher = async (id: string, name: string) => {
-    if (window.confirm(`Confirmer la suppression de ${name} ?`)) {
-      if (currentUserId) {
-        await dbDeleteTeacher(id);
-      }
-      const updatedTeachs = teachers.filter(t => t.id !== id);
-      const updatedCls = classes.map(c => ({
-        ...c,
-        assignments: c.assignments.filter(a => a.teacherId !== id)
-      }));
-      const updatedTable = timetable.filter(e => e.teacherId !== id);
-
-      setTeachers(updatedTeachs);
-      setClasses(updatedCls);
-      setTimetable(updatedTable);
-
-      if (currentUserId) {
-        // Mettre à jour en direct les classes liées dans Supabase
-        classes.forEach(c => {
-          if (c.assignments.some(a => a.teacherId === id)) {
-            dbUpdateClass(c.id, { assignments: c.assignments.filter(a => a.teacherId !== id) });
-          }
-        });
-
-        // Mettre à jour ou supprimer l'emploi du temps en base
-        const totalTarget = updatedCls.reduce((sum, c) => sum + c.assignments.reduce((s, a) => s + (a.hoursPerWeek || 0), 0), 0);
-        if (updatedTable.length === 0 || totalTarget === 0 || updatedCls.length === 0 || updatedTeachs.length === 0) {
-          await dbDeleteAllTimetables(currentUserId);
-          setGenerationScore(0);
-        } else {
-          const newScore = Math.min(100, Math.round((updatedTable.length / totalTarget) * 100));
-          setGenerationScore(newScore);
-          await dbSaveTimetable(
-            currentUserId,
-            `Mise à jour suite à suppression enseignant - ${new Date().toLocaleDateString('fr-FR')}`,
-            updatedTable,
-            unscheduled,
-            newScore,
-            { subjects, teachers: updatedTeachs, classes: updatedCls, activeDays, totalSlots }
-          );
+    showConfirm({
+      title: "Supprimer l'enseignant",
+      message: `Confirmer la suppression définitive de l'enseignant "${name}" de la base de données ?`,
+      confirmText: "Supprimer l'enseignant",
+      variant: "danger",
+      onConfirm: async () => {
+        if (currentUserId) {
+          await dbDeleteTeacher(id);
         }
-      }
+        const updatedTeachs = teachers.filter(t => t.id !== id);
+        const updatedCls = classes.map(c => ({
+          ...c,
+          assignments: c.assignments.filter(a => a.teacherId !== id)
+        }));
+        const updatedTable = timetable.filter(e => e.teacherId !== id);
 
-      triggerNotification("Fiche enseignant supprimée de la base.", "info");
-    }
+        setTeachers(updatedTeachs);
+        setClasses(updatedCls);
+        setTimetable(updatedTable);
+
+        if (currentUserId) {
+          // Mettre à jour en direct les classes liées dans Supabase
+          classes.forEach(c => {
+            if (c.assignments.some(a => a.teacherId === id)) {
+              dbUpdateClass(c.id, { assignments: c.assignments.filter(a => a.teacherId !== id) });
+            }
+          });
+
+          // Mettre à jour ou supprimer l'emploi du temps en base
+          const totalTarget = updatedCls.reduce((sum, c) => sum + c.assignments.reduce((s, a) => s + (a.hoursPerWeek || 0), 0), 0);
+          if (updatedTable.length === 0 || totalTarget === 0 || updatedCls.length === 0 || updatedTeachs.length === 0) {
+            await dbDeleteAllTimetables(currentUserId);
+            setGenerationScore(0);
+          } else {
+            const newScore = Math.min(100, Math.round((updatedTable.length / totalTarget) * 100));
+            setGenerationScore(newScore);
+            await dbSaveTimetable(
+              currentUserId,
+              `Mise à jour suite à suppression enseignant - ${new Date().toLocaleDateString('fr-FR')}`,
+              updatedTable,
+              unscheduled,
+              newScore,
+              { subjects, teachers: updatedTeachs, classes: updatedCls, activeDays, totalSlots }
+            );
+          }
+        }
+
+        triggerNotification("Fiche enseignant supprimée de la base.", "info");
+      }
+    });
   };
 
   // --- CLASSES OPERATIONS ---
@@ -3046,37 +3116,43 @@ Pour débloquer votre formule :
   };
 
   const handleDeleteClass = async (id: string, name: string) => {
-    if (window.confirm(`Supprimer la classe ${name} ?`)) {
-      if (currentUserId) {
-        await dbDeleteClass(id);
-      }
-      const updated = classes.filter(c => c.id !== id);
-      const updatedTable = timetable.filter(e => e.classId !== id);
-
-      setClasses(updated);
-      setTimetable(updatedTable);
-
-      if (currentUserId) {
-        const totalTarget = updated.reduce((sum, c) => sum + c.assignments.reduce((s, a) => s + (a.hoursPerWeek || 0), 0), 0);
-        if (updatedTable.length === 0 || totalTarget === 0 || updated.length === 0) {
-          await dbDeleteAllTimetables(currentUserId);
-          setGenerationScore(0);
-        } else {
-          const newScore = Math.min(100, Math.round((updatedTable.length / totalTarget) * 100));
-          setGenerationScore(newScore);
-          await dbSaveTimetable(
-            currentUserId,
-            `Mise à jour suite à suppression classe - ${new Date().toLocaleDateString('fr-FR')}`,
-            updatedTable,
-            unscheduled,
-            newScore,
-            { subjects, teachers, classes: updated, activeDays, totalSlots }
-          );
+    showConfirm({
+      title: "Supprimer la classe",
+      message: `Supprimer définitivement la classe "${name}" et toutes ses affectations d'enseignement ?`,
+      confirmText: "Supprimer la classe",
+      variant: "danger",
+      onConfirm: async () => {
+        if (currentUserId) {
+          await dbDeleteClass(id);
         }
-      }
+        const updated = classes.filter(c => c.id !== id);
+        const updatedTable = timetable.filter(e => e.classId !== id);
 
-      triggerNotification("Fiche classe supprimée de la base de données.", "info");
-    }
+        setClasses(updated);
+        setTimetable(updatedTable);
+
+        if (currentUserId) {
+          const totalTarget = updated.reduce((sum, c) => sum + c.assignments.reduce((s, a) => s + (a.hoursPerWeek || 0), 0), 0);
+          if (updatedTable.length === 0 || totalTarget === 0 || updated.length === 0) {
+            await dbDeleteAllTimetables(currentUserId);
+            setGenerationScore(0);
+          } else {
+            const newScore = Math.min(100, Math.round((updatedTable.length / totalTarget) * 100));
+            setGenerationScore(newScore);
+            await dbSaveTimetable(
+              currentUserId,
+              `Mise à jour suite à suppression classe - ${new Date().toLocaleDateString('fr-FR')}`,
+              updatedTable,
+              unscheduled,
+              newScore,
+              { subjects, teachers, classes: updated, activeDays, totalSlots }
+            );
+          }
+        }
+
+        triggerNotification("Fiche classe supprimée de la base de données.", "info");
+      }
+    });
   };
 
 
@@ -8050,6 +8126,25 @@ Pour débloquer votre formule :
             setIsDocViewOpen(false);
             setIsClientSubModalOpen(true);
           }}
+          theme={theme}
+        />
+
+        {/* BOÎTE DE DIALOGUE DE CONFIRMATION PERSONNALISÉE (DESIGN SYSTÈME DU SITE) */}
+        <ConfirmModal
+          isOpen={confirmDialog.isOpen}
+          onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+          onConfirm={async () => {
+            const action = confirmDialog.onConfirm;
+            setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+            if (action) {
+              await action();
+            }
+          }}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmText={confirmDialog.confirmText}
+          cancelText={confirmDialog.cancelText}
+          variant={confirmDialog.variant}
           theme={theme}
         />
 
