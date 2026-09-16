@@ -40,7 +40,6 @@ interface PedagogicalPlanningTabProps {
   onAddTeacher?: (teacher: Omit<Teacher, 'id'>) => Promise<Teacher | null>;
   onAddClass?: (cls: Omit<ClassGroup, 'id'>) => Promise<ClassGroup | null>;
   onAddSubject?: (name: string) => Promise<Subject | null>;
-  onLoadSampleData?: () => Promise<void>;
   onNavigateToTeachers?: () => void;
   onNavigateToClasses?: () => void;
   isPremiumOrSchool: boolean;
@@ -81,7 +80,6 @@ export default function PedagogicalPlanningTab({
   onAddTeacher,
   onAddClass,
   onAddSubject,
-  onLoadSampleData,
   onNavigateToTeachers,
   onNavigateToClasses,
   isPremiumOrSchool,
@@ -119,8 +117,6 @@ export default function PedagogicalPlanningTab({
 
   const [isAddSubjectModalOpen, setIsAddSubjectModalOpen] = useState(false);
   const [newSubjectName, setNewSubjectName] = useState('');
-
-  const [isLoadingSample, setIsLoadingSample] = useState(false);
 
   // Feedback Toasts
   const [successToast, setSuccessToast] = useState<string | null>(null);
@@ -200,13 +196,13 @@ export default function PedagogicalPlanningTab({
   // --- ALGORITHME D'OPTIMISATION & D'AFFECTATION ÉQUITABLE ---
   const runFairOptimizationAlgorithm = () => {
     if (!localTeachers || localTeachers.length === 0) {
-      setErrorToast("Aucun enseignant configuré. Ajoutez au moins un professeur à l'Étape 1 ou chargez le modèle type.");
+      setErrorToast("Aucun enseignant configuré. Ajoutez au moins un professeur à l'Étape 1.");
       setTimeout(() => setErrorToast(null), 5000);
       return;
     }
 
     if (!classes || classes.length === 0) {
-      setErrorToast("Aucune classe configurée. Créez vos classes à l'Étape 2 ou chargez le modèle type.");
+      setErrorToast("Aucune classe configurée. Créez vos classes à l'Étape 2.");
       setTimeout(() => setErrorToast(null), 5000);
       return;
     }
@@ -522,22 +518,6 @@ export default function PedagogicalPlanningTab({
     setIsAddSubjectModalOpen(false);
     setSuccessToast("Matière enregistrée !");
     setTimeout(() => setSuccessToast(null), 3000);
-  };
-
-  // --- CHARGEMENT DU MODÈLE TYPE COMPLET ---
-  const handleTriggerLoadSample = async () => {
-    if (!onLoadSampleData) return;
-    setIsLoadingSample(true);
-    try {
-      await onLoadSampleData();
-      setSuccessToast("Modèle complet (enseignants, classes, matières) chargé avec succès !");
-    } catch (e) {
-      console.error(e);
-      setErrorToast("Erreur lors du chargement des données types.");
-    } finally {
-      setIsLoadingSample(false);
-      setTimeout(() => setSuccessToast(null), 4000);
-    }
   };
 
   // --- EXPORT PDF DE LA RÉPARTITION (100% SÉCURISÉ) ---
@@ -900,22 +880,6 @@ export default function PedagogicalPlanningTab({
                     <span>Ajouter Enseignant</span>
                   </button>
 
-                  {onLoadSampleData && (
-                    <button
-                      type="button"
-                      onClick={handleTriggerLoadSample}
-                      disabled={isLoadingSample}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition-all cursor-pointer ${
-                        isLight
-                          ? "bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300"
-                          : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30"
-                      }`}
-                      title="Génère un jeu complet de professeurs et classes types"
-                    >
-                      <Zap className="w-3.5 h-3.5 text-amber-400" />
-                      <span>{isLoadingSample ? "Chargement..." : "⚡ Charger Modèle Type"}</span>
-                    </button>
-                  )}
 
                   <button
                     type="button"
@@ -950,21 +914,10 @@ export default function PedagogicalPlanningTab({
                   <div className="max-w-md mx-auto space-y-1.5">
                     <h4 className="text-base font-black">Aucun enseignant configuré pour l'instant</h4>
                     <p className={`text-xs ${isLight ? "text-slate-500" : "text-slate-400"}`}>
-                      Pour démarrer la planification équitable, ajoutez vos enseignants ou chargez instantanément notre modèle scolaire type complet en 1 clic.
+                      Pour démarrer la planification équitable en temps réel, ajoutez vos enseignants réels avec leurs quotas d'heures statutaires.
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                    {onLoadSampleData && (
-                      <button
-                        type="button"
-                        onClick={handleTriggerLoadSample}
-                        disabled={isLoadingSample}
-                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 flex items-center gap-2 cursor-pointer"
-                      >
-                        <Zap className="w-4 h-4" />
-                        <span>{isLoadingSample ? "Chargement..." : "⚡ Charger Équipe & Classes Types (1 clic)"}</span>
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={() => setIsAddTeacherModalOpen(true)}
@@ -1167,14 +1120,16 @@ export default function PedagogicalPlanningTab({
                       <Plus className="w-4 h-4" />
                       <span>Ajouter une première classe</span>
                     </button>
-                    {onLoadSampleData && (
+                    {onNavigateToClasses && (
                       <button
                         type="button"
-                        onClick={handleTriggerLoadSample}
-                        className="px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 text-amber-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                        onClick={onNavigateToClasses}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 ${
+                          isLight ? "bg-white hover:bg-slate-100 text-slate-700 border-slate-200" : "bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
+                        }`}
                       >
-                        <Zap className="w-4 h-4 text-amber-400" />
-                        <span>Initialiser le modèle complet</span>
+                        <span>Aller à l'Étape 4 (Classes)</span>
+                        <ExternalLink className="w-3 h-3 opacity-60" />
                       </button>
                     )}
                   </div>
