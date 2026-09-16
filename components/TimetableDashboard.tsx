@@ -3177,6 +3177,187 @@ Pour débloquer votre formule :
     }
   };
 
+  // --- HANDLERS DÉDIÉS AU MODULE PLANIFICATION PÉDAGOGIQUE ---
+  const handleAddTeacherFromPlanning = async (teacherData: Omit<Teacher, 'id'>): Promise<Teacher | null> => {
+    if (teachers.length >= currentPlan.maxTeachers) {
+      triggerNotification(`Limite d'enseignants atteinte pour votre formule (${currentPlan.maxTeachers} max).`, "error");
+      openUpgradeModal("Quota d'Enseignants Atteint", `Votre formule actuelle est limitée à ${currentPlan.maxTeachers} professeurs.`);
+      return null;
+    }
+    if (currentUserId) {
+      const created = await dbAddTeacher(currentUserId, teacherData);
+      if (created) {
+        setTeachers(prev => [...prev, created]);
+        triggerNotification(`Professeur "${created.name}" ajouté avec succès !`);
+        return created;
+      }
+    }
+    const localTeacher: Teacher = {
+      id: `teach-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      ...teacherData
+    };
+    setTeachers(prev => [...prev, localTeacher]);
+    triggerNotification(`Professeur "${localTeacher.name}" ajouté !`);
+    return localTeacher;
+  };
+
+  const handleAddClassFromPlanning = async (classData: Omit<ClassGroup, 'id'>): Promise<ClassGroup | null> => {
+    if (classes.length >= currentPlan.maxClasses) {
+      triggerNotification(`Limite de classes atteinte pour votre formule (${currentPlan.maxClasses} max).`, "error");
+      openUpgradeModal("Quota de Classes Atteint", `Votre formule actuelle est limitée à ${currentPlan.maxClasses} classes.`);
+      return null;
+    }
+    if (currentUserId) {
+      const created = await dbAddClass(currentUserId, classData);
+      if (created) {
+        setClasses(prev => [...prev, created]);
+        triggerNotification(`Classe "${created.name}" créée avec succès !`);
+        return created;
+      }
+    }
+    const localClass: ClassGroup = {
+      id: `cls-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      ...classData
+    };
+    setClasses(prev => [...prev, localClass]);
+    triggerNotification(`Classe "${localClass.name}" créée !`);
+    return localClass;
+  };
+
+  const handleAddSubjectFromPlanning = async (name: string): Promise<Subject | null> => {
+    const trimmed = name.trim();
+    if (!trimmed) return null;
+    const existing = subjects.find(s => s.name.toLowerCase() === trimmed.toLowerCase());
+    if (existing) return existing;
+    if (currentUserId) {
+      const created = await dbAddSubject(currentUserId, trimmed);
+      if (created) {
+        setSubjects(prev => [...prev, created]);
+        triggerNotification(`Matière "${created.name}" enregistrée !`);
+        return created;
+      }
+    }
+    const localSub: Subject = {
+      id: `sub-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      name: trimmed
+    };
+    setSubjects(prev => [...prev, localSub]);
+    triggerNotification(`Matière "${localSub.name}" enregistrée !`);
+    return localSub;
+  };
+
+  const handleLoadSamplePedagogicalData = async (): Promise<void> => {
+    try {
+      const defaultSubjectsList = [
+        "Mathématiques",
+        "Français",
+        "Histoire-Géographie",
+        "Anglais",
+        "SVT",
+        "Physique-Chimie",
+        "EPS"
+      ];
+
+      const newSubs: Subject[] = [...subjects];
+      for (const subName of defaultSubjectsList) {
+        if (!newSubs.some(s => s.name.toLowerCase() === subName.toLowerCase())) {
+          if (currentUserId) {
+            const created = await dbAddSubject(currentUserId, subName);
+            if (created) newSubs.push(created);
+          } else {
+            newSubs.push({ id: `sub-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`, name: subName });
+          }
+        }
+      }
+      setSubjects(newSubs);
+
+      const sampleTeachersConfig = [
+        { name: "M. Diop", subName: "Mathématiques", quota: 18, color: "#3b82f6" },
+        { name: "Mme Fall", subName: "Français", quota: 18, color: "#6366f1" },
+        { name: "M. Ndiaye", subName: "Histoire-Géographie", quota: 18, color: "#f59e0b" },
+        { name: "Mme Sow", subName: "Anglais", quota: 18, color: "#8b5cf6" },
+        { name: "M. Ba", subName: "Physique-Chimie", quota: 18, color: "#06b6d4" },
+        { name: "Mme Diallo", subName: "SVT", quota: 16, color: "#10b981" },
+        { name: "M. Traoré", subName: "EPS", quota: 20, color: "#ec4899" }
+      ];
+
+      const newTeachs: Teacher[] = [...teachers];
+      for (const tConfig of sampleTeachersConfig) {
+        if (!newTeachs.some(t => t.name.toLowerCase() === tConfig.name.toLowerCase())) {
+          const sub = newSubs.find(s => s.name.toLowerCase() === tConfig.subName.toLowerCase());
+          const teachData: Omit<Teacher, 'id'> = {
+            name: tConfig.name,
+            subjectIds: sub ? [sub.id] : [],
+            weeklyQuota: tConfig.quota,
+            color: tConfig.color,
+            unavailability: []
+          };
+          if (currentUserId) {
+            const created = await dbAddTeacher(currentUserId, teachData);
+            if (created) newTeachs.push(created);
+          } else {
+            newTeachs.push({ id: `teach-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`, ...teachData });
+          }
+        }
+      }
+      setTeachers(newTeachs);
+
+      const sampleClassesConfig = [
+        {
+          name: "6ème A",
+          hours: { "Mathématiques": 5, "Français": 5, "Histoire-Géographie": 3, "Anglais": 3, "SVT": 2, "EPS": 2 }
+        },
+        {
+          name: "5ème A",
+          hours: { "Mathématiques": 5, "Français": 5, "Histoire-Géographie": 3, "Anglais": 3, "SVT": 2, "EPS": 2 }
+        },
+        {
+          name: "4ème A",
+          hours: { "Mathématiques": 5, "Français": 5, "Histoire-Géographie": 3, "Anglais": 3, "SVT": 2, "Physique-Chimie": 2, "EPS": 2 }
+        },
+        {
+          name: "3ème A",
+          hours: { "Mathématiques": 5, "Français": 5, "Histoire-Géographie": 3, "Anglais": 3, "SVT": 2, "Physique-Chimie": 3, "EPS": 2 }
+        }
+      ];
+
+      const newClasses: ClassGroup[] = [...classes];
+      for (const cConfig of sampleClassesConfig) {
+        if (!newClasses.some(c => c.name.toLowerCase() === cConfig.name.toLowerCase())) {
+          const assignments: ClassAssignment[] = [];
+          Object.entries(cConfig.hours).forEach(([sName, h]) => {
+            const sub = newSubs.find(s => s.name.toLowerCase() === sName.toLowerCase());
+            if (sub) {
+              const matchedTeacher = newTeachs.find(t => (t.subjectIds || []).includes(sub.id));
+              assignments.push({
+                teacherId: matchedTeacher?.id || newTeachs[0]?.id || '',
+                subjectId: sub.id,
+                hoursPerWeek: Number(h),
+                group: 'all'
+              });
+            }
+          });
+          const classData: Omit<ClassGroup, 'id'> = {
+            name: cConfig.name,
+            assignments,
+            unavailability: []
+          };
+          if (currentUserId) {
+            const created = await dbAddClass(currentUserId, classData);
+            if (created) newClasses.push(created);
+          } else {
+            newClasses.push({ id: `cls-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`, ...classData });
+          }
+        }
+      }
+      setClasses(newClasses);
+      triggerNotification("Équipe et classes types chargées avec succès !");
+    } catch (e) {
+      console.error('Error loading sample pedagogical data:', e);
+      triggerNotification("Erreur lors du chargement des données types.", "error");
+    }
+  };
+
   if (isLoadingDb) {
     return (
       <div className={`min-h-screen flex flex-col items-center justify-center font-sans ${theme === 'light' ? 'bg-slate-50 text-slate-800' : 'bg-[#0b1326] text-slate-100'
@@ -6386,6 +6567,12 @@ Pour débloquer votre formule :
                         updated.forEach((c) => dbUpdateClass(c.id, c));
                       }
                     }}
+                    onAddTeacher={handleAddTeacherFromPlanning}
+                    onAddClass={handleAddClassFromPlanning}
+                    onAddSubject={handleAddSubjectFromPlanning}
+                    onLoadSampleData={handleLoadSamplePedagogicalData}
+                    onNavigateToTeachers={() => setActiveTab('teachers')}
+                    onNavigateToClasses={() => setActiveTab('classes')}
                     isPremiumOrSchool={Boolean(
                       currentPlan.features?.pedagogicalPlanning ||
                       currentPlan.id === 'plan_premium' ||
