@@ -2083,7 +2083,7 @@ Pour activer votre formule :
                       </div>
                       <div className="flex items-center gap-2">
                         {plan.features.geminiAI ? <Check className="w-4 h-4 text-emerald-400" /> : <XCircle className="w-4 h-4 text-gray-600" />}
-                        <span className={plan.features.geminiAI ? 'text-indigo-300 font-bold' : 'text-gray-500 line-through'}>Conseiller IA Gemini Pro</span>
+                        <span className={plan.features.geminiAI ? 'text-indigo-300 font-bold' : 'text-gray-500 line-through'}>Conseiller IA &amp; Diagnostics</span>
                       </div>
                       <div className="flex items-center gap-2">
                         {plan.features.pedagogicalPlanning ? <Check className="w-4 h-4 text-emerald-400" /> : <XCircle className="w-4 h-4 text-gray-600" />}
@@ -4004,7 +4004,7 @@ Pour activer votre formule :
                         })}
                         className="rounded accent-indigo-500"
                       />
-                      <span className="text-indigo-300 font-bold">Conseiller IA Gemini</span>
+                      <span className="text-indigo-300 font-bold">Conseiller IA &amp; Diagnostics</span>
                     </label>
 
                     <label className="flex items-center gap-2 p-2 rounded-xl bg-slate-950/60 border border-white/5 cursor-pointer hover:border-white/20">

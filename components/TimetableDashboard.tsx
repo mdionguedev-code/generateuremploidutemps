@@ -1526,7 +1526,7 @@ Pour débloquer votre formule :
         setGenerationScore(estData.savedScore);
       }
       setIsLoadingDb(false);
-      triggerNotification("Données actualisées depuis la base de données Supabase !", "info");
+      triggerNotification("Données actualisées depuis le serveur !", "info");
     }
   };
 
@@ -1649,8 +1649,8 @@ Pour débloquer votre formule :
   // --- AI SUGGESTIONS CONCIERGE CALL ---
   const handleQueryAiSuggestions = async () => {
     if (!currentPlan.features.geminiAI) {
-      triggerNotification("Les fonctionnalités d'intelligence artificielle Gemini ne sont pas incluses dans votre formule actuelle.", "error");
-      openUpgradeModal("Conseiller Directeur IA Gemini Pro", "L'analyse pédagogique et les conseils automatisés par IA sont réservés aux formules Premium et School.");
+      triggerNotification("Les fonctionnalités d'intelligence artificielle ne sont pas incluses dans votre formule actuelle.", "error");
+      openUpgradeModal("Conseiller Pédagogique IA Avancé", "L'analyse pédagogique et les conseils automatisés par IA sont réservés aux formules Premium et School.");
       return;
     }
     if (timetable.length === 0 || classes.length === 0) {
@@ -1658,7 +1658,7 @@ Pour débloquer votre formule :
       return;
     }
     setIsLoadingAi(true);
-    setAiSuggestions("L'assistant Gemini analyse vos conflits de planning, les temps d'attente des professeurs et les plages horaires...");
+    setAiSuggestions("L'assistant IA analyse vos conflits de planning, les temps d'attente des professeurs et les plages horaires...");
 
     try {
       const response = await fetch('/api/timetable/ai-suggest', {
@@ -1684,7 +1684,7 @@ Pour débloquer votre formule :
   // --- SPECIFIC PROBLEM DIAGNOSIS & REPLANNING VIA AI AGENT ---
   const handleAnalyzeProblem = async () => {
     if (!currentPlan.features.geminiAI) {
-      triggerNotification("Les fonctionnalités d'intelligence artificielle Gemini ne sont pas incluses dans votre formule actuelle.", "error");
+      triggerNotification("Les fonctionnalités d'intelligence artificielle ne sont pas incluses dans votre formule actuelle.", "error");
       openUpgradeModal("Diagnostic de Planning par IA", "Le diagnostic intelligent et les propositions de réaffectation par IA sont réservés aux formules Premium et School.");
       return;
     }
@@ -1697,7 +1697,7 @@ Pour débloquer votre formule :
       return;
     }
     setIsAnalyzingProblem(true);
-    setProblemAnalysis("L'assistant Gemini analyse votre problème spécifique et étudie les possibilités de déplacement des cours...");
+    setProblemAnalysis("L'assistant IA analyse votre problème spécifique et étudie les possibilités de déplacement des cours...");
     setAiExecutionReasoning('');
 
     try {
@@ -1730,7 +1730,7 @@ Pour débloquer votre formule :
 
   const handleExecuteAi = async (actionType: 'apply-suggestions' | 'solve-problem') => {
     if (!currentPlan.features.geminiAI) {
-      triggerNotification("Les fonctionnalités d'intelligence artificielle Gemini ne sont pas incluses dans votre formule actuelle.", "error");
+      triggerNotification("Les fonctionnalités d'intelligence artificielle ne sont pas incluses dans votre formule actuelle.", "error");
       openUpgradeModal("Résolution Automatisée par IA", "L'application des changements de planning par IA nécessite la formule Premium ou School.");
       return;
     }
@@ -4208,12 +4208,12 @@ Pour débloquer votre formule :
                 <button
                   onClick={() => {
                     if (!currentPlan.features.geminiAI) {
-                      openUpgradeModal("Conseiller Directeur IA Gemini Pro", "L'assistant IA d'aide à la décision et de diagnostic des plannings est réservé aux formules Premium et School.");
+                      openUpgradeModal("Conseiller Pédagogique IA Avancé", "L'assistant IA d'aide à la décision et de diagnostic des plannings est réservé aux formules Premium et School.");
                       return;
                     }
                     setActiveTab('ai');
                   }}
-                  title={!currentPlan.features.geminiAI ? "Nécessite le plan Premium ou School" : "Conseiller & Diagnostics IA Gemini"}
+                  title={!currentPlan.features.geminiAI ? "Nécessite le plan Premium ou School" : "Conseiller & Diagnostics IA"}
                   className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'ai'
                       ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25 border border-emerald-400/30'
                       : isLight
@@ -4223,7 +4223,7 @@ Pour débloquer votre formule :
                 >
                   <Sparkles className={`w-4 h-4 shrink-0 ${activeTab === 'ai' ? 'text-white' : isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
                   <span className={activeTab === 'ai' ? 'text-white' : isLight ? 'text-emerald-600 font-bold' : 'text-emerald-400 font-bold'}>
-                    Conseils IA Gemini
+                    Conseils IA
                   </span>
                   {!currentPlan.features.geminiAI && (
                     <VipLockBadge tooltip="Assistant IA réservé aux formules Premium & School" text="VIP" />
@@ -7309,7 +7309,7 @@ Pour débloquer votre formule :
                           {"Assistant IA de Suggestions & Diagnostics"}
                         </h2>
                         <p className="text-sm text-emerald-200/80 leading-relaxed max-w-xl">
-                          {"Utilisez notre intégration exclusive de l'IA de pointe Gemini (`gemini-3.5-flash`) pour obtenir des optimisations stratégiques de votre d'emploi du temps, désaturer l'occupation des professeurs et éliminer les trous inutiles dans le planning."}
+                          {"Utilisez notre moteur d'intelligence artificielle avancée pour obtenir des optimisations stratégiques de votre emploi du temps, désaturer l'occupation des professeurs et éliminer les trous inutiles dans le planning."}
                         </p>
                       </div>
 
@@ -7317,7 +7317,7 @@ Pour débloquer votre formule :
                         onClick={() => {
                           if (!currentPlan.features.geminiAI) {
                             triggerNotification("L'Assistant IA requiert un plan supérieur (Premium ou School).", "error");
-                            openUpgradeModal("Conseiller Directeur IA Gemini Pro", "Les requêtes et analyses automatisées par intelligence artificielle nécessitent la formule Premium ou School.");
+                            openUpgradeModal("Conseiller Pédagogique IA Avancé", "Les requêtes et analyses automatisées par intelligence artificielle nécessitent la formule Premium ou School.");
                             return;
                           }
                           if (timetable.length === 0 || classes.length === 0) {
@@ -7399,7 +7399,7 @@ Pour débloquer votre formule :
                             <Sparkles className="w-10 h-10 text-emerald-500 mx-auto opacity-40 mb-3 animate-bounce" />
                             <h4 className={`font-bold mb-1 ${isLight ? 'text-slate-800' : 'text-white'}`}>{"Aucune suggestion active"}</h4>
                             <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600 font-normal' : 'text-gray-400'}`}>
-                              {"Cliquez sur le bouton ci-dessus pour lancer une analyse approfondie de l'emploi du temps actuel par Gemini."}
+                              {"Cliquez sur le bouton ci-dessus pour lancer une analyse approfondie de l'emploi du temps actuel par l'Intelligence Artificielle."}
                             </p>
                           </div>
                         )
@@ -7448,7 +7448,7 @@ Pour débloquer votre formule :
                             onClick={() => {
                               if (!currentPlan.features.geminiAI) {
                                 triggerNotification("L'Assistant IA requiert un plan supérieur (Premium ou School).", "error");
-                                openUpgradeModal("Assistant Directeur IA Gemini Pro", "Le diagnostic chirurgical et la résolution automatique des contraintes par IA nécessitent la formule Premium ou School.");
+                                openUpgradeModal("Assistant Pédagogique IA Avancé", "Le diagnostic chirurgical et la résolution automatique des contraintes par IA nécessitent la formule Premium ou School.");
                                 return;
                               }
                               if (timetable.length === 0 || classes.length === 0) {

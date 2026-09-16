@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     const { plan, isSubscriptionActive } = authRes.context;
     if (!isSubscriptionActive || !plan.features?.geminiAI) {
       return NextResponse.json(
-        { error: 'Les fonctionnalités d\'intelligence artificielle Gemini ne sont pas incluses dans votre formule d\'abonnement active.' },
+        { error: 'Les fonctionnalités d\'intelligence artificielle ne sont pas incluses dans votre formule d\'abonnement active.' },
         { status: 403 }
       );
     }

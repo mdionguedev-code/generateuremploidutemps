@@ -503,7 +503,7 @@ export default function PedagogicalPlanningTab({
 
     setIsDuplicateModalOpen(false);
     setSelectedTargetClassIds([]);
-    setSuccessToast(`Grille dupliquée avec succès vers ${selectedTargetClassIds.length} classe(s) et sauvegardée en direct dans Supabase !`);
+    setSuccessToast(`Grille dupliquée avec succès vers ${selectedTargetClassIds.length} classe(s) et sauvegardée en direct !`);
     setTimeout(() => setSuccessToast(null), 3500);
   };
 
@@ -646,7 +646,7 @@ export default function PedagogicalPlanningTab({
       const created = await onAddSubject(trimmed);
       if (created) {
         setDirectSubjectName('');
-        setSuccessToast(`Matière "${created.name}" enregistrée dans Supabase !`);
+        setSuccessToast(`Matière "${created.name}" enregistrée avec succès !`);
         setTimeout(() => setSuccessToast(null), 3000);
       }
     }
@@ -700,7 +700,7 @@ export default function PedagogicalPlanningTab({
       });
       if (created) {
         setDirectClassName('');
-        setSuccessToast(`Classe "${created.name}" enregistrée dans Supabase !`);
+        setSuccessToast(`Classe "${created.name}" enregistrée avec succès !`);
         setTimeout(() => setSuccessToast(null), 3000);
       }
     }
@@ -915,7 +915,7 @@ export default function PedagogicalPlanningTab({
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5 shadow-xs">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                  <span>Base Supabase Live</span>
+                  <span>Synchronisé en direct</span>
                 </span>
               </div>
               <p className={`text-xs sm:text-sm mt-1 leading-relaxed ${isLight ? "text-slate-600" : "text-slate-300"}`}>
@@ -1212,7 +1212,7 @@ export default function PedagogicalPlanningTab({
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                        Matières enregistrées dans la base Supabase ({subjects.length}) :
+                        Matières enregistrées dans la base de données ({subjects.length}) :
                       </h4>
                     </div>
 
@@ -1581,7 +1581,7 @@ export default function PedagogicalPlanningTab({
                       </span>
                     </div>
                     <p className={`text-xs ${isLight ? "text-slate-600" : "text-slate-300"}`}>
-                      Ajoutez les divisions de votre établissement (ex: 6ème A, 5ème B, 1ère S...). Elles seront sauvegardées en direct dans votre base Supabase.
+                      Ajoutez les divisions de votre établissement (ex: 6ème A, 5ème B, 1ère S...). Elles seront sauvegardées en direct dans votre base de données.
                     </p>
 
                     {/* Saisie rapide directe */}
