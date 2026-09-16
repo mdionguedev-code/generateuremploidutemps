@@ -25,6 +25,7 @@ import {
   AlertCircle,
   ExternalLink,
   ChevronRight,
+  ChevronDown,
   Info
 } from 'lucide-react';
 import { Teacher, ClassGroup, Subject, ClassAssignment } from '@/lib/types';
@@ -40,6 +41,9 @@ interface PedagogicalPlanningTabProps {
   onAddTeacher?: (teacher: Omit<Teacher, 'id'>) => Promise<Teacher | null>;
   onAddClass?: (cls: Omit<ClassGroup, 'id'>) => Promise<ClassGroup | null>;
   onAddSubject?: (name: string) => Promise<Subject | null>;
+  onDeleteSubject?: (id: string, name: string) => Promise<void>;
+  onDeleteTeacher?: (id: string, name: string) => Promise<void>;
+  onDeleteClass?: (id: string, name: string) => Promise<void>;
   onNavigateToTeachers?: () => void;
   onNavigateToClasses?: () => void;
   isPremiumOrSchool: boolean;
@@ -71,6 +75,20 @@ const PRESET_COLORS = [
   '#f43f5e', '#f59e0b', '#10b981', '#06b6d4'
 ];
 
+const COMMON_CURRICULUM_SUBJECTS = [
+  "Mathématiques",
+  "Français",
+  "Histoire-Géographie",
+  "Anglais",
+  "SVT",
+  "Physique-Chimie",
+  "EPS",
+  "Philosophie",
+  "Espagnol",
+  "Arabe",
+  "Informatique"
+];
+
 export default function PedagogicalPlanningTab({
   teachers,
   classes,
@@ -80,6 +98,9 @@ export default function PedagogicalPlanningTab({
   onAddTeacher,
   onAddClass,
   onAddSubject,
+  onDeleteSubject,
+  onDeleteTeacher,
+  onDeleteClass,
   onNavigateToTeachers,
   onNavigateToClasses,
   isPremiumOrSchool,
@@ -117,6 +138,21 @@ export default function PedagogicalPlanningTab({
 
   const [isAddSubjectModalOpen, setIsAddSubjectModalOpen] = useState(false);
   const [newSubjectName, setNewSubjectName] = useState('');
+
+  // Sous-étapes Étape 1 : 1A (Matières) et 1B (Professeurs & Quotas)
+  const [step1SubTab, setStep1SubTab] = useState<'1A' | '1B'>((subjects && subjects.length > 0) ? '1B' : '1A');
+  // Sous-étapes Étape 2 : 2A (Classes) et 2B (Grilles Horaires)
+  const [step2SubTab, setStep2SubTab] = useState<'2A' | '2B'>((classes && classes.length > 0) ? '2B' : '2A');
+  // Filtre classe pour la vue 2B
+  const [selectedClassIdForGrid, setSelectedClassIdForGrid] = useState<string | null>(null);
+
+  // Saisie rapide directe
+  const [directSubjectName, setDirectSubjectName] = useState('');
+  const [directClassName, setDirectClassName] = useState('');
+
+  // Dropdown pour l'attribution des matières
+  const [isTeacherModalSubjectDropdownOpen, setIsTeacherModalSubjectDropdownOpen] = useState(false);
+  const [openTeacherSubjectDropdownId, setOpenTeacherSubjectDropdownId] = useState<string | null>(null);
 
   // Feedback Toasts
   const [successToast, setSuccessToast] = useState<string | null>(null);
@@ -520,6 +556,95 @@ export default function PedagogicalPlanningTab({
     setTimeout(() => setSuccessToast(null), 3000);
   };
 
+  // --- ACTIONS DIRECTES & SUPPRESSIONS EN BASE DE DONNÉES ---
+  const handleDirectAddSubject = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = directSubjectName.trim();
+    if (!trimmed) return;
+    if (subjects.some(s => s.name.toLowerCase() === trimmed.toLowerCase())) {
+      setErrorToast(`La matière "${trimmed}" est déjà enregistrée.`);
+      setTimeout(() => setErrorToast(null), 3000);
+      return;
+    }
+    if (onAddSubject) {
+      const created = await onAddSubject(trimmed);
+      if (created) {
+        setDirectSubjectName('');
+        setSuccessToast(`Matière "${created.name}" enregistrée dans Supabase !`);
+        setTimeout(() => setSuccessToast(null), 3000);
+      }
+    }
+  };
+
+  const handleQuickAddSubject = async (name: string) => {
+    if (subjects.some(s => s.name.toLowerCase() === name.toLowerCase())) {
+      setSuccessToast(`La matière "${name}" est déjà enregistrée.`);
+      setTimeout(() => setSuccessToast(null), 2500);
+      return;
+    }
+    if (onAddSubject) {
+      const created = await onAddSubject(name);
+      if (created) {
+        setSuccessToast(`Matière "${created.name}" ajoutée !`);
+        setTimeout(() => setSuccessToast(null), 2500);
+      }
+    }
+  };
+
+  const handleDeleteSubjectClick = async (sub: Subject) => {
+    if (window.confirm(`Supprimer définitivement la matière "${sub.name}" de la base de données ?`)) {
+      if (onDeleteSubject) {
+        await onDeleteSubject(sub.id, sub.name);
+      }
+      setSuccessToast(`Matière "${sub.name}" supprimée.`);
+      setTimeout(() => setSuccessToast(null), 3000);
+    }
+  };
+
+  const handleDirectAddClass = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = directClassName.trim();
+    if (!trimmed) return;
+    if (classes.some(c => c.name.toLowerCase() === trimmed.toLowerCase())) {
+      setErrorToast(`La classe "${trimmed}" est déjà créée.`);
+      setTimeout(() => setErrorToast(null), 3000);
+      return;
+    }
+    if (onAddClass) {
+      const created = await onAddClass({
+        name: trimmed,
+        assignments: [],
+        unavailability: []
+      });
+      if (created) {
+        setDirectClassName('');
+        setSuccessToast(`Classe "${created.name}" enregistrée dans Supabase !`);
+        setTimeout(() => setSuccessToast(null), 3000);
+      }
+    }
+  };
+
+  const handleDeleteClassClick = async (cls: ClassGroup) => {
+    if (window.confirm(`Supprimer définitivement la classe "${cls.name}" de la base de données ?`)) {
+      if (onDeleteClass) {
+        await onDeleteClass(cls.id, cls.name);
+      }
+      setSuccessToast(`Classe "${cls.name}" supprimée.`);
+      setTimeout(() => setSuccessToast(null), 3000);
+    }
+  };
+
+  const handleDeleteTeacherClick = async (teacher: Teacher) => {
+    if (window.confirm(`Supprimer définitivement l'enseignant "${teacher.name}" de la base de données ?`)) {
+      if (onDeleteTeacher) {
+        await onDeleteTeacher(teacher.id, teacher.name);
+        setLocalTeachers(prev => prev.filter(t => t.id !== teacher.id));
+      }
+      setSuccessToast(`Enseignant "${teacher.name}" supprimé.`);
+      setTimeout(() => setSuccessToast(null), 3000);
+    }
+  };
+
   // --- EXPORT PDF DE LA RÉPARTITION (100% SÉCURISÉ) ---
   const handleExportPdf = () => {
     try {
@@ -748,8 +873,8 @@ export default function PedagogicalPlanningTab({
         {/* Barre de Progression en 4 Étapes Claires */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mt-6 pt-5 border-t border-white/10">
           {[
-            { step: 1, title: '1. Professeurs & Quotas', desc: `${localTeachers.length} prof(s) configuré(s)` },
-            { step: 2, title: '2. Besoins des Classes', desc: `${(classes || []).length} classe(s) avec grilles` },
+            { step: 1, title: '1. Matières & Quotas Profs', desc: `${subjects.length} mat. • ${localTeachers.length} prof(s)` },
+            { step: 2, title: '2. Classes & Besoins Horaires', desc: `${(classes || []).length} classe(s) • grilles` },
             { step: 3, title: '3. Affectation Équitable', desc: 'Calcul d\'optimisation' },
             { step: 4, title: '4. Matrice & Validation', desc: 'Ajuster & Appliquer' }
           ].map(s => {
@@ -853,409 +978,824 @@ export default function PedagogicalPlanningTab({
         <div className="space-y-6">
 
           {/* =================================================================== */}
-          {/* ÉTAPE 1 : GESTION DES PROFESSEURS, QUOTAS & MATIÈRES                */}
+          {/* ÉTAPE 1 : MATIÈRES SÉQUENCÉES (1A) PUIS PROFESSEURS & QUOTAS (1B)   */}
           {/* =================================================================== */}
           {currentStep === 1 && (
             <div className={`p-6 rounded-3xl border space-y-6 ${
               isLight ? "bg-white border-slate-200 shadow-sm" : "bg-slate-900/80 border-white/10 shadow-xl"
             }`}>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 border-white/10">
-                <div>
-                  <h3 className="text-base font-black flex items-center gap-2">
-                    <GraduationCap className="w-5 h-5 text-indigo-500" />
-                    <span>Étape 1 : Quotas contractuels &amp; Disciplines enseignées</span>
-                  </h3>
+              {/* En-tête de l'Étape 1 avec les 2 sous-onglets 1A et 1B */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-5 border-white/10">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 font-bold text-[10px] uppercase tracking-wider">
+                      Étape 1 sur 4
+                    </span>
+                    <h3 className="text-lg font-black tracking-tight">
+                      Matières &amp; Équipe Enseignante
+                    </h3>
+                  </div>
                   <p className={`text-xs ${isLight ? "text-slate-500" : "text-slate-400"}`}>
-                    Ajustez le quota hebdomadaire (ex: 18h) et cochez les matières que chaque enseignant peut dispenser.
+                    Configurez d'abord en <strong>A</strong> vos matières scolaires, puis en <strong>B</strong> vos professeurs avec leurs quotas et disciplines.
                   </p>
                 </div>
-                
-                <div className="flex items-center gap-2 flex-wrap">
+
+                {/* Sélecteur de sous-étapes A et B */}
+                <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-black/20 border border-white/10 shrink-0">
                   <button
                     type="button"
-                    onClick={() => setIsAddTeacherModalOpen(true)}
-                    className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 flex items-center gap-1.5 cursor-pointer transition-all"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Ajouter Enseignant</span>
-                  </button>
-
-
-                  <button
-                    type="button"
-                    onClick={() => setIsAddSubjectModalOpen(true)}
-                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                      isLight ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200" : "bg-white/5 hover:bg-white/10 text-white border-white/10"
+                    onClick={() => setStep1SubTab('1A')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                      step1SubTab === '1A'
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                        : isLight ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-white/5'
                     }`}
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Matière</span>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
+                      step1SubTab === '1A' ? 'bg-white text-indigo-700' : 'bg-white/10 text-slate-400'
+                    }`}>A</span>
+                    <span>1A. Matières ({subjects.length})</span>
+                    {subjects.length > 0 && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setCurrentStep(2)}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-md flex items-center gap-1.5 cursor-pointer"
+                    onClick={() => setStep1SubTab('1B')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                      step1SubTab === '1B'
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                        : isLight ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    }`}
                   >
-                    <span>Passer aux besoins des classes</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
+                      step1SubTab === '1B' ? 'bg-white text-indigo-700' : 'bg-white/10 text-slate-400'
+                    }`}>B</span>
+                    <span>1B. Profs &amp; Quotas ({localTeachers.length})</span>
+                    {localTeachers.length > 0 && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
                   </button>
                 </div>
               </div>
 
-              {/* TABLE DES ENSEIGNANTS OU EMPTY STATE */}
-              {localTeachers.length === 0 ? (
-                <div className={`p-8 sm:p-12 text-center rounded-2xl border space-y-4 ${
-                  isLight ? "bg-slate-50 border-slate-200" : "bg-slate-950/40 border-white/5"
-                }`}>
-                  <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto shadow-inner">
-                    <GraduationCap className="w-7 h-7" />
-                  </div>
-                  <div className="max-w-md mx-auto space-y-1.5">
-                    <h4 className="text-base font-black">Aucun enseignant configuré pour l'instant</h4>
-                    <p className={`text-xs ${isLight ? "text-slate-500" : "text-slate-400"}`}>
-                      Pour démarrer la planification équitable en temps réel, ajoutez vos enseignants réels avec leurs quotas d'heures statutaires.
+              {/* =============================================================== */}
+              {/* SOUS-ÉTAPE 1A : DÉFINITION & VALIDATION DES MATIÈRES             */}
+              {/* =============================================================== */}
+              {step1SubTab === '1A' && (
+                <div className="space-y-6 animate-in fade-in duration-200">
+                  <div className={`p-5 rounded-2xl border space-y-3 ${
+                    isLight ? "bg-indigo-50/50 border-indigo-200/70" : "bg-indigo-950/20 border-indigo-500/20"
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-indigo-400 font-extrabold text-sm">
+                        <BookOpen className="w-4 h-4" />
+                        <span>Enregistrer les matières de votre établissement</span>
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-400">
+                        {subjects.length} matière(s) configurée(s)
+                      </span>
+                    </div>
+                    <p className={`text-xs ${isLight ? "text-slate-600" : "text-slate-300"}`}>
+                      Saisissez vos matières réelles. Une fois enregistrées, vous pourrez les attribuer instantanément aux professeurs à l'étape 1B via une liste déroulante.
                     </p>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsAddTeacherModalOpen(true)}
-                      className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>Ajouter un premier enseignant</span>
-                    </button>
-                    {onNavigateToTeachers && (
+
+                    {/* Formulaire d'ajout direct */}
+                    <form onSubmit={handleDirectAddSubject} className="flex flex-col sm:flex-row gap-2 pt-1">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          value={directSubjectName}
+                          onChange={(e) => setDirectSubjectName(e.target.value)}
+                          placeholder="Nom de la matière (ex: Mathématiques, Français, SVT, Anglais...)"
+                          className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none focus:border-indigo-500 ${
+                            isLight ? "bg-white border-slate-300 text-slate-900 shadow-sm" : "bg-slate-950 border-white/10 text-white"
+                          }`}
+                        />
+                      </div>
                       <button
-                        type="button"
-                        onClick={onNavigateToTeachers}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 ${
-                          isLight ? "bg-white hover:bg-slate-100 text-slate-700 border-slate-200" : "bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
-                        }`}
+                        type="submit"
+                        disabled={!directSubjectName.trim()}
+                        className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 cursor-pointer shrink-0 transition-all"
                       >
-                        <span>Aller à l'Étape 3 (Fiches Profs)</span>
-                        <ExternalLink className="w-3 h-3 opacity-60" />
+                        <Plus className="w-4 h-4" />
+                        <span>Ajouter la Matière</span>
                       </button>
+                    </form>
+
+                    {/* Raccourcis de matières scolaires réelles fréquentes */}
+                    <div className="pt-2 space-y-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Ajout rapide en 1 clic (matières scolaires courantes) :
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {COMMON_CURRICULUM_SUBJECTS.map((subName) => {
+                          const alreadyExists = subjects.some(s => s.name.toLowerCase() === subName.toLowerCase());
+                          if (alreadyExists) return null;
+                          return (
+                            <button
+                              key={subName}
+                              type="button"
+                              onClick={() => handleQuickAddSubject(subName)}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer flex items-center gap-1 ${
+                                isLight 
+                                  ? "bg-white hover:bg-indigo-50 text-slate-700 border-slate-200 hover:border-indigo-300 shadow-xs" 
+                                  : "bg-white/5 hover:bg-white/10 text-slate-300 border-white/5 hover:border-indigo-400/30"
+                              }`}
+                              title={`Ajouter ${subName}`}
+                            >
+                              <Plus className="w-3 h-3 text-indigo-400" />
+                              <span>{subName}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Liste des matières enregistrées */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                        Matières enregistrées dans la base Supabase ({subjects.length}) :
+                      </h4>
+                    </div>
+
+                    {subjects.length === 0 ? (
+                      <div className={`p-8 text-center rounded-2xl border space-y-2 ${
+                        isLight ? "bg-slate-50 border-slate-200" : "bg-slate-950/40 border-white/5"
+                      }`}>
+                        <BookOpen className="w-8 h-8 text-indigo-400 mx-auto opacity-70" />
+                        <p className="text-xs font-bold">Aucune matière enregistrée pour le moment.</p>
+                        <p className={`text-[11px] ${isLight ? "text-slate-500" : "text-slate-400"}`}>
+                          Saisissez le nom d'une matière ci-dessus ou cliquez sur l'un des raccourcis pour l'enregistrer dans votre établissement.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {subjects.map((sub) => {
+                          const qualifiedTeachers = localTeachers.filter(t => (t.subjectIds || []).includes(sub.id));
+                          return (
+                            <div
+                              key={sub.id}
+                              className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all ${
+                                isLight ? "bg-white border-slate-200 shadow-xs hover:border-indigo-300" : "bg-slate-950/60 border-white/10 hover:border-indigo-500/30"
+                              }`}
+                            >
+                              <div className="space-y-0.5 min-w-0">
+                                <div className="font-extrabold text-xs truncate" title={sub.name}>
+                                  {sub.name}
+                                </div>
+                                <div className="text-[10px] text-slate-400">
+                                  {qualifiedTeachers.length > 0 
+                                    ? `${qualifiedTeachers.length} prof(s) qualifié(s)`
+                                    : "Aucun prof assigné"}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSubjectClick(sub)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer transition-all shrink-0"
+                                title="Supprimer la matière de la base"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
-                </div>
-              ) : (
-                <div className="overflow-x-auto rounded-2xl border border-white/10">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className={`border-b ${isLight ? "bg-slate-50 text-slate-700 border-slate-200" : "bg-slate-950 text-slate-300 border-white/10"}`}>
-                        <th className="p-3.5 font-bold">Enseignant</th>
-                        <th className="p-3.5 font-bold">Quota Hebdomadaire (h/sem)</th>
-                        <th className="p-3.5 font-bold">Matières Enseignées (Cliquer pour basculer)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                      {localTeachers.map((teacher) => {
-                        const teacherSubs = teacher.subjectIds || [];
-                        return (
-                          <tr key={teacher.id} className={`transition-colors ${isLight ? "hover:bg-slate-50" : "hover:bg-white/[0.02]"}`}>
-                            <td className="p-3.5">
-                              <div className="flex items-center gap-2.5">
-                                <div 
-                                  className="w-3.5 h-3.5 rounded-full shrink-0 shadow-sm"
-                                  style={{ backgroundColor: teacher.color || '#6366f1' }}
-                                />
-                                <span className="font-bold text-xs">{teacher.name}</span>
-                              </div>
-                            </td>
-                            <td className="p-3.5">
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="number"
-                                  min={1}
-                                  max={40}
-                                  value={teacher.weeklyQuota || 18}
-                                  onChange={(e) => handleTeacherQuotaChange(teacher.id, parseInt(e.target.value) || 1)}
-                                  className={`w-20 px-2.5 py-1 rounded-lg border font-mono font-black text-center text-xs focus:outline-none focus:border-indigo-500 ${
-                                    isLight ? "bg-white border-slate-300 text-slate-900" : "bg-slate-950 border-white/10 text-white"
-                                  }`}
-                                />
-                                <span className="text-[11px] opacity-70">heures / semaine</span>
-                              </div>
-                            </td>
-                            <td className="p-3.5">
-                              <div className="flex flex-wrap gap-1.5">
-                                {(subjects || []).map((sub) => {
-                                  const isAssigned = teacherSubs.includes(sub.id);
-                                  return (
-                                    <button
-                                      key={sub.id}
-                                      type="button"
-                                      onClick={() => handleToggleTeacherSubject(teacher.id, sub.id)}
-                                      className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer border ${
-                                        isAssigned
-                                          ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
-                                          : isLight
-                                          ? "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"
-                                          : "bg-white/5 text-slate-400 border-white/5 hover:bg-white/10"
-                                      }`}
-                                    >
-                                      {isAssigned ? `✓ ${sub.name}` : `+ ${sub.name}`}
-                                    </button>
-                                  );
-                                })}
-                                {(subjects || []).length === 0 && (
-                                  <span className="text-[11px] text-slate-400 italic">Aucune matière créée. Cliquez sur "+ Matière".</span>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+
+                  {/* Bouton de validation pour passer à 1B */}
+                  <div className="pt-4 border-t border-white/10 flex items-center justify-between flex-wrap gap-3">
+                    <span className={`text-xs ${isLight ? "text-slate-500" : "text-slate-400"}`}>
+                      {subjects.length > 0 
+                        ? `✓ ${subjects.length} matière(s) prête(s) pour l'attribution aux professeurs.`
+                        : "Veuillez enregistrer au moins une matière avant de passer aux professeurs."}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => setStep1SubTab('1B')}
+                      disabled={subjects.length === 0}
+                      className="px-6 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-40 text-white font-black text-xs shadow-lg shadow-indigo-600/20 flex items-center gap-2 cursor-pointer transition-all"
+                    >
+                      <span>Valider les Matières &amp; Configurer les Professeurs (Étape 1B)</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               )}
 
-              {/* Résumé de capacité par matière */}
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider flex items-center gap-2 text-indigo-400">
-                    <BookOpen className="w-4 h-4" />
-                    <span>Capacité totale disponible par matière :</span>
-                  </h4>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddSubjectModalOpen(true)}
-                    className="text-xs text-indigo-400 hover:underline flex items-center gap-1 font-bold"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>Nouvelle Matière</span>
-                  </button>
-                </div>
+              {/* =============================================================== */}
+              {/* SOUS-ÉTAPE 1B : PROFESSEURS, QUOTAS & LISTE DÉROULANTE MATIÈRES  */}
+              {/* =============================================================== */}
+              {step1SubTab === '1B' && (
+                <div className="space-y-6 animate-in fade-in duration-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-sm font-black flex items-center gap-2 text-indigo-400">
+                        <Users className="w-4 h-4" />
+                        <span>Équipe Enseignante &amp; Quotas Contractuels</span>
+                      </h4>
+                      <p className={`text-xs ${isLight ? "text-slate-500" : "text-slate-400"}`}>
+                        Attribuez les matières à chaque professeur à l'aide de la liste déroulante et ajustez leur volume horaire statutaire.
+                      </p>
+                    </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-                  {subjectBalanceStats.map((stat) => (
-                    <div
-                      key={stat.subject.id}
-                      className={`p-3 rounded-xl border space-y-1 ${
-                        isLight ? "bg-slate-50 border-slate-200" : "bg-slate-950/60 border-white/5"
-                      }`}
-                    >
-                      <div className="font-bold text-xs truncate">{stat.subject.name}</div>
-                      <div className="text-[11px] flex items-center justify-between text-slate-400">
-                        <span>{stat.teachers.length} prof(s)</span>
-                        <span className="font-mono font-bold text-indigo-400">{stat.availableCapacity}h dispo</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsAddTeacherModalOpen(true)}
+                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 flex items-center gap-1.5 cursor-pointer transition-all"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>+ Ajouter un Professeur</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {localTeachers.length === 0 ? (
+                    <div className={`p-8 sm:p-12 text-center rounded-2xl border space-y-4 ${
+                      isLight ? "bg-slate-50 border-slate-200" : "bg-slate-950/40 border-white/5"
+                    }`}>
+                      <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto shadow-inner">
+                        <GraduationCap className="w-7 h-7" />
+                      </div>
+                      <div className="max-w-md mx-auto space-y-1.5">
+                        <h4 className="text-base font-black">Aucun professeur enregistré</h4>
+                        <p className={`text-xs ${isLight ? "text-slate-500" : "text-slate-400"}`}>
+                          Ajoutez les membres de votre corps professoral, fixez leur quota contractuel et assignez leurs disciplines.
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-center gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsAddTeacherModalOpen(true)}
+                          className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md flex items-center gap-2 cursor-pointer"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Ajouter un premier professeur</span>
+                        </button>
                       </div>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="overflow-x-auto rounded-2xl border border-white/10">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className={`border-b ${isLight ? "bg-slate-50 text-slate-700 border-slate-200" : "bg-slate-950 text-slate-300 border-white/10"}`}>
+                            <th className="p-3.5 font-bold">Enseignant</th>
+                            <th className="p-3.5 font-bold">Quota (h/semaine)</th>
+                            <th className="p-3.5 font-bold">Disciplines Enseignées (Liste Déroulante)</th>
+                            <th className="p-3.5 font-bold text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                          {localTeachers.map((teacher) => {
+                            const teacherSubs = teacher.subjectIds || [];
+                            const isDropdownOpen = openTeacherSubjectDropdownId === teacher.id;
+
+                            return (
+                              <tr key={teacher.id} className={`transition-colors ${isLight ? "hover:bg-slate-50" : "hover:bg-white/[0.02]"}`}>
+                                <td className="p-3.5">
+                                  <div className="flex items-center gap-2.5">
+                                    <div 
+                                      className="w-3.5 h-3.5 rounded-full shrink-0 shadow-sm"
+                                      style={{ backgroundColor: teacher.color || '#6366f1' }}
+                                    />
+                                    <span className="font-bold text-xs">{teacher.name}</span>
+                                  </div>
+                                </td>
+
+                                <td className="p-3.5">
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={40}
+                                      value={teacher.weeklyQuota || 18}
+                                      onChange={(e) => handleTeacherQuotaChange(teacher.id, parseInt(e.target.value) || 1)}
+                                      className={`w-20 px-2.5 py-1 rounded-lg border font-mono font-black text-center text-xs focus:outline-none focus:border-indigo-500 ${
+                                        isLight ? "bg-white border-slate-300 text-slate-900" : "bg-slate-950 border-white/10 text-white"
+                                      }`}
+                                    />
+                                    <span className="text-[11px] opacity-70">h / sem</span>
+                                  </div>
+                                </td>
+
+                                <td className="p-3.5 relative">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    {/* Badges des matières actuelles */}
+                                    {teacherSubs.map((sId) => {
+                                      const sub = subjects.find(s => s.id === sId);
+                                      if (!sub) return null;
+                                      return (
+                                        <span
+                                          key={sub.id}
+                                          className="px-2.5 py-0.5 rounded-lg text-[11px] font-semibold bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center gap-1"
+                                        >
+                                          <span>{sub.name}</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleToggleTeacherSubject(teacher.id, sub.id)}
+                                            className="hover:text-rose-400 cursor-pointer ml-0.5"
+                                            title="Retirer cette matière"
+                                          >
+                                            ×
+                                          </button>
+                                        </span>
+                                      );
+                                    })}
+
+                                    {/* Bouton pour ouvrir la liste déroulante des matières */}
+                                    <div className="relative inline-block">
+                                      <button
+                                        type="button"
+                                        onClick={() => setOpenTeacherSubjectDropdownId(isDropdownOpen ? null : teacher.id)}
+                                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border flex items-center gap-1 transition-all cursor-pointer ${
+                                          isDropdownOpen
+                                            ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
+                                            : isLight
+                                            ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
+                                            : "bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
+                                        }`}
+                                      >
+                                        <span>+ Matières</span>
+                                        <ChevronDown className={`w-3 h-3 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                                      </button>
+
+                                      {/* Menu déroulant des matières pour ce professeur */}
+                                      {isDropdownOpen && (
+                                        <div className={`absolute left-0 mt-1.5 z-40 w-56 p-2 rounded-2xl border shadow-2xl space-y-1 max-h-56 overflow-y-auto ${
+                                          isLight ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-indigo-500/30 text-white"
+                                        }`}>
+                                          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1">
+                                            Sélectionnez les matières :
+                                          </div>
+                                          {subjects.length === 0 ? (
+                                            <div className="text-[11px] p-2 text-slate-400 italic">
+                                              Aucune matière. Allez en 1A.
+                                            </div>
+                                          ) : (
+                                            subjects.map((sub) => {
+                                              const isAssigned = teacherSubs.includes(sub.id);
+                                              return (
+                                                <button
+                                                  key={sub.id}
+                                                  type="button"
+                                                  onClick={() => handleToggleTeacherSubject(teacher.id, sub.id)}
+                                                  className={`w-full text-left px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-between cursor-pointer transition-all ${
+                                                    isAssigned
+                                                      ? "bg-indigo-600 text-white font-bold"
+                                                      : isLight
+                                                      ? "hover:bg-slate-100 text-slate-700"
+                                                      : "hover:bg-white/5 text-slate-300"
+                                                  }`}
+                                                >
+                                                  <span className="truncate">{sub.name}</span>
+                                                  {isAssigned && <Check className="w-3.5 h-3.5 shrink-0" />}
+                                                </button>
+                                              );
+                                            })
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </td>
+
+                                <td className="p-3.5 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteTeacherClick(teacher)}
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer transition-all"
+                                    title="Supprimer l'enseignant"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Navigation vers Étape 2 */}
+                  <div className="pt-4 border-t border-white/10 flex items-center justify-between flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setStep1SubTab('1A')}
+                      className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        isLight ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200" : "bg-white/5 hover:bg-white/10 text-white border-white/10"
+                      }`}
+                    >
+                      ← Revenir à l'Étape 1A (Matières)
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(2)}
+                      disabled={localTeachers.length === 0}
+                      className="px-6 py-3 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-40 text-white font-black text-xs shadow-lg shadow-purple-600/20 flex items-center gap-2 cursor-pointer transition-all"
+                    >
+                      <span>Valider l'Équipe &amp; Passer à l'Étape 2 (Besoins des Classes)</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
           {/* =================================================================== */}
-          {/* ÉTAPE 2 : BESOINS DES CLASSES (GRILLES HORAIRES PAR MATIÈRE)        */}
+          {/* ÉTAPE 2 : CLASSES (2A) PUIS VOLUMES HORAIRES HEBDOMADAIRES (2B)     */}
           {/* =================================================================== */}
           {currentStep === 2 && (
             <div className={`p-6 rounded-3xl border space-y-6 ${
               isLight ? "bg-white border-slate-200 shadow-sm" : "bg-slate-900/80 border-white/10 shadow-xl"
             }`}>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4 border-white/10">
-                <div>
-                  <h3 className="text-base font-black flex items-center gap-2">
-                    <BookOpen className="w-5 h-5 text-indigo-500" />
-                    <span>Étape 2 : Définition des besoins horaires des classes</span>
-                  </h3>
+              {/* En-tête de l'Étape 2 avec sous-onglets 2A et 2B */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-5 border-white/10">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 font-bold text-[10px] uppercase tracking-wider">
+                      Étape 2 sur 4
+                    </span>
+                    <h3 className="text-lg font-black tracking-tight">
+                      Classes &amp; Besoins Horaires Hebdomadaires
+                    </h3>
+                  </div>
                   <p className={`text-xs ${isLight ? "text-slate-500" : "text-slate-400"}`}>
-                    Renseignez les matières requises pour chaque division et leur volume d'heures hebdomadaires.
+                    En <strong>A</strong>, ajoutez vos classes/divisions, puis en <strong>B</strong>, attribuez les matières et leurs volumes horaires par semaine.
                   </p>
                 </div>
-                
-                <div className="flex items-center gap-2 flex-wrap">
+
+                {/* Sélecteur de sous-étapes 2A et 2B */}
+                <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-black/20 border border-white/10 shrink-0">
                   <button
                     type="button"
-                    onClick={() => setCurrentStep(1)}
-                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                      isLight ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200" : "bg-white/5 hover:bg-white/10 text-white border-white/10"
+                    onClick={() => setStep2SubTab('2A')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                      step2SubTab === '2A'
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                        : isLight ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-white/5'
                     }`}
                   >
-                    Précédent
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
+                      step2SubTab === '2A' ? 'bg-white text-indigo-700' : 'bg-white/10 text-slate-400'
+                    }`}>A</span>
+                    <span>2A. Classes ({(classes || []).length})</span>
+                    {(classes || []).length > 0 && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
                   </button>
+
                   <button
                     type="button"
-                    onClick={() => setIsAddClassModalOpen(true)}
-                    className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md flex items-center gap-1.5 cursor-pointer"
+                    onClick={() => setStep2SubTab('2B')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                      step2SubTab === '2B'
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                        : isLight ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    }`}
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Ajouter Classe</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={runFairOptimizationAlgorithm}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/20 flex items-center gap-2 cursor-pointer"
-                  >
-                    <Zap className="w-4 h-4 text-amber-300" />
-                    <span>Calculer l'affectation équitable</span>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
+                      step2SubTab === '2B' ? 'bg-white text-indigo-700' : 'bg-white/10 text-slate-400'
+                    }`}>B</span>
+                    <span>2B. Volumes Horaires / Semaine</span>
                   </button>
                 </div>
               </div>
 
-              {/* GRILLES HORAIRES PAR CLASSE OU EMPTY STATE */}
-              {(classes || []).length === 0 ? (
-                <div className={`p-8 sm:p-12 text-center rounded-2xl border space-y-4 ${
-                  isLight ? "bg-slate-50 border-slate-200" : "bg-slate-950/40 border-white/5"
-                }`}>
-                  <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto shadow-inner">
-                    <BookOpen className="w-7 h-7" />
-                  </div>
-                  <div className="max-w-md mx-auto space-y-1.5">
-                    <h4 className="text-base font-black">Aucune classe configurée</h4>
-                    <p className={`text-xs ${isLight ? "text-slate-500" : "text-slate-400"}`}>
-                      Créez vos divisions de classes (ex: 6ème A, 3ème B) pour définir leurs volumes d'heures par matière.
+              {/* =============================================================== */}
+              {/* SOUS-ÉTAPE 2A : CRÉATION & GESTION DES CLASSES                  */}
+              {/* =============================================================== */}
+              {step2SubTab === '2A' && (
+                <div className="space-y-6 animate-in fade-in duration-200">
+                  <div className={`p-5 rounded-2xl border space-y-3 ${
+                    isLight ? "bg-indigo-50/50 border-indigo-200/70" : "bg-indigo-950/20 border-indigo-500/20"
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-indigo-400 font-extrabold text-sm">
+                        <BookOpen className="w-4 h-4" />
+                        <span>Créer les classes / divisions scolaires</span>
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-400">
+                        {(classes || []).length} classe(s) créée(s)
+                      </span>
+                    </div>
+                    <p className={`text-xs ${isLight ? "text-slate-600" : "text-slate-300"}`}>
+                      Ajoutez les divisions de votre établissement (ex: 6ème A, 5ème B, 1ère S...). Elles seront sauvegardées en direct dans votre base Supabase.
                     </p>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsAddClassModalOpen(true)}
-                      className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>Ajouter une première classe</span>
-                    </button>
-                    {onNavigateToClasses && (
-                      <button
-                        type="button"
-                        onClick={onNavigateToClasses}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 ${
-                          isLight ? "bg-white hover:bg-slate-100 text-slate-700 border-slate-200" : "bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
+
+                    {/* Saisie rapide directe */}
+                    <form onSubmit={handleDirectAddClass} className="flex flex-col sm:flex-row gap-2 pt-1">
+                      <input
+                        type="text"
+                        value={directClassName}
+                        onChange={(e) => setDirectClassName(e.target.value)}
+                        placeholder="Nom de la classe (ex: 6ème A, 5ème B, Seconde C, Terminale S...)"
+                        className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none focus:border-indigo-500 ${
+                          isLight ? "bg-white border-slate-300 text-slate-900 shadow-sm" : "bg-slate-950 border-white/10 text-white"
                         }`}
+                      />
+                      <button
+                        type="submit"
+                        disabled={!directClassName.trim()}
+                        className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 cursor-pointer shrink-0 transition-all"
                       >
-                        <span>Aller à l'Étape 4 (Classes)</span>
-                        <ExternalLink className="w-3 h-3 opacity-60" />
+                        <Plus className="w-4 h-4" />
+                        <span>Ajouter la Classe</span>
                       </button>
+                    </form>
+                  </div>
+
+                  {/* Grille des classes créées */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                      Divisions scolaires configurées ({(classes || []).length}) :
+                    </h4>
+
+                    {(classes || []).length === 0 ? (
+                      <div className={`p-8 text-center rounded-2xl border space-y-2 ${
+                        isLight ? "bg-slate-50 border-slate-200" : "bg-slate-950/40 border-white/5"
+                      }`}>
+                        <BookOpen className="w-8 h-8 text-indigo-400 mx-auto opacity-70" />
+                        <p className="text-xs font-bold">Aucune classe configurée pour le moment.</p>
+                        <p className={`text-[11px] ${isLight ? "text-slate-500" : "text-slate-400"}`}>
+                          Renseignez le nom d'une classe ci-dessus pour la créer immédiatement.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {(classes || []).map((cls) => {
+                          const clsReqs = classRequirements[cls.id] || {};
+                          const totalHours = Object.values(clsReqs).reduce((a, b) => a + b, 0);
+
+                          return (
+                            <div
+                              key={cls.id}
+                              className={`p-4 rounded-2xl border space-y-2 transition-all ${
+                                isLight ? "bg-white border-slate-200 shadow-xs hover:border-indigo-300" : "bg-slate-950/60 border-white/10 hover:border-indigo-500/30"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-extrabold text-sm truncate">{cls.name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteClassClick(cls)}
+                                  className="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer transition-all"
+                                  title="Supprimer la classe"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-slate-400">Volume horaire :</span>
+                                <span className={`font-mono font-bold px-2 py-0.5 rounded-full ${
+                                  totalHours > 0
+                                    ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
+                                    : isLight ? "bg-slate-100 text-slate-500" : "bg-white/5 text-slate-400"
+                                }`}>
+                                  {totalHours > 0 ? `${totalHours} h / sem` : "Non défini"}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                      Grille horaire par classe ({classes.length} classes) :
-                    </h4>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {classes.map((cls) => {
-                      const clsReqs = classRequirements[cls.id] || {};
-                      const totalHours = Object.values(clsReqs).reduce((a, b) => a + b, 0);
+                  {/* Bouton de passage à 2B */}
+                  <div className="pt-4 border-t border-white/10 flex items-center justify-between flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(1)}
+                      className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        isLight ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200" : "bg-white/5 hover:bg-white/10 text-white border-white/10"
+                      }`}
+                    >
+                      ← Revenir à l'Étape 1 (Professeurs)
+                    </button>
 
-                      return (
-                        <div
-                          key={cls.id}
-                          className={`p-4 rounded-2xl border space-y-3 transition-all ${
-                            isLight ? "bg-slate-50/70 border-slate-200 hover:border-indigo-300" : "bg-slate-950/60 border-white/10 hover:border-indigo-500/30"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between border-b pb-2 border-white/5">
-                            <div className="flex items-center gap-2">
-                              <span className="font-extrabold text-sm">{cls.name}</span>
-                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 font-bold">
-                                {totalHours}h / semaine
-                              </span>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDuplicateSourceClassId(cls.id);
-                                setSelectedTargetClassIds(classes.filter(c => c.id !== cls.id).map(c => c.id));
-                                setIsDuplicateModalOpen(true);
-                              }}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border flex items-center gap-1.5 transition-all cursor-pointer ${
-                                isLight ? "bg-white hover:bg-slate-100 text-slate-700 border-slate-200" : "bg-white/5 hover:bg-white/10 text-white border-white/10"
-                              }`}
-                              title="Dupliquer ces volumes vers d'autres classes"
-                            >
-                              <Copy className="w-3 h-3 text-indigo-400" />
-                              <span>Dupliquer</span>
-                            </button>
-                          </div>
-
-                          {/* Matières de cette classe */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {(subjects || []).map((sub) => {
-                              const hours = clsReqs[sub.id] || 0;
-                              return (
-                                <div
-                                  key={sub.id}
-                                  className={`p-2 rounded-xl border flex items-center justify-between gap-2 ${
-                                    hours > 0
-                                      ? isLight ? "bg-white border-indigo-200" : "bg-slate-900 border-indigo-500/30"
-                                      : isLight ? "bg-slate-100/50 border-slate-200 opacity-60" : "bg-slate-950/40 border-white/5 opacity-50"
-                                  }`}
-                                >
-                                  <span className="text-xs font-semibold truncate">{sub.name}</span>
-                                  <div className="flex items-center gap-1 shrink-0">
-                                    <input
-                                      type="number"
-                                      min={0}
-                                      max={12}
-                                      value={hours}
-                                      onChange={(e) => handleClassSubjectHoursChange(cls.id, sub.id, parseInt(e.target.value) || 0)}
-                                      className={`w-14 px-2 py-0.5 rounded-lg border font-mono font-bold text-center text-xs focus:outline-none focus:border-indigo-500 ${
-                                        isLight ? "bg-white border-slate-300 text-slate-900" : "bg-slate-950 border-white/10 text-white"
-                                      }`}
-                                    />
-                                    <span className="text-[10px] text-slate-400">h</span>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
+                    <button
+                      type="button"
+                      onClick={() => setStep2SubTab('2B')}
+                      disabled={(classes || []).length === 0}
+                      className="px-6 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-40 text-white font-black text-xs shadow-lg shadow-indigo-600/20 flex items-center gap-2 cursor-pointer transition-all"
+                    >
+                      <span>Valider les Classes &amp; Définir les Volumes Horaires (Étape 2B)</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               )}
 
-              {/* Balance Offre vs Demande par Matière */}
-              <div className="space-y-3 pt-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider flex items-center gap-2 text-indigo-400">
-                  <TrendingUp className="w-4 h-4" />
-                  <span>Équilibre des volumes horaires (Demande vs Disponibilité) :</span>
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {subjectBalanceStats.map((stat) => (
-                    <div
-                      key={stat.subject.id}
-                      className={`p-3.5 rounded-2xl border space-y-2 ${
-                        stat.status === 'deficit'
-                          ? isLight ? "bg-rose-50 border-rose-200 text-rose-950" : "bg-rose-950/20 border-rose-500/30 text-rose-200"
-                          : stat.status === 'perfect'
-                          ? isLight ? "bg-emerald-50 border-emerald-200 text-emerald-950" : "bg-emerald-950/20 border-emerald-500/30 text-emerald-200"
-                          : isLight ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-slate-950/60 border-white/5 text-white"
+              {/* =============================================================== */}
+              {/* SOUS-ÉTAPE 2B : VOLUMES HORAIRES HEBDOMADAIRES PAR MATIÈRE      */}
+              {/* =============================================================== */}
+              {step2SubTab === '2B' && (
+                <div className="space-y-6 animate-in fade-in duration-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-black flex items-center gap-2 text-indigo-400">
+                        <CalendarCheck className="w-4 h-4" />
+                        <span>Attribution des Matières &amp; Volumes d'Heures / Semaine</span>
+                      </h4>
+                      <p className={`text-xs ${isLight ? "text-slate-500" : "text-slate-400"}`}>
+                        Indiquez pour chaque classe le nombre d'heures hebdomadaires requis par matière. Dupliquez en 1 clic pour gagner du temps.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={runFairOptimizationAlgorithm}
+                      className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-xs shadow-lg shadow-indigo-600/20 flex items-center gap-2 cursor-pointer transition-all"
+                    >
+                      <Zap className="w-4 h-4 text-amber-300" />
+                      <span>⚡ Calculer l'Affectation Équitable (Étape 3)</span>
+                    </button>
+                  </div>
+
+                  {/* Sélecteur d'onglets de classes pour naviguer confortablement */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedClassIdForGrid(null)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
+                        selectedClassIdForGrid === null
+                          ? "bg-indigo-600 text-white shadow-sm"
+                          : isLight ? "bg-slate-100 text-slate-700 hover:bg-slate-200" : "bg-white/5 text-slate-300 hover:bg-white/10"
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs">{stat.subject.name}</span>
-                        <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
-                          stat.status === 'deficit'
-                            ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                            : stat.status === 'perfect'
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                        }`}>
-                          {stat.status === 'deficit' ? `Déficit: ${Math.abs(stat.diff)}h` : stat.status === 'perfect' ? 'Équilibre parfait' : `Surplus: +${stat.diff}h`}
-                        </span>
-                      </div>
+                      Toutes les classes ({(classes || []).length})
+                    </button>
 
-                      <div className="flex items-center justify-between text-[11px] opacity-80">
-                        <span>Besoin classes : <strong>{stat.requiredHours}h</strong> ({stat.classesCount} classes)</span>
-                        <span>Dispo profs : <strong>{stat.availableCapacity}h</strong></span>
-                      </div>
+                    {(classes || []).map((cls) => {
+                      const totalH = Object.values(classRequirements[cls.id] || {}).reduce((a, b) => a + b, 0);
+                      const isSelected = selectedClassIdForGrid === cls.id;
+                      return (
+                        <button
+                          key={cls.id}
+                          type="button"
+                          onClick={() => setSelectedClassIdForGrid(cls.id)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1.5 ${
+                            isSelected
+                              ? "bg-indigo-600 text-white shadow-sm"
+                              : isLight ? "bg-slate-100 text-slate-700 hover:bg-slate-200" : "bg-white/5 text-slate-300 hover:bg-white/10"
+                          }`}
+                        >
+                          <span>{cls.name}</span>
+                          <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
+                            isSelected ? "bg-white/20 text-white" : "bg-black/20 text-slate-400"
+                          }`}>
+                            {totalH}h
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Grilles horaires des classes filtrées */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {(classes || [])
+                      .filter(c => selectedClassIdForGrid === null || c.id === selectedClassIdForGrid)
+                      .map((cls) => {
+                        const clsReqs = classRequirements[cls.id] || {};
+                        const totalHours = Object.values(clsReqs).reduce((a, b) => a + b, 0);
+
+                        return (
+                          <div
+                            key={cls.id}
+                            className={`p-4 rounded-2xl border space-y-3 transition-all ${
+                              isLight ? "bg-slate-50/80 border-slate-200 shadow-xs" : "bg-slate-950/60 border-white/10"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between border-b pb-2 border-white/5">
+                              <div className="flex items-center gap-2">
+                                <span className="font-black text-sm">{cls.name}</span>
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 font-bold">
+                                  {totalHours} h / semaine
+                                </span>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDuplicateSourceClassId(cls.id);
+                                  setSelectedTargetClassIds((classes || []).filter(c => c.id !== cls.id).map(c => c.id));
+                                  setIsDuplicateModalOpen(true);
+                                }}
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border flex items-center gap-1.5 transition-all cursor-pointer ${
+                                  isLight ? "bg-white hover:bg-slate-100 text-slate-700 border-slate-200 shadow-xs" : "bg-white/5 hover:bg-white/10 text-white border-white/10"
+                                }`}
+                                title="Dupliquer ces volumes vers d'autres classes"
+                              >
+                                <Copy className="w-3 h-3 text-indigo-400" />
+                                <span>Dupliquer</span>
+                              </button>
+                            </div>
+
+                            {/* Matières avec inputs numériques */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {(subjects || []).map((sub) => {
+                                const hours = clsReqs[sub.id] || 0;
+                                return (
+                                  <div
+                                    key={sub.id}
+                                    className={`p-2 rounded-xl border flex items-center justify-between gap-2 ${
+                                      hours > 0
+                                        ? isLight ? "bg-white border-indigo-200" : "bg-slate-900 border-indigo-500/30"
+                                        : isLight ? "bg-slate-100/40 border-slate-200 opacity-60" : "bg-slate-950/40 border-white/5 opacity-50"
+                                    }`}
+                                  >
+                                    <span className="text-xs font-semibold truncate" title={sub.name}>{sub.name}</span>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        max={15}
+                                        value={hours}
+                                        onChange={(e) => handleClassSubjectHoursChange(cls.id, sub.id, parseInt(e.target.value) || 0)}
+                                        className={`w-14 px-2 py-1 rounded-lg border font-mono font-bold text-center text-xs focus:outline-none focus:border-indigo-500 ${
+                                          isLight ? "bg-white border-slate-300 text-slate-900" : "bg-slate-950 border-white/10 text-white"
+                                        }`}
+                                      />
+                                      <span className="text-[10px] text-slate-400">h</span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+
+                  {/* Balance Demande vs Disponibilité */}
+                  <div className="space-y-3 pt-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider flex items-center gap-2 text-indigo-400">
+                      <TrendingUp className="w-4 h-4" />
+                      <span>Équilibre des volumes horaires (Demande des classes vs Capacité des profs) :</span>
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {subjectBalanceStats.map((stat) => (
+                        <div
+                          key={stat.subject.id}
+                          className={`p-3.5 rounded-2xl border space-y-2 ${
+                            stat.status === 'deficit'
+                              ? isLight ? "bg-rose-50 border-rose-200 text-rose-950" : "bg-rose-950/20 border-rose-500/30 text-rose-200"
+                              : stat.status === 'perfect'
+                              ? isLight ? "bg-emerald-50 border-emerald-200 text-emerald-950" : "bg-emerald-950/20 border-emerald-500/30 text-emerald-200"
+                              : isLight ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-slate-950/60 border-white/5 text-white"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-xs">{stat.subject.name}</span>
+                            <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                              stat.status === 'deficit'
+                                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                : stat.status === 'perfect'
+                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                            }`}>
+                              {stat.status === 'deficit' ? `Déficit: ${Math.abs(stat.diff)}h` : stat.status === 'perfect' ? 'Équilibre parfait' : `Surplus: +${stat.diff}h`}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-[11px] opacity-80">
+                            <span>Classes : <strong>{stat.requiredHours}h</strong></span>
+                            <span>Profs : <strong>{stat.availableCapacity}h</strong></span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+
+                  {/* Actions de bas de page 2B */}
+                  <div className="pt-4 border-t border-white/10 flex items-center justify-between flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setStep2SubTab('2A')}
+                      className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        isLight ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200" : "bg-white/5 hover:bg-white/10 text-white border-white/10"
+                      }`}
+                    >
+                      ← Revenir à l'Étape 2A (Classes)
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={runFairOptimizationAlgorithm}
+                      className="px-6 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-xs shadow-lg shadow-indigo-600/20 flex items-center gap-2 cursor-pointer transition-all"
+                    >
+                      <Zap className="w-4 h-4 text-amber-300" />
+                      <span>⚡ Lancer le Calcul d'Affectation Équitable (Étape 3)</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -1561,35 +2101,84 @@ export default function PedagogicalPlanningTab({
                 />
               </div>
 
-              <div>
-                <label className="block font-bold mb-1.5">Matières enseignées :</label>
-                <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1">
-                  {(subjects || []).map((sub) => {
-                    const isSelected = newTeacherSubjectIds.includes(sub.id);
-                    return (
-                      <button
-                        type="button"
-                        key={sub.id}
-                        onClick={() => {
-                          if (isSelected) {
-                            setNewTeacherSubjectIds(prev => prev.filter(id => id !== sub.id));
-                          } else {
-                            setNewTeacherSubjectIds(prev => [...prev, sub.id]);
-                          }
-                        }}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer border ${
-                          isSelected
-                            ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
-                            : isLight
-                            ? "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
-                            : "bg-white/5 text-slate-400 border-white/5 hover:bg-white/10"
-                        }`}
-                      >
-                        {isSelected ? `✓ ${sub.name}` : `+ ${sub.name}`}
-                      </button>
-                    );
-                  })}
-                </div>
+              <div className="relative">
+                <label className="block font-bold mb-1.5">Matières enseignées (Liste déroulante) :</label>
+                <button
+                  type="button"
+                  onClick={() => setIsTeacherModalSubjectDropdownOpen(!isTeacherModalSubjectDropdownOpen)}
+                  className={`w-full px-3 py-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                    isLight ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-slate-950 border-white/10 text-white"
+                  }`}
+                >
+                  <span className="truncate">
+                    {newTeacherSubjectIds.length === 0
+                      ? "Sélectionner les disciplines..."
+                      : `${newTeacherSubjectIds.length} matière(s) sélectionnée(s)`}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isTeacherModalSubjectDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isTeacherModalSubjectDropdownOpen && (
+                  <div className={`absolute z-30 mt-1.5 w-full rounded-2xl border p-2 shadow-2xl space-y-1 max-h-48 overflow-y-auto ${
+                    isLight ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-indigo-500/30 text-white"
+                  }`}>
+                    {subjects.length === 0 ? (
+                      <div className="p-2 text-slate-400 italic text-center">
+                        Aucune matière enregistrée. Veuillez d'abord en ajouter à l'Étape 1A.
+                      </div>
+                    ) : (
+                      subjects.map((sub) => {
+                        const isSelected = newTeacherSubjectIds.includes(sub.id);
+                        return (
+                          <button
+                            type="button"
+                            key={sub.id}
+                            onClick={() => {
+                              if (isSelected) {
+                                setNewTeacherSubjectIds(prev => prev.filter(id => id !== sub.id));
+                              } else {
+                                setNewTeacherSubjectIds(prev => [...prev, sub.id]);
+                              }
+                            }}
+                            className={`w-full text-left px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-between cursor-pointer transition-all ${
+                              isSelected
+                                ? "bg-indigo-600 text-white font-bold"
+                                : isLight ? "hover:bg-slate-100 text-slate-700" : "hover:bg-white/5 text-slate-300"
+                            }`}
+                          >
+                            <span>{sub.name}</span>
+                            {isSelected && <Check className="w-3.5 h-3.5" />}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+
+                {/* Badges des matières sélectionnées */}
+                {newTeacherSubjectIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {newTeacherSubjectIds.map(id => {
+                      const sub = subjects.find(s => s.id === id);
+                      if (!sub) return null;
+                      return (
+                        <span
+                          key={id}
+                          className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center gap-1"
+                        >
+                          <span>{sub.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setNewTeacherSubjectIds(prev => prev.filter(sid => sid !== id))}
+                            className="hover:text-rose-400 ml-0.5"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div>

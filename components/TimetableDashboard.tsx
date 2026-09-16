@@ -6458,6 +6458,9 @@ Pour débloquer votre formule :
                     onAddTeacher={handleAddTeacherFromPlanning}
                     onAddClass={handleAddClassFromPlanning}
                     onAddSubject={handleAddSubjectFromPlanning}
+                    onDeleteSubject={handleDeleteSubject}
+                    onDeleteTeacher={handleDeleteTeacher}
+                    onDeleteClass={handleDeleteClass}
                     onNavigateToTeachers={() => setActiveTab('teachers')}
                     onNavigateToClasses={() => setActiveTab('classes')}
                     isPremiumOrSchool={Boolean(
