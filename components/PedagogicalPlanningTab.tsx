@@ -164,32 +164,23 @@ export default function PedagogicalPlanningTab({
   }, [teachers]);
 
   useEffect(() => {
-    // Initialiser les besoins des classes à partir des assignments existants
+    // Initialiser les besoins des classes à partir des assignments réels de Supabase
     const reqs: { [classId: string]: { [subjectId: string]: number } } = {};
     const initialComputed: { [key: string]: string } = {};
 
     (classes || []).forEach(c => {
       reqs[c.id] = {};
       (c.assignments || []).forEach(a => {
-        if (!reqs[c.id][a.subjectId]) {
+        if (a.subjectId && a.hoursPerWeek > 0) {
           reqs[c.id][a.subjectId] = a.hoursPerWeek;
-        } else {
-          reqs[c.id][a.subjectId] = Math.max(reqs[c.id][a.subjectId], a.hoursPerWeek);
         }
-        if (a.teacherId) {
+        if (a.teacherId && a.subjectId) {
           initialComputed[`${c.id}_${a.subjectId}`] = a.teacherId;
         }
       });
     });
 
-    setClassRequirements(prev => {
-      const merged = { ...reqs };
-      Object.entries(prev).forEach(([cId, sMap]) => {
-        if (!merged[cId]) merged[cId] = {};
-        merged[cId] = { ...merged[cId], ...sMap };
-      });
-      return merged;
-    });
+    setClassRequirements(reqs);
 
     if (Object.keys(initialComputed).length > 0) {
       setComputedAssignments(prev => ({ ...initialComputed, ...prev }));
@@ -401,16 +392,47 @@ export default function PedagogicalPlanningTab({
   };
 
   const handleClassSubjectHoursChange = (classId: string, subjectId: string, hours: number) => {
+    const validHours = hours <= 0 ? 0 : Math.min(15, Math.max(1, hours));
+
     setClassRequirements(prev => {
       const next = { ...prev };
       if (!next[classId]) next[classId] = {};
-      if (hours <= 0) {
+      if (validHours <= 0) {
         delete next[classId][subjectId];
       } else {
-        next[classId][subjectId] = Math.min(15, Math.max(1, hours));
+        next[classId][subjectId] = validHours;
       }
       return next;
     });
+
+    // Synchroniser en direct avec les classes et la base de données Supabase
+    const updatedClasses = (classes || []).map(cls => {
+      if (cls.id !== classId) return cls;
+      const currentAssignments = cls.assignments || [];
+      let nextAssignments: ClassAssignment[];
+      if (validHours <= 0) {
+        nextAssignments = currentAssignments.filter(a => a.subjectId !== subjectId);
+      } else {
+        const existingIndex = currentAssignments.findIndex(a => a.subjectId === subjectId);
+        if (existingIndex >= 0) {
+          nextAssignments = currentAssignments.map((a, idx) =>
+            idx === existingIndex ? { ...a, hoursPerWeek: validHours } : a
+          );
+        } else {
+          nextAssignments = [
+            ...currentAssignments,
+            {
+              teacherId: computedAssignments[`${classId}_${subjectId}`] || '',
+              subjectId,
+              hoursPerWeek: validHours,
+              group: 'all'
+            }
+          ];
+        }
+      }
+      return { ...cls, assignments: nextAssignments };
+    });
+    onUpdateClasses(updatedClasses);
   };
 
   const handleExecuteDuplication = () => {
@@ -425,9 +447,28 @@ export default function PedagogicalPlanningTab({
       return next;
     });
 
+    // Synchroniser en direct les classes cibles dupliquées avec Supabase
+    const updatedClasses = (classes || []).map(cls => {
+      if (!selectedTargetClassIds.includes(cls.id)) return cls;
+      const nextAssignments: ClassAssignment[] = [];
+      Object.entries(sourceGrid).forEach(([subId, h]) => {
+        if (h > 0) {
+          const existing = (cls.assignments || []).find(a => a.subjectId === subId);
+          nextAssignments.push({
+            teacherId: existing?.teacherId || computedAssignments[`${cls.id}_${subId}`] || '',
+            subjectId: subId,
+            hoursPerWeek: Math.min(15, Math.max(1, h)),
+            group: existing?.group || 'all'
+          });
+        }
+      });
+      return { ...cls, assignments: nextAssignments };
+    });
+    onUpdateClasses(updatedClasses);
+
     setIsDuplicateModalOpen(false);
     setSelectedTargetClassIds([]);
-    setSuccessToast(`Grille dupliquée avec succès vers ${selectedTargetClassIds.length} classe(s) !`);
+    setSuccessToast(`Grille dupliquée avec succès vers ${selectedTargetClassIds.length} classe(s) et sauvegardée en direct dans Supabase !`);
     setTimeout(() => setSuccessToast(null), 3500);
   };
 
@@ -818,6 +859,10 @@ export default function PedagogicalPlanningTab({
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black uppercase tracking-wider bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-500 border border-amber-500/30 flex items-center gap-1">
                   <Crown className="w-3 h-3" />
                   Premium &amp; School
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5 shadow-xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  <span>Base Supabase Live</span>
                 </span>
               </div>
               <p className={`text-xs sm:text-sm mt-1 leading-relaxed ${isLight ? "text-slate-600" : "text-slate-300"}`}>

@@ -2449,6 +2449,20 @@ Pour débloquer votre formule :
       setClasses(updatedCls);
       setTimetable(updatedTable);
 
+      if (currentUserId) {
+        // Mettre à jour en direct les professeurs et classes liés dans Supabase
+        teachers.forEach(t => {
+          if (t.subjectIds.includes(id)) {
+            dbUpdateTeacher(t.id, { subjectIds: t.subjectIds.filter(sid => sid !== id) });
+          }
+        });
+        classes.forEach(c => {
+          if (c.assignments.some(a => a.subjectId === id)) {
+            dbUpdateClass(c.id, { assignments: c.assignments.filter(a => a.subjectId !== id) });
+          }
+        });
+      }
+
       triggerNotification("Matière supprimée de la base de données.", "info");
     }
   };
@@ -2574,6 +2588,15 @@ Pour débloquer votre formule :
       setTeachers(updatedTeachs);
       setClasses(updatedCls);
       setTimetable(updatedTable);
+
+      if (currentUserId) {
+        // Mettre à jour en direct les classes liées dans Supabase
+        classes.forEach(c => {
+          if (c.assignments.some(a => a.teacherId === id)) {
+            dbUpdateClass(c.id, { assignments: c.assignments.filter(a => a.teacherId !== id) });
+          }
+        });
+      }
 
       triggerNotification("Fiche enseignant supprimée de la base.", "info");
     }
