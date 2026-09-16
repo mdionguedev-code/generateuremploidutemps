@@ -3904,6 +3904,76 @@ Pour activer votre formule :
                   </div>
                 </div>
 
+                {/* GESTION DES FONCTIONNALITÉS & MODULES */}
+                <div className="pt-2">
+                  <label className="block text-gray-400 mb-2 font-semibold">Fonctionnalités & Modules Inclus :</label>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <label className="flex items-center gap-2 p-2 rounded-xl bg-slate-950/60 border border-white/5 cursor-pointer hover:border-white/20">
+                      <input
+                        type="checkbox"
+                        checked={editingPlanModal.features?.pedagogicalPlanning ?? (editingPlanModal.id === 'plan_premium' || editingPlanModal.id === 'plan_school' || editingPlanModal.code === 'PREMIUM' || editingPlanModal.code === 'SCHOOL')}
+                        onChange={e => setEditingPlanModal({
+                          ...editingPlanModal,
+                          features: {
+                            ...editingPlanModal.features,
+                            pedagogicalPlanning: e.target.checked
+                          }
+                        })}
+                        className="rounded accent-purple-500"
+                      />
+                      <span className="text-purple-300 font-bold">Planification Pédagogique (VIP)</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 p-2 rounded-xl bg-slate-950/60 border border-white/5 cursor-pointer hover:border-white/20">
+                      <input
+                        type="checkbox"
+                        checked={editingPlanModal.features?.geminiAI ?? (editingPlanModal.id === 'plan_premium' || editingPlanModal.id === 'plan_school' || editingPlanModal.code === 'PREMIUM' || editingPlanModal.code === 'SCHOOL')}
+                        onChange={e => setEditingPlanModal({
+                          ...editingPlanModal,
+                          features: {
+                            ...editingPlanModal.features,
+                            geminiAI: e.target.checked
+                          }
+                        })}
+                        className="rounded accent-indigo-500"
+                      />
+                      <span className="text-indigo-300 font-bold">Conseiller IA Gemini</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 p-2 rounded-xl bg-slate-950/60 border border-white/5 cursor-pointer hover:border-white/20">
+                      <input
+                        type="checkbox"
+                        checked={editingPlanModal.features?.excelExport ?? true}
+                        onChange={e => setEditingPlanModal({
+                          ...editingPlanModal,
+                          features: {
+                            ...editingPlanModal.features,
+                            excelExport: e.target.checked
+                          }
+                        })}
+                        className="rounded accent-emerald-500"
+                      />
+                      <span className="text-gray-300">Export Excel (.xlsx)</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 p-2 rounded-xl bg-slate-950/60 border border-white/5 cursor-pointer hover:border-white/20">
+                      <input
+                        type="checkbox"
+                        checked={editingPlanModal.features?.wordExport ?? true}
+                        onChange={e => setEditingPlanModal({
+                          ...editingPlanModal,
+                          features: {
+                            ...editingPlanModal.features,
+                            wordExport: e.target.checked
+                          }
+                        })}
+                        className="rounded accent-blue-500"
+                      />
+                      <span className="text-gray-300">Export Word (.doc)</span>
+                    </label>
+                  </div>
+                </div>
+
                 <div className="pt-4 flex items-center justify-end gap-3 border-t border-white/10">
                   <button
                     type="button"

@@ -106,6 +106,7 @@ export async function verifyUserPlanAccess(): Promise<
       .maybeSingle();
 
     if (dbPlan) {
+      const isPremOrSchool = dbPlan.id === 'plan_premium' || dbPlan.id === 'plan_school' || dbPlan.code === 'PREMIUM' || dbPlan.code === 'SCHOOL';
       plan = {
         id: dbPlan.id,
         name: dbPlan.name,
@@ -118,7 +119,16 @@ export async function verifyUserPlanAccess(): Promise<
         maxTeachers: dbPlan.max_teachers,
         maxGenerations: dbPlan.max_generations,
         maxExports: dbPlan.max_exports,
-        features: dbPlan.features,
+        features: {
+          pdfExport: dbPlan.features?.pdfExport ?? true,
+          excelExport: dbPlan.features?.excelExport ?? isPremOrSchool,
+          wordExport: dbPlan.features?.wordExport ?? isPremOrSchool,
+          geminiAI: dbPlan.features?.geminiAI ?? isPremOrSchool,
+          prioritySupport: dbPlan.features?.prioritySupport ?? isPremOrSchool,
+          multiUser: dbPlan.features?.multiUser ?? (dbPlan.id === 'plan_school' || dbPlan.code === 'SCHOOL'),
+          customBranding: dbPlan.features?.customBranding ?? true,
+          pedagogicalPlanning: dbPlan.features?.pedagogicalPlanning ?? isPremOrSchool
+        },
         popular: dbPlan.popular,
         description: dbPlan.description
       };

@@ -688,13 +688,33 @@ export default function TimetableDashboard({
 
   // Current plan context
   const currentPlan = useMemo(() => {
-    return (
+    const rawPlan = (
       saasPlans.find(p => p.id === userPlanId) ||
       saasPlans.find(p => p.id === currentClient.planId) ||
       saasPlans.find(p => p.id === 'plan_trial') ||
       saasPlans[0] ||
       DEFAULT_FALLBACK_PLAN
     );
+    const isPremOrSchool =
+      rawPlan.id === 'plan_premium' ||
+      rawPlan.id === 'plan_school' ||
+      rawPlan.code === 'PREMIUM' ||
+      rawPlan.code === 'SCHOOL' ||
+      userPlanId === 'plan_premium' ||
+      userPlanId === 'plan_school' ||
+      currentClient.planId === 'plan_premium' ||
+      currentClient.planId === 'plan_school';
+
+    return {
+      ...rawPlan,
+      features: {
+        ...rawPlan.features,
+        pedagogicalPlanning: rawPlan.features?.pedagogicalPlanning ?? isPremOrSchool,
+        geminiAI: rawPlan.features?.geminiAI ?? isPremOrSchool,
+        excelExport: rawPlan.features?.excelExport ?? isPremOrSchool,
+        wordExport: rawPlan.features?.wordExport ?? isPremOrSchool
+      }
+    };
   }, [saasPlans, userPlanId, currentClient.planId, DEFAULT_FALLBACK_PLAN]);
 
   const maxGenerations = useMemo(() => {
@@ -3803,32 +3823,47 @@ Pour débloquer votre formule :
                 <div className={`h-px my-1 hidden lg:block ${isLight ? 'bg-slate-200' : 'bg-white/10'}`} />
 
                 {/* --- MODULE PLANIFICATION (PLURI-PROF / QUOTAS / AFFECTATION) --- */}
-                <button
-                  onClick={() => {
-                    if (!currentPlan.features.pedagogicalPlanning) {
-                      openUpgradeModal("Module de Planification & Répartition Pédagogique", "L'équilibrage automatique des quotas et l'attribution équitable des heures d'enseignement sont réservés aux formules Premium et School.");
-                      return;
-                    }
-                    setActiveTab('planning');
-                  }}
-                  title={!currentPlan.features.pedagogicalPlanning ? "Nécessite un plan supérieur" : "Module de Planification & Répartition Pédagogique"}
-                  className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer relative ${activeTab === 'planning'
-                      ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 text-white shadow-lg shadow-purple-500/25 border border-purple-400/30'
-                      : isLight
-                        ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
-                        : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
-                    }`}
-                >
-                  <SlidersHorizontal className={`w-4 h-4 shrink-0 ${activeTab === 'planning' ? 'text-white' : isLight ? 'text-purple-600' : 'text-purple-400'}`} />
-                  <span className="hidden sm:inline lg:inline">Planification</span>
-                  {!currentPlan.features.pedagogicalPlanning ? (
-                    <VipLockBadge tooltip="Module réservé aux formules Premium & School" text="VIP" />
-                  ) : (
-                    <span className={`hidden sm:inline text-[9px] font-mono px-1.5 py-0.2 rounded font-black ${activeTab === 'planning' ? 'bg-white/20 text-white' : isLight ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
-                      VIP
-                    </span>
-                  )}
-                </button>
+                {(() => {
+                  const hasPedagogicalAccess = Boolean(
+                    currentPlan.features?.pedagogicalPlanning ||
+                    currentPlan.id === 'plan_premium' ||
+                    currentPlan.id === 'plan_school' ||
+                    currentPlan.code === 'PREMIUM' ||
+                    currentPlan.code === 'SCHOOL' ||
+                    userPlanId === 'plan_premium' ||
+                    userPlanId === 'plan_school' ||
+                    currentClient.planId === 'plan_premium' ||
+                    currentClient.planId === 'plan_school'
+                  );
+                  return (
+                    <button
+                      onClick={() => {
+                        if (!hasPedagogicalAccess) {
+                          openUpgradeModal("Module de Planification & Répartition Pédagogique", "L'équilibrage automatique des quotas et l'attribution équitable des heures d'enseignement sont réservés aux formules Premium et School.");
+                          return;
+                        }
+                        setActiveTab('planning');
+                      }}
+                      title={!hasPedagogicalAccess ? "Nécessite un plan supérieur (Premium ou School)" : "Module de Planification & Répartition Pédagogique"}
+                      className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer relative ${activeTab === 'planning'
+                          ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 text-white shadow-lg shadow-purple-500/25 border border-purple-400/30'
+                          : isLight
+                            ? 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 border border-transparent'
+                            : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+                        }`}
+                    >
+                      <SlidersHorizontal className={`w-4 h-4 shrink-0 ${activeTab === 'planning' ? 'text-white' : isLight ? 'text-purple-600' : 'text-purple-400'}`} />
+                      <span className="hidden sm:inline lg:inline">Planification</span>
+                      {!hasPedagogicalAccess ? (
+                        <VipLockBadge tooltip="Module réservé aux formules Premium & School" text="VIP" />
+                      ) : (
+                        <span className={`hidden sm:inline text-[9px] font-mono px-1.5 py-0.2 rounded font-black ${activeTab === 'planning' ? 'bg-white/20 text-white' : isLight ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
+                          VIP
+                        </span>
+                      )}
+                    </button>
+                  );
+                })()}
 
                 <button
                   onClick={() => setActiveTab('stats')}
@@ -6351,7 +6386,17 @@ Pour débloquer votre formule :
                         updated.forEach((c) => dbUpdateClass(c.id, c));
                       }
                     }}
-                    isPremiumOrSchool={Boolean(currentPlan.features.pedagogicalPlanning)}
+                    isPremiumOrSchool={Boolean(
+                      currentPlan.features?.pedagogicalPlanning ||
+                      currentPlan.id === 'plan_premium' ||
+                      currentPlan.id === 'plan_school' ||
+                      currentPlan.code === 'PREMIUM' ||
+                      currentPlan.code === 'SCHOOL' ||
+                      userPlanId === 'plan_premium' ||
+                      userPlanId === 'plan_school' ||
+                      currentClient.planId === 'plan_premium' ||
+                      currentClient.planId === 'plan_school'
+                    )}
                     onOpenUpgrade={() => openUpgradeModal("Module de Planification Pédagogique", "L'affectation équitable et les exports de répartition nécessitent la formule Premium ou School.")}
                     isLight={isLight}
                     schoolName={schoolName}

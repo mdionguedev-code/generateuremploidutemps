@@ -397,15 +397,15 @@ export async function getSaaSAdminLivePlatformData() {
     maxTeachers: p.max_teachers,
     maxGenerations: p.max_generations,
     maxExports: p.max_exports,
-    features: p.features || {
-      pdfExport: true,
-      excelExport: false,
-      wordExport: false,
-      geminiAI: false,
-      prioritySupport: false,
-      multiUser: false,
-      customBranding: true,
-      pedagogicalPlanning: false
+    features: {
+      pdfExport: p.features?.pdfExport ?? true,
+      excelExport: p.features?.excelExport ?? (p.id === 'plan_premium' || p.id === 'plan_school' || p.code === 'PREMIUM' || p.code === 'SCHOOL'),
+      wordExport: p.features?.wordExport ?? (p.id === 'plan_premium' || p.id === 'plan_school' || p.code === 'PREMIUM' || p.code === 'SCHOOL'),
+      geminiAI: p.features?.geminiAI ?? (p.id === 'plan_premium' || p.id === 'plan_school' || p.code === 'PREMIUM' || p.code === 'SCHOOL'),
+      prioritySupport: p.features?.prioritySupport ?? (p.id === 'plan_premium' || p.id === 'plan_school' || p.code === 'PREMIUM' || p.code === 'SCHOOL'),
+      multiUser: p.features?.multiUser ?? (p.id === 'plan_school' || p.code === 'SCHOOL'),
+      customBranding: p.features?.customBranding ?? true,
+      pedagogicalPlanning: p.features?.pedagogicalPlanning ?? (p.id === 'plan_premium' || p.id === 'plan_school' || p.code === 'PREMIUM' || p.code === 'SCHOOL')
     },
     popular: p.popular,
     description: p.description,
@@ -902,15 +902,15 @@ export async function dbGetPublicPlans(): Promise<SaaSPlan[]> {
     maxTeachers: p.max_teachers,
     maxGenerations: p.max_generations,
     maxExports: p.max_exports,
-    features: p.features || {
-      pdfExport: true,
-      excelExport: false,
-      wordExport: false,
-      geminiAI: false,
-      prioritySupport: false,
-      multiUser: false,
-      customBranding: true,
-      pedagogicalPlanning: false
+    features: {
+      pdfExport: p.features?.pdfExport ?? true,
+      excelExport: p.features?.excelExport ?? (p.id === 'plan_premium' || p.id === 'plan_school' || p.code === 'PREMIUM' || p.code === 'SCHOOL'),
+      wordExport: p.features?.wordExport ?? (p.id === 'plan_premium' || p.id === 'plan_school' || p.code === 'PREMIUM' || p.code === 'SCHOOL'),
+      geminiAI: p.features?.geminiAI ?? (p.id === 'plan_premium' || p.id === 'plan_school' || p.code === 'PREMIUM' || p.code === 'SCHOOL'),
+      prioritySupport: p.features?.prioritySupport ?? (p.id === 'plan_premium' || p.id === 'plan_school' || p.code === 'PREMIUM' || p.code === 'SCHOOL'),
+      multiUser: p.features?.multiUser ?? (p.id === 'plan_school' || p.code === 'SCHOOL'),
+      customBranding: p.features?.customBranding ?? true,
+      pedagogicalPlanning: p.features?.pedagogicalPlanning ?? (p.id === 'plan_premium' || p.id === 'plan_school' || p.code === 'PREMIUM' || p.code === 'SCHOOL')
     },
     popular: p.popular,
     description: p.description,
